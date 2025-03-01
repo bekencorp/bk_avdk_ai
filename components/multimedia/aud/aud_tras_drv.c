@@ -3931,6 +3931,19 @@ static bk_err_t aud_tras_drv_set_spk_gain(uint16_t value)
 	bk_err_t ret = BK_OK;
 	if (aud_tras_drv_info.spk_info.spk_type == AUD_INTF_SPK_TYPE_BOARD || aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_BOARD) {
 		bk_aud_dac_set_gain((uint32_t)value);
+
+        if (value == 0) {
+            aud_tras_dac_pa_ctrl(false);
+        } else {
+            aud_tras_dac_pa_ctrl(true);
+        }
+
+        if (aud_tras_drv_info.spk_info.spk_type == AUD_INTF_SPK_TYPE_BOARD) {
+            aud_tras_drv_info.spk_info.dac_config->dac_gain = value;
+        } else {
+            aud_tras_drv_info.voc_info.dac_config->dac_gain = value;
+        }
+
 		return BK_ERR_AUD_INTF_OK;
 	}
 
