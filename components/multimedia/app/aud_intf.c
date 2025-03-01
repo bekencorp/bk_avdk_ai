@@ -932,7 +932,7 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 			goto aud_intf_voc_init_exit;
 		}
 		aud_intf_info.voc_info.aec_setup->init_flags = 0x1f;
-		aud_intf_info.voc_info.aec_setup->mic_delay = 0;
+		aud_intf_info.voc_info.aec_setup->mic_delay = 4;//25us?
 		aud_intf_info.voc_info.aec_setup->ec_depth = setup.aec_cfg.ec_depth;
 		aud_intf_info.voc_info.aec_setup->ref_scale = setup.aec_cfg.ref_scale;
 		aud_intf_info.voc_info.aec_setup->TxRxThr = setup.aec_cfg.TxRxThr;
