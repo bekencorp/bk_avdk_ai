@@ -415,9 +415,13 @@ static bk_err_t camera_compression_ratio_config_handle(media_mailbox_msg_t *msg)
 
 static bk_err_t camera_uvc_register_device_info_cb_handle(media_mailbox_msg_t *msg)
 {
+#if CONFIG_USB_UVC
 	bk_uvc_camera_register_info_callback(camera_uvc_device_info_notify_to_cp0);
-
 	msg_send_rsp_to_media_major_mailbox(msg, BK_OK, APP_MODULE);
+#else
+	LOGW("%s NOT SUPPORT DVP_CAMERA\n", __func__);
+	msg_send_rsp_to_media_major_mailbox(msg, BK_FAIL, APP_MODULE);
+#endif
 
 	return BK_OK;
 }
@@ -426,6 +430,7 @@ static bk_err_t camera_set_uvc_param_handle(media_mailbox_msg_t *msg)
 {
 	int ret = BK_OK;
 
+#if CONFIG_USB_UVC
 	if (CAMERA_STATE_DISABLED == get_camera_state())
 	{
 		LOGI("%s uvc not open\n", __func__);
@@ -433,6 +438,10 @@ static bk_err_t camera_set_uvc_param_handle(media_mailbox_msg_t *msg)
 	}
 
 	ret = bk_uvc_camera_set_config((bk_uvc_config_t *)msg->param);
+#else
+	LOGW("%s NOT SUPPORT DVP_CAMERA\n", __func__);
+	goto end;
+#endif
 
 end:
 	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
@@ -509,7 +518,6 @@ bk_err_t camera_event_handle(media_mailbox_msg_t *msg)
 			camera_compression_ratio_config_handle(msg);
 			break;
 
-#if CONFIG_USB_UVC
 		case EVENT_CAM_REG_UVC_INFO_CB_IND:
 			camera_uvc_register_device_info_cb_handle(msg);
 			break;
@@ -517,7 +525,6 @@ bk_err_t camera_event_handle(media_mailbox_msg_t *msg)
 		case EVENT_CAM_SET_UVC_PARAM_IND:
 			camera_set_uvc_param_handle(msg);
 			break;
-#endif
 
 		case EVENT_CAM_GET_H264_INFO_IND:
 			camera_get_h264_encode_param_handle(msg);
