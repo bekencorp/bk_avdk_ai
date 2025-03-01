@@ -116,6 +116,8 @@ volatile debug_dump_data_header_t dump_header =
 #define AEC_DATA_DUMP_BY_UART
 #endif//CONFIG_DEBUG_DUMP
 
+bool aec_all_data_flag = false;
+
 #ifdef AEC_DATA_DUMP_BY_UART
 #include "uart_util.h"
 static uart_util_t g_aec_data_uart_util = {0};
@@ -761,15 +763,19 @@ static bk_err_t aud_tras_aec(void)
 		aud_tras_drv_info.voc_info.aud_tras_dump_aec_cb((uint8_t *)aec_info_pr->ref_addr, aec_info_pr->samp_rate_points*2);
 	}
     #if CONFIG_DEBUG_DUMP
-    dump_header.len1 = aec_info_pr->samp_rate_points*2;
-    dump_header.len2 = aec_info_pr->samp_rate_points*2;
-    dump_header.len3 = aec_info_pr->samp_rate_points*2;
-    dump_header.timestamp = rtos_get_time();
-    AEC_DATA_DUMP_BY_UART_DATA((void *)&dump_header,sizeof(dump_header));
-    dump_header.seq_no++;
+    if(aec_all_data_flag)
+    {
+        dump_header.len1 = aec_info_pr->samp_rate_points*2;
+        dump_header.len2 = aec_info_pr->samp_rate_points*2;
+        dump_header.len3 = aec_info_pr->samp_rate_points*2;
+        dump_header.timestamp = rtos_get_time();
+        AEC_DATA_DUMP_BY_UART_DATA((void *)&dump_header,sizeof(dump_header));
+        dump_header.seq_no++;
+
+        AEC_DATA_DUMP_BY_UART_DATA(aec_info_pr->mic_addr, aec_info_pr->samp_rate_points*2);
+        AEC_DATA_DUMP_BY_UART_DATA(aec_info_pr->ref_addr, aec_info_pr->samp_rate_points*2);
+    }
     #endif
-    AEC_DATA_DUMP_BY_UART_DATA(aec_info_pr->mic_addr, aec_info_pr->samp_rate_points*2);
-    AEC_DATA_DUMP_BY_UART_DATA(aec_info_pr->ref_addr, aec_info_pr->samp_rate_points*2);
 
 #if CONFIG_AUD_TRAS_AEC_DUMP_DEBUG
 #if CONFIG_AUD_TRAS_AEC_DUMP_MODE_TF
@@ -830,8 +836,12 @@ static bk_err_t aud_tras_aec(void)
         }
     }
 #endif
-
-    AEC_DATA_DUMP_BY_UART_DATA(aec_info_pr->out_addr, aec_info_pr->samp_rate_points*2);
+    #if CONFIG_DEBUG_DUMP
+    if(aec_all_data_flag)
+    {
+        AEC_DATA_DUMP_BY_UART_DATA(aec_info_pr->out_addr, aec_info_pr->samp_rate_points*2);
+    }
+    #endif
 
 #if CONFIG_AUD_TRAS_AEC_DUMP_DEBUG
 #if CONFIG_AUD_TRAS_AEC_DUMP_MODE_TF
