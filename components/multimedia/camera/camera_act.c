@@ -48,6 +48,7 @@ camera_info_t camera_info = {0};
 bool dvp_camera_reset_open_ind = false;
 media_mailbox_msg_t camera_media_msg = {0};
 
+
 void camera_uvc_device_info_notify_to_cp0(bk_uvc_device_brief_info_t *info, uvc_state_t state)
 {
 	camera_media_msg.event = EVENT_UVC_DEVICE_INFO_NOTIFY;
@@ -508,6 +509,7 @@ bk_err_t camera_event_handle(media_mailbox_msg_t *msg)
 			camera_compression_ratio_config_handle(msg);
 			break;
 
+#if CONFIG_USB_UVC
 		case EVENT_CAM_REG_UVC_INFO_CB_IND:
 			camera_uvc_register_device_info_cb_handle(msg);
 			break;
@@ -515,6 +517,7 @@ bk_err_t camera_event_handle(media_mailbox_msg_t *msg)
 		case EVENT_CAM_SET_UVC_PARAM_IND:
 			camera_set_uvc_param_handle(msg);
 			break;
+#endif
 
 		case EVENT_CAM_GET_H264_INFO_IND:
 			camera_get_h264_encode_param_handle(msg);

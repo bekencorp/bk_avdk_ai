@@ -15,7 +15,7 @@ static int _fs_mount(void)
 
     fs_name = "fatfs";
     partition.part_type = FATFS_DEVICE;
-    partition.part_dev.device_name = FATFS_DEV_FLASH;
+    partition.part_dev.device_name = FATFS_DEV_SDCARD;
     partition.mount_path = "/";
 
     ret = mount("SOURCE_NONE", partition.mount_path, fs_name, 0, &partition);

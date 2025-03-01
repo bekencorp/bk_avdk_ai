@@ -43,8 +43,6 @@
 #include <driver/dma2d.h>
 #include <driver/jpeg_dec_types.h>
 #include "modules/image_scale.h"
-#include <driver/uvc_camera_types.h>
-#include <driver/uvc_camera.h>
 
 #include <driver/timer.h>
 #include <driver/psram.h>
@@ -65,8 +63,10 @@
 #include <lcd_scale.h>
 #include <camera_act.h>
 
+#if CONFIG_USB_UVC
 #include <driver/uvc_camera_types.h>
 #include <driver/uvc_camera.h>
+#endif
 #include <driver/dvp_camera.h>
 #include <driver/dvp_camera_types.h>
 
@@ -1886,7 +1886,11 @@ void lcd_event_handle(media_mailbox_msg_t *msg)
 		}
 		case EVENT_GET_UVC_STATUS_IND:
 		{
+#if CONFIG_USB_UVC
 			bool camera_status = check_uvc_status();
+#else
+			bool camera_status = false;
+#endif
 			msg->param =(uint32_t)(camera_status);
 			break;
 		}
