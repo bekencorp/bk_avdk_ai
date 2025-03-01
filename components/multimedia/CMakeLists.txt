@@ -162,6 +162,7 @@ if (CONFIG_MEDIA_MAJOR)
 	)
 endif()
 
+
 if (CONFIG_MEDIA_MAJOR)
 if (CONFIG_MEDIA_BT_AUDIO)
 	list(APPEND srcs
@@ -205,3 +206,21 @@ endif()# CONFIG_MEDIA
 
 endif() # CONFIG_SOC_BK7258
 armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES bk_cli lvgl net_transfer avdk_libs video unity media_utils  bk_draw_blend display_service avdk_utils)
+
+if (CONFIG_SOC_BK7258) # CONFIG_SOC_BK7258
+if (CONFIG_MEDIA_MAJOR)
+if (CONFIG_AEC_VERSION_V2)
+	set(avdk_lib $ENV{ARMINO_PATH}/../components/avdk_libs/${ARMINO_SOC}/libs)
+	get_filename_component(lib_name ${avdk_lib}/libaec_v2.a NAME)
+	add_prebuilt_library(${lib_name} "${avdk_lib}/libaec_v2.a")
+	target_link_libraries(${COMPONENT_LIB} INTERFACE ${lib_name})
+endif()
+
+if (CONFIG_AEC_VERSION_V1)
+	set(avdk_lib $ENV{ARMINO_PATH}/../components/avdk_libs/${ARMINO_SOC}/libs)
+	get_filename_component(lib_name ${avdk_lib}/libaec.a NAME)
+	add_prebuilt_library(${lib_name} "${avdk_lib}/libaec.a")
+	target_link_libraries(${COMPONENT_LIB} INTERFACE ${lib_name})
+endif()
+endif()
+endif() # CONFIG_SOC_BK7258

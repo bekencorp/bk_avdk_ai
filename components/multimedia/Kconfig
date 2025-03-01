@@ -209,4 +209,28 @@ menu "Media"
         bool "Enable AI ASR run in cpu2"
         default n
 
+	choice AEC_VERSION
+		prompt "Select AEC Version"
+		default AEC_VERSION_V1
+
+		config AEC_VERSION_V1
+		bool "Enable AEC V1 Version"
+
+		config AEC_VERSION_V2
+		bool "Enable AEC V2 Version"
+	endchoice
+
+	choice AEC_ECHO_COLLECT_MODE
+		prompt "Select AEC Echo Collect Mode"
+		default AEC_ECHO_COLLECT_MODE_SOFTWARE
+
+		config AEC_ECHO_COLLECT_MODE_SOFTWARE
+		bool "Enable AEC Echo Collect Software Mode"
+
+		config AEC_ECHO_COLLECT_MODE_HARDWARE
+		bool "Enable AEC Echo Collect Hardware Mode"
+		help
+			need connect speaker to mic2
+	endchoice
+
 endmenu

@@ -27,7 +27,11 @@
 #include "aud_intf_private.h"
 #include "aud_tras_drv.h"
 #include <driver/psram.h>
+#if CONFIG_AEC_VERSION_V2
+#include <modules/aec_v2.h>
+#else
 #include <modules/aec.h>
+#endif
 #include <driver/audio_ring_buff.h>
 #include <modules/g711.h>
 #include "gpio_driver.h"
@@ -410,16 +414,51 @@ aud_dac_exit:
 	return BK_FAIL;
 }
 
+#if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
+const uint16_t EQTAB[257] = 
+{ 
+  8638,10022,10662,10996,11263,11527,11804,12099,12390,12624,12825,13007,13178,13344,13510,13763,
+  13981,14146,14310,14471,14629,14783,14930,15069,15199,15319,15428,15527,15614,15688,15749,15810,
+  15870,15929,15986,16040,16092,16139,16183,16222,16256,16285,16309,16327,16339,16345,16345,16345,
+  16345,16345,16345,16345,16344,16343,16342,16339,16336,16331,16326,16319,16310,16300,16288,16275,
+  16259,16241,16221,16199,16175,16148,16118,16086,16051,16014,15973,15930,15883,15834,15782,15727,
+  15669,15608,15548,15488,15428,15368,15309,15249,15190,15130,15070,15009,14948,14886,14824,14761,
+  14697,14632,14566,14499,14431,14361,14291,14219,14146,14071,13994,13916,13835,13753,13670,13582,
+  13489,13392,13291,13190,13089,12987,12885,12780,12673,12563,12449,12330,12205,12076,11939,11796,
+  11646,11487,11321,11144,10957,10761,10554,10337,10108,9868, 9616, 9351, 9074, 8783, 8481, 8165,
+  7831, 7480, 7113, 6748, 6388, 6032, 5681, 5337, 4999, 4670, 4349, 4037, 3736, 3445, 3165, 2898,
+  2643, 2401, 2173, 1960, 1761, 1577, 1408, 1256, 1120, 1001, 898,  812,  744,  692,  658,  642,
+  624,  606,  587,  568,  549,  531,  512,  494,  476,  459,  442,  425,  409,  393,  378,  363,
+  348,  334,  321,  308,  296,  284,  273,  263,  253,  244,  236,  228,  221,  214,  208,  203,
+  197,  192,  186,  180,  174,  168,  162,  156,  151,  145,  140,  135,  130,  125,  121,  116,
+  112,  108,  105,  101,  98,   95,   93,   90,   88,   86,   85,   84,   83,   82,   82,   82,
+  82,   82,   82,   82,   82,   82,   82,   82,   82,   82,   82,   82,   82,   82,   82,   82,   82
+ };
+#endif
+
 static bk_err_t aud_tras_drv_aec_cfg(void)
 {
 	uint32_t aec_context_size = 0;
 	uint32_t val = 0;
 	aec_info_t *temp_aec_info = aud_tras_drv_info.voc_info.aec_info;
 	/* init aec context */
+#if CONFIG_AEC_VERSION_V2
+    LOGI("%s, %d, use AEC Version V2 \n", __func__, __LINE__);
+#else
+    LOGI("%s, %d, use AEC Version V1 \n", __func__, __LINE__);
+#endif
+
+#if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
+    LOGI("%s, %d, use AEC hardware mode \n", __func__, __LINE__);
+	aec_context_size = aec_size(2000);
+#else
+    LOGI("%s, %d, use AEC software mode \n", __func__, __LINE__);
 	aec_context_size = aec_size(1000);
+#endif
+
 	LOGI("%s, %d, malloc aec size: %d \n", __func__, __LINE__, aec_context_size);
 	temp_aec_info->aec = (AECContext*)audio_tras_drv_malloc(aec_context_size);
-//	temp_aec_info->aec = (AECContext*)psram_malloc(aec_context_size);
+	//temp_aec_info->aec = (AECContext*)psram_malloc(aec_context_size);
 	LOGI("%s, %d, aec use malloc sram: %p \n", __func__, __LINE__, temp_aec_info->aec);
 	if (temp_aec_info->aec == NULL) {
 		LOGE("%s, %d, malloc aec fail, aec_context_size: %d \n", __func__, __LINE__, aec_context_size);
@@ -443,10 +482,21 @@ static bk_err_t aud_tras_drv_aec_cfg(void)
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_FLAGS, temp_aec_info->aec_config->init_flags);							//库内各模块开关; aec_init内默认赋值0x1f;
 
 	/* 回声消除相关 */
+#if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
+	temp_aec_info->aec_config->mic_delay = 16;//0x0
+	temp_aec_info->aec_config->ec_depth = 0x2;//0x14
+	temp_aec_info->aec_config->voice_vol =0x0d;//0xe
+	temp_aec_info->aec_config->ns_level = 0x5;//0x2
+	temp_aec_info->aec_config->ns_para = 0x02;//0x1
+	temp_aec_info->aec_config->drc = 0x0;//0xf
+#endif
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_MIC_DELAY, temp_aec_info->aec_config->mic_delay);						//设置参考信号延迟(采样点数，需要dump数据观察)
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_EC_DEPTH, temp_aec_info->aec_config->ec_depth);							//建议取值范围1~50; 后面几个参数建议先用aec_init内的默认值，具体需要根据实际情况调试; 总得来说回声越大需要调的越大
+
+#if CONFIG_AEC_VERSION_V1
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_TxRxThr, temp_aec_info->aec_config->TxRxThr);							//建议取值范围10~64
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_TxRxFlr, temp_aec_info->aec_config->TxRxFlr);							//建议取值范围1~10
+#endif
 
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_REF_SCALE, temp_aec_info->aec_config->ref_scale);						//取值0,1,2；rx数据如果幅值太小的话适当放大
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_VOL, temp_aec_info->aec_config->voice_vol);								//通话过程中如果需要经常调节喇叭音量就设置下当前音量等级
@@ -455,7 +505,20 @@ static bk_err_t aud_tras_drv_aec_cfg(void)
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_NS_PARA, temp_aec_info->aec_config->ns_para);							//只能取值0,1,2; 降噪由弱到强，建议默认值
 	/* drc(输出音量相关) */
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_DRC, temp_aec_info->aec_config->drc);									//建议取值范围0x10~0x1f;   越大输出声音越大
-
+#if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
+	LOGI("aec config:0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x\n", 
+		temp_aec_info->aec_config->init_flags, //0x1f
+		temp_aec_info->aec_config->mic_delay,//0x0
+		temp_aec_info->aec_config->ec_depth,//0x14
+		temp_aec_info->aec_config->TxRxThr,//0x1e
+		temp_aec_info->aec_config->TxRxFlr,//0x6
+		temp_aec_info->aec_config->ref_scale,//0x0
+		temp_aec_info->aec_config->voice_vol,//0xe
+		temp_aec_info->aec_config->ns_level,//0x2
+		temp_aec_info->aec_config->ns_para,//0x1
+		temp_aec_info->aec_config->drc//0xf
+		 );
+#endif
 	return BK_OK;
 }
 
@@ -697,6 +760,11 @@ static bk_err_t aud_tras_dac_dma_config(dma_id_t dma_id, int32_t *ring_buff_addr
 	return BK_OK;
 }
 
+#if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
+int16_t temp_buf[640] = {0};
+//int16_t temp_ref_buf[640] = {0};
+#endif
+
 static bk_err_t aud_tras_aec(void)
 {
 	bk_err_t ret = BK_OK;
@@ -711,6 +779,21 @@ static bk_err_t aud_tras_aec(void)
 	flush_all_dcache();
 #endif
 
+#if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
+	if (ring_buffer_get_fill_size(&(aud_tras_drv_info.voc_info.mic_rb)) >= aec_info_pr->samp_rate_points*4) {
+		size = ring_buffer_read(&(aud_tras_drv_info.voc_info.mic_rb), (uint8_t*)temp_buf, aec_info_pr->samp_rate_points*4);
+		if (size != aec_info_pr->samp_rate_points*4) {
+			LOGE("%s, %d, read mic_ring_buff fail, size:%d \n", __func__, __LINE__, size);
+			//return BK_FAIL;
+		}
+
+		for(uint32_t i = 0; i < 320; i++)
+		{
+			aec_info_pr->mic_addr[i] = temp_buf[2 *i];
+			aec_info_pr->ref_addr[i] = temp_buf[2*i+1];
+		}
+	}
+#else
 	/* get a fram mic data from mic_ring_buff */
 	if (ring_buffer_get_fill_size(&(aud_tras_drv_info.voc_info.mic_rb)) >= aec_info_pr->samp_rate_points*2) {
 		size = ring_buffer_read(&(aud_tras_drv_info.voc_info.mic_rb), (uint8_t*)aec_info_pr->mic_addr, aec_info_pr->samp_rate_points*2);
@@ -718,11 +801,13 @@ static bk_err_t aud_tras_aec(void)
 			LOGE("%s, %d, read mic_ring_buff fail, size:%d \n", __func__, __LINE__, size);
 			//return BK_FAIL;
 		}
-	} else {
+	}
+#endif
+    else
+    {
 		LOGD("%s, %d, do not have mic data need to aec \n", __func__, __LINE__);
 		return BK_OK;
 	}
-
 
 	if (aud_tras_drv_info.voc_info.spk_en == AUD_INTF_VOC_SPK_CLOSE || aud_tras_drv_info.voc_info.aec_enable == false) {
 		/* save mic data after aec processed to aec_ring_buffer */
@@ -744,6 +829,7 @@ static bk_err_t aud_tras_aec(void)
 		return BK_OK;
 	}
 
+#if CONFIG_AEC_ECHO_COLLECT_MODE_SOFTWARE
 	/* read ref data from ref_ring_buff */
 	if (ring_buffer_get_fill_size(&(aec_info_pr->ref_rb)) >= aec_info_pr->samp_rate_points*2) {
 		size = ring_buffer_read(&(aec_info_pr->ref_rb), (uint8_t*)aec_info_pr->ref_addr, aec_info_pr->samp_rate_points*2);
@@ -757,6 +843,7 @@ static bk_err_t aud_tras_aec(void)
 		os_memset((void *)aec_info_pr->ref_addr, 0, aec_info_pr->samp_rate_points*2);
 	}
 	//os_printf("ref_addr: ref_addr[0]= %02x, ref_addr[0]= %02x \r\n", ref_addr[0], ref_addr[1]);
+#endif
 
 	if (aud_tras_drv_info.voc_info.aud_tras_dump_aec_cb) {
 		aud_tras_drv_info.voc_info.aud_tras_dump_aec_cb((uint8_t *)aec_info_pr->mic_addr, aec_info_pr->samp_rate_points*2);
@@ -807,6 +894,10 @@ static bk_err_t aud_tras_aec(void)
 #endif
 
 #endif //CONFIG_AUD_TRAS_AEC_DUMP_DEBUG
+
+#if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
+    aec_info_pr->aec->flags = 0x1d;
+#endif
 
 	/* aec process data */
 	//os_printf("ref_addr:%p, mic_addr:%p, out_addr:%p \r\n", aec_context_pr->ref_addr, aec_context_pr->mic_addr, aec_context_pr->out_addr);
@@ -1691,6 +1782,7 @@ static bk_err_t aud_tras_dec(void)
 	}
 #endif
 
+#if CONFIG_AEC_ECHO_COLLECT_MODE_SOFTWARE
 	if (aud_tras_drv_info.voc_info.aec_enable) {
 		/* read mic fill data size */
 		uint32_t mic_fill_size = ring_buffer_get_fill_size(&(aud_tras_drv_info.voc_info.mic_rb));
@@ -1717,9 +1809,9 @@ static bk_err_t aud_tras_dec(void)
 				goto decoder_exit;
 			}
 		}
-
-
 	}
+#endif
+
 
 #if CONFIG_AUD_TRAS_DAC_DEBUG
 	if (aud_voc_dac_debug_flag) {
@@ -2949,7 +3041,11 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 			err = BK_ERR_AUD_INTF_MEMY;
 			goto aud_tras_drv_voc_init_exit;
 		} else {
+#if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
+			aud_tras_drv_info.voc_info.adc_config->adc_chl = AUD_ADC_CHL_LR;
+#else
 			aud_tras_drv_info.voc_info.adc_config->adc_chl = AUD_ADC_CHL_L;
+#endif
 			aud_tras_drv_info.voc_info.adc_config->samp_rate = voc_cfg->samp_rate;
 			aud_tras_drv_info.voc_info.adc_config->adc_gain = voc_cfg->aud_setup.adc_gain;	//default: 0x2d
 			aud_tras_drv_info.voc_info.adc_config->adc_samp_edge = AUD_ADC_SAMP_EDGE_RISING;
@@ -3040,7 +3136,11 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 	}
 
 	/* -------------------step3: init and config DMA to carry mic and ref data ----------------------------- */
+#if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
+	aud_tras_drv_info.voc_info.mic_ring_buff = (int32_t *)audio_tras_drv_malloc(aud_tras_drv_info.voc_info.mic_samp_rate_points*4*aud_tras_drv_info.voc_info.mic_frame_number + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
+#else
 	aud_tras_drv_info.voc_info.mic_ring_buff = (int32_t *)audio_tras_drv_malloc(aud_tras_drv_info.voc_info.mic_samp_rate_points*2*aud_tras_drv_info.voc_info.mic_frame_number + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
+#endif
 	if (aud_tras_drv_info.voc_info.mic_ring_buff == NULL) {
 		LOGE("%s, %d, malloc mic ring buffer fail \n", __func__, __LINE__);
 		err = BK_ERR_AUD_INTF_MEMY;
@@ -3065,16 +3165,24 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 		}
 
 		/* config audio adc dma to carry mic data to "mic_ring_buff" */
+#if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
+		ret = aud_tras_adc_dma_config(aud_tras_drv_info.voc_info.adc_dma_id, aud_tras_drv_info.voc_info.mic_ring_buff, (aud_tras_drv_info.voc_info.mic_samp_rate_points*4)*aud_tras_drv_info.voc_info.mic_frame_number + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, aud_tras_drv_info.voc_info.mic_samp_rate_points*4, AUD_INTF_MIC_CHL_DUAL);
+#else
 		ret = aud_tras_adc_dma_config(aud_tras_drv_info.voc_info.adc_dma_id, aud_tras_drv_info.voc_info.mic_ring_buff, (aud_tras_drv_info.voc_info.mic_samp_rate_points*2)*aud_tras_drv_info.voc_info.mic_frame_number + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, aud_tras_drv_info.voc_info.mic_samp_rate_points*2, AUD_INTF_MIC_CHL_MIC1);
+#endif
 		if (ret != BK_OK) {
 			LOGE("%s, %d, config audio adc dma fail \n", __func__, __LINE__);
 			err = ret;
 			goto aud_tras_drv_voc_init_exit;
 		}
 
+#if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
+		ring_buffer_init(&(aud_tras_drv_info.voc_info.mic_rb), (uint8_t*)aud_tras_drv_info.voc_info.mic_ring_buff, aud_tras_drv_info.voc_info.mic_samp_rate_points*4*aud_tras_drv_info.voc_info.mic_frame_number + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, aud_tras_drv_info.voc_info.adc_dma_id, RB_DMA_TYPE_WRITE);
+		LOGI("step3: init and config mic DMA complete, adc_dma_id:%d, mic_ring_buff:%p, size:%d, carry_length:%d \n", aud_tras_drv_info.voc_info.adc_dma_id, aud_tras_drv_info.voc_info.mic_ring_buff, (aud_tras_drv_info.voc_info.mic_samp_rate_points*4)*aud_tras_drv_info.voc_info.mic_frame_number, aud_tras_drv_info.voc_info.mic_samp_rate_points*4);
+#else
 		ring_buffer_init(&(aud_tras_drv_info.voc_info.mic_rb), (uint8_t*)aud_tras_drv_info.voc_info.mic_ring_buff, aud_tras_drv_info.voc_info.mic_samp_rate_points*2*aud_tras_drv_info.voc_info.mic_frame_number + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, aud_tras_drv_info.voc_info.adc_dma_id, RB_DMA_TYPE_WRITE);
-
 		LOGI("step3: init and config mic DMA complete, adc_dma_id:%d, mic_ring_buff:%p, size:%d, carry_length:%d \n", aud_tras_drv_info.voc_info.adc_dma_id, aud_tras_drv_info.voc_info.mic_ring_buff, (aud_tras_drv_info.voc_info.mic_samp_rate_points*2)*aud_tras_drv_info.voc_info.mic_frame_number, aud_tras_drv_info.voc_info.mic_samp_rate_points*2);
+#endif
 	} else if (aud_tras_drv_info.voc_info.mic_type == AUD_INTF_MIC_TYPE_UAC) {
 		/* init mic_ring_buff */
 		ring_buffer_init(&(aud_tras_drv_info.voc_info.mic_rb), (uint8_t*)aud_tras_drv_info.voc_info.mic_ring_buff, aud_tras_drv_info.voc_info.mic_samp_rate_points*2*aud_tras_drv_info.voc_info.mic_frame_number + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, DMA_ID_MAX, RB_DMA_TYPE_NULL);
@@ -3709,6 +3817,7 @@ static bk_err_t aud_tras_drv_set_aec_para(aud_intf_voc_aec_ctl_t *aec_ctl)
 			aec_ctrl(aud_tras_drv_info.voc_info.aec_info->aec, AEC_CTRL_CMD_SET_VOL, aud_tras_drv_info.voc_info.aec_info->aec_config->voice_vol);
 			break;
 
+#if CONFIG_AEC_VERSION_V1
 		case AUD_INTF_VOC_AEC_TXRX_THR:
 			aud_tras_drv_info.voc_info.aec_info->aec_config->TxRxThr = aec_ctl->value;
 			aec_ctrl(aud_tras_drv_info.voc_info.aec_info->aec, AEC_CTRL_CMD_SET_TxRxThr, aud_tras_drv_info.voc_info.aec_info->aec_config->TxRxThr);
@@ -3718,6 +3827,7 @@ static bk_err_t aud_tras_drv_set_aec_para(aud_intf_voc_aec_ctl_t *aec_ctl)
 			aud_tras_drv_info.voc_info.aec_info->aec_config->TxRxFlr = aec_ctl->value;
 			aec_ctrl(aud_tras_drv_info.voc_info.aec_info->aec, AEC_CTRL_CMD_SET_TxRxFlr, aud_tras_drv_info.voc_info.aec_info->aec_config->TxRxFlr);
 			break;
+#endif
 
 		case AUD_INTF_VOC_AEC_NS_LEVEL:
 			aud_tras_drv_info.voc_info.aec_info->aec_config->ns_level = (uint8_t)aec_ctl->value;

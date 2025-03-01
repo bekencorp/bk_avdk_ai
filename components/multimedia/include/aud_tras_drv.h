@@ -1,7 +1,11 @@
 #pragma once
 
 #include <driver/audio_ring_buff.h>
+#if CONFIG_AEC_VERSION_V2
+#include <modules/aec_v2.h>
+#else
 #include <modules/aec.h>
+#endif
 //#include <driver/aud_types.h>
 #include <driver/dma.h>
 #include "aud_intf_private.h"
