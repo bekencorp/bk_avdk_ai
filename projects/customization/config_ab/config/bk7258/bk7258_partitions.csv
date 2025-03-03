@@ -4,9 +4,9 @@
 #Name,Offset,Size,Type,Read,Write
 bootloader,,68k,code,TRUE,FALSE
 app,,1428k,code,TRUE,FALSE
-app1,,480k,code,TRUE,FALSE
-app2,,132k,code,TRUE,FALSE
-s_app,,1904k,data,TRUE,
+app1,,476k,code,TRUE,FALSE
+app2,,204k,code,TRUE,FALSE
+s_app,,2108k,data,TRUE,
 usr_config,,64K,data,TRUE,
 easyflash,,8K,data,TRUE,
 ota_fina_executive,0x7FD000,4K,data,TRUE,
