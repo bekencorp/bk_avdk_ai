@@ -196,7 +196,7 @@ static void spk_data_read_task_main(beken_thread_arg_t param_data)
             if (BK_OK != rtos_get_semaphore(&spk_data_read_handle->can_process, 20 / portTICK_RATE_MS)) //portMAX_DELAY, 25 / portTICK_RATE_MS
             {
                 //return -1;
-                //player_log(LOG_ERR, "%s, %d, rtos_get_semaphore fail\n", __func__, __LINE__);
+                //LOGW("%s, %d, rtos_get_semaphore fail\n", __func__, __LINE__);
             }
             else
             {
@@ -213,6 +213,12 @@ static void spk_data_read_task_main(beken_thread_arg_t param_data)
                 }
                 else
                 {
+                    /* notify app speaker data pool is empty. */
+                    if (spk_data_read_handle->config.pool_empty_notify_cb)
+                    {
+                        spk_data_read_handle->config.pool_empty_notify_cb(spk_data_read_handle, spk_data_read_handle->config.usr_data);
+                    }
+
                     /* fill silence data */
                     LOGD("%s, %d, fill silence data\n", __func__, __LINE__);
                     os_memset(spk_data_read_handle->read_buff, 0, spk_data_read_handle->frame_size);
@@ -257,15 +263,15 @@ static bk_err_t spk_data_read_task_init(onboard_speaker_play_priv_t *spk_data_re
 
     ONBOARD_SPK_PLAY_CHECK_NULL(spk_data_read_handle);
 
-    spk_data_read_handle->read_buff = os_malloc(spk_data_read_handle->frame_size);
+    spk_data_read_handle->read_buff = psram_malloc(spk_data_read_handle->frame_size);
     ONBOARD_SPK_PLAY_CHECK_NULL(spk_data_read_handle->read_buff);
 
-    os_memset(spk_data_read_handle->read_buff, 0, sizeof(spk_data_read_handle->frame_size));
+    os_memset(spk_data_read_handle->read_buff, 0, spk_data_read_handle->frame_size);
 
     ret = rtos_init_semaphore(&spk_data_read_handle->sem, 1);
     if (ret != BK_OK)
     {
-        LOGE("%s, %d, create semaphore fail\n", __func__, __LINE__);
+        LOGE("%s, %d, ceate semaphore fail\n", __func__, __LINE__);
         err = BK_FAIL;
         goto fail;
     }
@@ -290,7 +296,7 @@ static bk_err_t spk_data_read_task_init(onboard_speaker_play_priv_t *spk_data_re
     }
 
     ret = rtos_create_thread(&spk_data_read_handle->spk_data_read_task_hdl,
-                             (BEKEN_DEFAULT_WORKER_PRIORITY - 1),
+                             4,
                              "spk_data_rd",
                              (beken_thread_function_t)spk_data_read_task_main,
                              2048,
@@ -403,7 +409,7 @@ static void aud_dac_dma_finish_isr(void)
     bk_err_t ret = rtos_set_semaphore(&gl_onboard_speaker_play->can_process);
     if (ret != BK_OK)
     {
-        LOGE("%s, rtos_set_semaphore fail \n", __func__);
+        LOGE("%s, rtos_set_semaphore fail %p\n", __func__, gl_onboard_speaker_play->can_process);
     }
 }
 
@@ -749,6 +755,8 @@ static int onboard_speaker_play_open(audio_play_t *play, audio_play_cfg_t *confi
     temp_onboard_speaker_play->config.play_mode = config->play_mode;
     temp_onboard_speaker_play->config.frame_size = config->frame_size;
     temp_onboard_speaker_play->config.pool_size = config->pool_size;
+    temp_onboard_speaker_play->config.pool_empty_notify_cb = config->pool_empty_notify_cb;
+    temp_onboard_speaker_play->config.usr_data = config->usr_data;
 
     bk_pm_module_vote_cpu_freq(PM_DEV_ID_AUDIO, PM_CPU_FRQ_480M);
 
@@ -809,7 +817,7 @@ static int onboard_speaker_play_close(audio_play_t *play)
     onboard_speaker_state_set(priv, AUDIO_PLAY_STA_IDLE);
 
     psram_free(priv);
-    priv = NULL;
+    play->play_ctx = NULL;
 
     LOGD("onboard spk close complete\n");
 

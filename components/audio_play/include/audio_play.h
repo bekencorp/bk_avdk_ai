@@ -53,16 +53,20 @@ typedef enum
     AUDIO_PLAY_SET_VOLUME,
 } audio_play_ctl_t;
 
+typedef int (*pool_empty_notify)(void *play_ctx, void *params);
+
 typedef struct
 {
-    uint8_t port;                   /*!< select port when connect multiple speaker, default 0 when connect one device */
+    uint8_t port;                               /*!< select port when connect multiple speaker, default 0 when connect one device */
     uint8_t nChans;
     uint32_t sampRate;
     uint8_t bitsPerSample;
     int volume;
     audio_play_mode_t play_mode;
-    uint32_t frame_size;            /*!< frame size unit byte */
-    uint32_t pool_size;             /*!< the size (unit byte) of ringbuffer pool saved speaker data need to play */
+    uint32_t frame_size;                        /*!< frame size unit byte */
+    uint32_t pool_size;                         /*!< the size (unit byte) of ringbuffer pool saved speaker data need to play */
+    pool_empty_notify pool_empty_notify_cb;     /*!< call this callback when ringbuffer pool saved speaker data is empty.(play finish) */
+    void *usr_data;                             /*!< the parameter of pool_empty_notify_cb callback */
 } audio_play_cfg_t;
 
 #define DEFAULT_AUDIO_PLAY_CONFIG() {       \
@@ -74,6 +78,8 @@ typedef struct
     .play_mode = AUDIO_PLAY_MODE_DIFFEN,    \
     .frame_size = 320,                      \
     .pool_size = 640,                       \
+    .pool_empty_notify_cb = NULL,           \
+    .usr_data = NULL,                       \
 }
 
 typedef struct audio_play audio_play_t;
@@ -122,7 +128,7 @@ audio_play_t *audio_play_create(  audio_play_type_t play_type, audio_play_cfg_t 
  *
  * @return
  *    - BK_OK: success
- *    - NULL: failed
+ *    - Others: failed
  */
 bk_err_t audio_play_destroy(audio_play_t *play);
 
@@ -136,7 +142,7 @@ bk_err_t audio_play_destroy(audio_play_t *play);
  *
  * @return
  *    - BK_OK: success
- *    - NULL: failed
+ *    - Others: failed
  */
 bk_err_t audio_play_open(audio_play_t *play);
 
@@ -150,7 +156,7 @@ bk_err_t audio_play_open(audio_play_t *play);
  *
  * @return
  *    - BK_OK: success
- *    - NULL: failed
+ *    - Others: failed
  */
 bk_err_t audio_play_close(audio_play_t *play);
 
@@ -167,7 +173,7 @@ bk_err_t audio_play_close(audio_play_t *play);
  *
  * @return
  *    - BK_OK: success
- *    - NULL: failed
+ *    - Others: failed
  */
 bk_err_t audio_play_write_data(audio_play_t *play, char *buffer, uint32_t len);
 
@@ -182,7 +188,7 @@ bk_err_t audio_play_write_data(audio_play_t *play, char *buffer, uint32_t len);
  *
  * @return
  *    - BK_OK: success
- *    - NULL: failed
+ *    - Others: failed
  */
 bk_err_t audio_play_control(audio_play_t *play, audio_play_ctl_t ctl);
 
@@ -197,7 +203,7 @@ bk_err_t audio_play_control(audio_play_t *play, audio_play_ctl_t ctl);
  *
  * @return
  *    - BK_OK: success
- *    - NULL: failed
+ *    - Others: failed
  */
 bk_err_t audio_play_set_volume(audio_play_t *play, int volume);
 

@@ -645,6 +645,11 @@ bk_err_t bk_aud_intf_voc_rx_debug(aud_intf_dump_data_callback dump_callback);
  */
 bk_err_t bk_aud_intf_voc_aec_debug(aud_intf_dump_data_callback dump_callback);
 
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+bk_err_t bk_aud_intf_voc_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_tone);
+
+bk_err_t bk_aud_intf_voc_stop_prompt_tone(void);
+#endif
 
 /**
  * @}

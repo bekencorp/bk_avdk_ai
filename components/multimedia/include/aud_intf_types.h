@@ -199,6 +199,19 @@ typedef enum {
 	AUD_INTF_VOC_AEC_MAX,
 } aud_intf_voc_aec_para_t;
 
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+/* prompt tone event */
+typedef enum {
+	AUD_INTF_VOC_START_CONFIG_NETWORK = 0,
+	AUD_INTF_VOC_CONFIG_NETWORK_SUCCESS,
+	AUD_INTF_VOC_CONFIG_NETWORK_FAIL,
+	AUD_INTF_VOC_NETWORK_DISCONNECT,
+	AUD_INTF_VOC_AGENT_OFFLINE,
+	AUD_INTF_VOC_ASR_WAKEUP,
+	AUD_INTF_VOC_ASR_STANDBY,
+} aud_intf_voc_prompt_tone_t;
+#endif
+
 /* mic control */
 typedef enum {
 	AUD_INTF_VOC_MIC_OPEN = 0,		/**< open mic */

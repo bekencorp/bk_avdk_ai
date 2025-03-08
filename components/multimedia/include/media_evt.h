@@ -132,6 +132,8 @@ typedef enum
     /* ASR */
     EVENT_ASR_INIT_REQ,
     EVENT_ASR_DEINIT_REQ,
+	EVENT_AUD_VOC_PLAY_PROMPT_TONE_REQ,
+	EVENT_AUD_VOC_STOP_PROMPT_TONE_REQ,
 
 	/* UAC op */
 	EVENT_AUD_UAC_REGIS_CONT_STATE_CB_REQ,		/**< register uac mic and speaker connect state callback */

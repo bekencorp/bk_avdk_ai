@@ -200,7 +200,20 @@ endif()#CONFIG_MEDIA_MINOR
 
 endif()#(CONFIG_CPU_CNT GREATER 1)
 
+if (CONFIG_MEDIA_MAJOR)
+if (CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE)
+	list(APPEND incs prompt_tone_play/include)
 
+	list(APPEND srcs
+		prompt_tone_play/src/audio_codec.c
+		prompt_tone_play/src/audio_source.c
+		prompt_tone_play/src/mp3_codec.c
+		prompt_tone_play/src/pcm_codec.c
+		prompt_tone_play/src/prompt_tone_play.c
+		prompt_tone_play/src/source_array.c
+	)
+endif()
+endif()
 
 endif()# CONFIG_MEDIA
 

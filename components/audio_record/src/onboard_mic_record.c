@@ -796,7 +796,7 @@ static int onboard_mic_record_close(audio_record_t *record)
     AUD_MIC_DATA_DUMP_CLOSE();
 
     psram_free(priv);
-    priv = NULL;
+    record->record_ctx = NULL;
 
     LOGD("onboard mic close complete\n");
     return BK_OK;

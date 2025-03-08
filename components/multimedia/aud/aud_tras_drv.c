@@ -53,7 +53,9 @@
 #include "psram_mem_slab.h"
 
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
-#include "armino_16k_16bit_mono_pcm_prompt_tone.h"
+#include "prompt_tone.h"
+#include "ring_buffer.h"
+#include "prompt_tone_play.h"
 #endif
 
 #if CONFIG_AI_ASR_MODE_CPU2
@@ -143,9 +145,18 @@ static g722_decode_state_t g722_dec = {0};
 #endif
 
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
-static uint32_t prompt_tone_total_size = 0;
-static char *prompt_tone_ptr = NULL;
-static uint32_t prompt_tone_read_ptr = 0;
+#define PROMPT_TONE_RB_SIZE     (1280)
+static ringbuf_handle_t gl_prompt_tone_rb = NULL;
+static bool gl_prompt_tone_play_flag = false;
+static prompt_tone_pool_empty_notify gl_prompt_tone_empty_notify = NULL;
+static void *gl_notify_user_data = NULL;
+static prompt_tone_play_handle_t gl_prompt_tone_play_handle = NULL;
+typedef struct
+{
+    char *url;
+    uint32_t total_len;
+} prommpt_tone_info_t;
+static prommpt_tone_info_t prommpt_tone_info = {0};
 #endif
 
 #if CONFIG_AI_ASR_MODE_CPU2
@@ -1671,14 +1682,21 @@ static bk_err_t aud_tras_dec(void)
 
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
                 /* Check whether play prompt tone */
-                if (prompt_tone_ptr && (prompt_tone_total_size - prompt_tone_read_ptr) > 0) {
-                    if ((prompt_tone_total_size - prompt_tone_read_ptr) >= aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
-                        os_memcpy(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, &prompt_tone_ptr[prompt_tone_read_ptr], aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
-                        prompt_tone_read_ptr += aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2;
-                    } else  {
-                        os_memcpy(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, &prompt_tone_ptr[prompt_tone_read_ptr], prompt_tone_total_size - prompt_tone_read_ptr);
-                        prompt_tone_read_ptr = prompt_tone_total_size;
-                        os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data + (prompt_tone_total_size - prompt_tone_read_ptr), 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - (prompt_tone_total_size - prompt_tone_read_ptr));
+                if (gl_prompt_tone_play_flag) {
+                    int r_size = aud_tras_drv_read_prompt_tone_data((char *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2, 0);
+                    if (r_size <= 0 && gl_prompt_tone_empty_notify) {
+                        /* prompt tone pool empty */
+                        gl_prompt_tone_empty_notify(gl_notify_user_data);
+                        os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                        /* send message to aud_tras_drv_main to stop prompt_tone play */
+                        if (aud_tras_drv_send_msg(AUD_TRAS_STOP_PROMPT_TONE, NULL) != BK_OK)
+                        {
+                            LOGE("%s, %d, send tras stop prompt tone fail\n", __func__, __LINE__);
+                        }
+                    } else {
+                        if (r_size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
+                            os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
+                        }
                     }
                 } else {
 #endif
@@ -2872,6 +2890,16 @@ static bk_err_t aud_tras_drv_voc_deinit(void)
 	}
 #endif
 
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+    /* init ringbuffer */
+    if (gl_prompt_tone_rb)
+    {
+        rb_destroy(gl_prompt_tone_rb);
+        gl_prompt_tone_rb = NULL;
+    }
+#endif
+
+
 #if CONFIG_AI_ASR_MODE_CPU2
     msg_send_req_to_media_major_mailbox_sync(EVENT_ASR_DEINIT_REQ, MINOR_MODULE, 0, NULL);
 
@@ -3349,6 +3377,21 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
     if (ret != BK_OK) {
         LOGE("%s, %d, init asr in cpu2 fail, ret: %d\n", __func__, __LINE__, ret);
         err = BK_ERR_AUD_INTF_START_CPU2;
+        goto aud_tras_drv_voc_init_exit;
+    }
+#endif
+
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+    /* init ringbuffer */
+    if (gl_prompt_tone_rb)
+    {
+        rb_destroy(gl_prompt_tone_rb);
+        gl_prompt_tone_rb = NULL;
+    }
+    gl_prompt_tone_rb = rb_create(PROMPT_TONE_RB_SIZE);
+    if (!gl_prompt_tone_rb)
+    {
+        LOGE("%s, %d, create gl_prompt_tone_rb: %d fail\n", __func__, __LINE__, PROMPT_TONE_RB_SIZE);
         goto aud_tras_drv_voc_init_exit;
     }
 #endif
@@ -4369,6 +4412,101 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
                     }
                     break;
 
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+                case AUD_TRAS_PLAY_PROMPT_TONE:
+                    LOGI("AUD_TRAS_PLAY_PROMPT_TONE\n");
+                    prommpt_tone_info_t *prommpt_tone = (prommpt_tone_info_t *)msg.param;
+                    prompt_tone_play_cfg_t config = DEFAULT_PROMPT_TONE_PLAY_CONFIG();
+                    config.source_cfg.url = (char *)prommpt_tone->url;
+                    config.source_cfg.total_size = prommpt_tone->total_len;
+                    /* stop play */
+                    if (gl_prompt_tone_play_handle)
+                    {
+                        prompt_tone_play_destroy(gl_prompt_tone_play_handle);
+                        gl_prompt_tone_play_handle = NULL;
+                    }
+                    gl_prompt_tone_play_handle = prompt_tone_play_create(&config);
+                    if (!gl_prompt_tone_play_handle)
+                    {
+                        LOGE("%s, %d, prompt_tone_play_create fail\n", __func__, __LINE__);
+                        break;
+                    }
+                    prompt_tone_play_open(gl_prompt_tone_play_handle);
+                    break;
+
+                case AUD_TRAS_STOP_PROMPT_TONE:
+                    LOGI("AUD_TRAS_STOP_PROMPT_TONE\n");
+                    if (BK_OK != prompt_tone_play_close(gl_prompt_tone_play_handle, 0))
+                    {
+                        LOGE("%s, %d, prompt_tone_play_close fail\n", __func__, __LINE__);
+                    }
+                    if (BK_OK != prompt_tone_play_destroy(gl_prompt_tone_play_handle))
+                    {
+                        LOGE("%s, %d, prompt_tone_play_destroy fail\n", __func__, __LINE__);
+                    }
+                    gl_prompt_tone_play_handle = NULL;
+                    break;
+
+                case AUD_TRAS_PLAY_PROMPT_TONE_REQ:
+                {
+                    bool play_flag = true;
+                    mailbox_msg = (media_mailbox_msg_t *)msg.param;
+                    //aud_tras_uac_auto_connect_ctrl((bool)mailbox_msg->param);
+                    aud_intf_voc_prompt_tone_t prompt_tone = (aud_intf_voc_prompt_tone_t)mailbox_msg->param;
+                    switch (prompt_tone)
+                    {
+                        case AUD_INTF_VOC_START_CONFIG_NETWORK:
+                            prommpt_tone_info.url = (char *)start_config_network_16k_16bit_mono_pcm;
+                            prommpt_tone_info.total_len = sizeof(start_config_network_16k_16bit_mono_pcm);
+                            break;
+
+                        case AUD_INTF_VOC_CONFIG_NETWORK_SUCCESS:
+                            prommpt_tone_info.url = (char *)config_network_success_16k_16bit_mono_pcm;
+                            prommpt_tone_info.total_len = sizeof(config_network_success_16k_16bit_mono_pcm);
+                            break;
+
+                        case AUD_INTF_VOC_CONFIG_NETWORK_FAIL:
+                            prommpt_tone_info.url = (char *)config_network_fail_16k_16bit_mono_pcm;
+                            prommpt_tone_info.total_len = sizeof(config_network_fail_16k_16bit_mono_pcm);
+                            break;
+
+                        case AUD_INTF_VOC_NETWORK_DISCONNECT:
+                            prommpt_tone_info.url = (char *)network_disconnect_16k_16bit_mono_pcm;
+                            prommpt_tone_info.total_len = sizeof(network_disconnect_16k_16bit_mono_pcm);
+                            break;
+
+                        default:
+                            LOGE("%s, %d, prompt_tone: %d not support fail\n", __func__, __LINE__, prompt_tone);
+                            play_flag = false;
+                            break;
+                    }
+
+                    if (play_flag)
+                    {
+                        ret = aud_tras_drv_send_msg(AUD_TRAS_PLAY_PROMPT_TONE, (void *)&prommpt_tone_info);
+                        if (ret != BK_OK)
+                        {
+                            LOGE("%s, %d, send tras play prompt tone fail\n", __func__, __LINE__);
+                        }
+                    }
+                    else
+                    {
+                        ret = BK_FAIL;
+                    }
+                    msg_send_rsp_to_media_major_mailbox(mailbox_msg, ret, APP_MODULE);
+                    break;
+                }
+
+                case AUD_TRAS_STOP_PROMPT_TONE_REQ:
+                    ret = aud_tras_drv_send_msg(AUD_TRAS_STOP_PROMPT_TONE, NULL);
+                    if (ret != BK_OK)
+                    {
+                        LOGE("%s, %d, send tras stop prompt tone fail\n", __func__, __LINE__);
+                    }
+                    msg_send_rsp_to_media_major_mailbox(mailbox_msg, ret, APP_MODULE);
+                    break;
+#endif
+
 				default:
 					break;
 			}
@@ -4576,6 +4714,15 @@ bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result)
         {
             LOGE("%s, %d, send tras asr wakeup fail\n", __func__, __LINE__);
         }
+
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+        prommpt_tone_info.url = (char *)armino_16k_16bit_mono_pcm;
+        prommpt_tone_info.total_len = sizeof(armino_16k_16bit_mono_pcm);
+        if (aud_tras_drv_send_msg(AUD_TRAS_PLAY_PROMPT_TONE, (void *)&prommpt_tone_info) != BK_OK)
+        {
+            LOGE("%s, %d, send tras play prompt tone fail\n", __func__, __LINE__);
+        }
+#endif
     } else if (asr_result == BYEBYE_ARMINO) {
         gl_dialog_running = 0;
         LOGI("%s \n", "byebye armino ");
@@ -4584,25 +4731,58 @@ bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result)
         {
             LOGE("%s, %d, send tras asr wakeup fail\n", __func__, __LINE__);
         }
+
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+        prommpt_tone_info.url = (char *)byebye_16k_16bit_mono_pcm;
+        prommpt_tone_info.total_len = sizeof(byebye_16k_16bit_mono_pcm);
+        if (aud_tras_drv_send_msg(AUD_TRAS_PLAY_PROMPT_TONE, (void *)&prommpt_tone_info) != BK_OK)
+        {
+            LOGE("%s, %d, send tras play prompt tone fail\n", __func__, __LINE__);
+        }
+#endif
     } else {
         //nothing todo
     }
 
-#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
-    if (gl_dialog_running) {
-        prompt_tone_ptr = (char *)armino_16k_16bit_mono_pcm_prompt_tone;
-        prompt_tone_total_size = sizeof(armino_16k_16bit_mono_pcm_prompt_tone);   //play start dialog prompt tone
-        prompt_tone_read_ptr = 0;
-    } else {
-        prompt_tone_ptr = (char *)byebye_16k_16bit_mono_pcm_prompt_tone;
-        prompt_tone_total_size = sizeof(byebye_16k_16bit_mono_pcm_prompt_tone);   //play stop dialog prompt tone
-        prompt_tone_read_ptr = 0;
-    }
+    return BK_OK;
+}
 #endif
+
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+int aud_tras_drv_read_prompt_tone_data(char *buffer, uint32_t len, uint32_t timeout)
+{
+    if (gl_prompt_tone_rb) {
+        return rb_read(gl_prompt_tone_rb, buffer, len, timeout);
+    } else {
+        return BK_FAIL;
+    }
+}
+
+int aud_tras_drv_write_prompt_tone_data(char *buffer, uint32_t len, uint32_t timeout)
+{
+    if (gl_prompt_tone_rb) {
+        return rb_write(gl_prompt_tone_rb, buffer, len, timeout);
+    } else {
+        return BK_FAIL;
+    }
+}
+
+bk_err_t aud_tras_drv_register_prompt_tone_pool_empty_notify(prompt_tone_pool_empty_notify notify, void *user_data)
+{
+    gl_prompt_tone_empty_notify = notify;
+    gl_notify_user_data = user_data;
+
+    return BK_OK;
+}
+
+bk_err_t aud_tras_drv_control_prompt_tone_play(bool en)
+{
+    gl_prompt_tone_play_flag = en;
 
     return BK_OK;
 }
 #endif
+
 
 #if CONFIG_AI_ASR_MODE_CPU2
 void aud_cp2_ready_notify(void)
@@ -4759,6 +4939,16 @@ bk_err_t audio_event_handle(media_mailbox_msg_t * msg)
 		case EVENT_AUD_VOC_AEC_DEBUG_REQ:
 			aud_tras_drv_send_msg(AUD_TRAS_DRV_VOC_AEC_DEBUG, (void *)msg);
 			break;
+
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+        case EVENT_AUD_VOC_PLAY_PROMPT_TONE_REQ:
+            aud_tras_drv_send_msg(AUD_TRAS_PLAY_PROMPT_TONE_REQ, (void *)msg);
+            break;
+
+        case EVENT_AUD_VOC_STOP_PROMPT_TONE_REQ:
+            aud_tras_drv_send_msg(AUD_TRAS_STOP_PROMPT_TONE_REQ, (void *)msg);
+            break;
+#endif
 
 		/* uac event */
 		case EVENT_AUD_UAC_REGIS_CONT_STATE_CB_REQ:

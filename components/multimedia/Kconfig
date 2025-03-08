@@ -200,6 +200,7 @@ menu "Media"
         depends on AUD_INTF_SUPPORT_AI_DIALOG_FREE
         bool "Enable supoort prompt tone"
         default n
+
     config DEBUG_DUMP
         bool "dump debug data"
         default n

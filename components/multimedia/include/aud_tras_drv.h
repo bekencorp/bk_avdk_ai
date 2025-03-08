@@ -98,6 +98,14 @@ typedef enum {
 	AUD_TRAS_ASR_WAKEUP_IND,
 	AUD_TRAS_ASR_STANDBY_IND,
 
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+    AUD_TRAS_PLAY_PROMPT_TONE,
+    AUD_TRAS_STOP_PROMPT_TONE,
+
+    AUD_TRAS_PLAY_PROMPT_TONE_REQ,
+    AUD_TRAS_STOP_PROMPT_TONE_REQ,
+#endif
+
 	AUD_TRAS_DRV_MAX,
 } aud_tras_drv_op_t;
 
@@ -511,6 +519,15 @@ typedef int (*aud_tras_drv_aec_output_callback)(unsigned char *data, unsigned in
 bk_err_t aud_tras_drv_register_aec_ouput_callback(aud_tras_drv_aec_output_callback cb, void *user_data);
 
 bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result);
+#endif
+
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+typedef int (*prompt_tone_pool_empty_notify)(void *user_data);
+
+bk_err_t aud_tras_drv_register_prompt_tone_pool_empty_notify(prompt_tone_pool_empty_notify notify, void *user_data);
+bk_err_t aud_tras_drv_control_prompt_tone_play(bool en);
+int aud_tras_drv_read_prompt_tone_data(char *buffer, uint32_t len, uint32_t timeout);
+int aud_tras_drv_write_prompt_tone_data(char *buffer, uint32_t len, uint32_t timeout);
 #endif
 
 #if CONFIG_AI_ASR_MODE_CPU2
