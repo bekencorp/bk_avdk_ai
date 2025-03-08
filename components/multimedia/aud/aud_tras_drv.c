@@ -74,52 +74,12 @@
 #define LOGD(...) BK_LOGD(AUD_TRAS_DRV_TAG, ##__VA_ARGS__)
 
 #if CONFIG_DEBUG_DUMP
-#define HEADER_MAGICWORD_PART1    (0xDEADBEEF)
-#define HEADER_MAGICWORD_PART2    (0x0F1001F0)
-
-typedef enum {
-    DUMP_TYPE_AUD_MIC = 0,
-    DUMP_TYPE_AGORA_RX_SPK,
-    DUMP_TYPE_AGORA_TX_MIC,
-    DUMP_TYPE_AEC_DATA,
-    DUMP_TYPE_DUMP_DISABLE
-} debug_dump_type_t;
-
-typedef enum {
-    DUMP_FILE_TYPE_PCM = 0,
-    DUMP_FILE_TYPE_G722,
-    DUMP_FILE_TYPE_INVALID,
-} debug_dump_file_type_t;
-
-typedef struct
-{
-    uint32_t header_magicword_part1;
-    uint32_t header_magicword_part2;
-    uint8_t  dump_type;
-    uint8_t  dump_file_type;
-    uint16_t len1;
-    uint16_t len2;
-    uint16_t len3;
-    uint32_t seq_no;
-    uint32_t timestamp;
-} debug_dump_data_header_t;
-
-volatile debug_dump_data_header_t dump_header = 
-{
-    .header_magicword_part1 = HEADER_MAGICWORD_PART1,
-    .header_magicword_part2 = HEADER_MAGICWORD_PART2,
-    .dump_type = DUMP_TYPE_AEC_DATA,
-    .dump_file_type = DUMP_FILE_TYPE_PCM,
-    .len1 = 0,
-    .len2 = 0,
-    .len3 = 0,
-    .seq_no = 0
-};
-
-#define AEC_DATA_DUMP_BY_UART
+#include "debug_dump.h"
+bool aec_all_data_flag = false;
 #endif//CONFIG_DEBUG_DUMP
 
-bool aec_all_data_flag = false;
+
+//#define AEC_DATA_DUMP_BY_UART
 
 #ifdef AEC_DATA_DUMP_BY_UART
 #include "uart_util.h"
@@ -851,15 +811,27 @@ static bk_err_t aud_tras_aec(void)
     #if CONFIG_DEBUG_DUMP
     if(aec_all_data_flag)
     {
-        dump_header.len1 = aec_info_pr->samp_rate_points*2;
-        dump_header.len2 = aec_info_pr->samp_rate_points*2;
-        dump_header.len3 = aec_info_pr->samp_rate_points*2;
-        dump_header.timestamp = rtos_get_time();
-        AEC_DATA_DUMP_BY_UART_DATA((void *)&dump_header,sizeof(dump_header));
-        dump_header.seq_no++;
+        #if 0
+        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_NUM(DUMP_TYPE_AEC_MIC_DATA,3);//mic/ref/aec out
 
-        AEC_DATA_DUMP_BY_UART_DATA(aec_info_pr->mic_addr, aec_info_pr->samp_rate_points*2);
-        AEC_DATA_DUMP_BY_UART_DATA(aec_info_pr->ref_addr, aec_info_pr->samp_rate_points*2);
+        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW(DUMP_TYPE_AEC_MIC_DATA,0,DUMP_FILE_TYPE_PCM,aec_info_pr->samp_rate_points*2);
+        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW(DUMP_TYPE_AEC_REF_DATA,1,DUMP_FILE_TYPE_PCM,aec_info_pr->samp_rate_points*2);
+        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW(DUMP_TYPE_AEC_OUT_DATA,2,DUMP_FILE_TYPE_PCM,aec_info_pr->samp_rate_points*2);
+        #else
+        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AEC_MIC_DATA,0,aec_info_pr->samp_rate_points*2);
+        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AEC_REF_DATA,1,aec_info_pr->samp_rate_points*2);
+        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AEC_OUT_DATA,2,aec_info_pr->samp_rate_points*2);
+        #endif
+        
+        DEBUG_DATA_DUMP_UPDATE_HEADER_TIMESTAMP(DUMP_TYPE_AEC_MIC_DATA);
+        DEBUG_DATA_DUMP_BY_UART_HEADER(DUMP_TYPE_AEC_MIC_DATA);
+        //AEC_DATA_DUMP_BY_UART_DATA((void *)&dump_header,sizeof(dump_header));
+        DEBUG_DATA_DUMP_UPDATE_HEADER_SEQ_NUM(DUMP_TYPE_AEC_MIC_DATA);
+
+        //AEC_DATA_DUMP_BY_UART_DATA(aec_info_pr->mic_addr, aec_info_pr->samp_rate_points*2);
+        //AEC_DATA_DUMP_BY_UART_DATA(aec_info_pr->ref_addr, aec_info_pr->samp_rate_points*2);
+        DEBUG_DATA_DUMP_BY_UART_DATA(aec_info_pr->mic_addr, aec_info_pr->samp_rate_points*2);
+        DEBUG_DATA_DUMP_BY_UART_DATA(aec_info_pr->ref_addr, aec_info_pr->samp_rate_points*2);
     }
     #endif
 
@@ -929,7 +901,8 @@ static bk_err_t aud_tras_aec(void)
     #if CONFIG_DEBUG_DUMP
     if(aec_all_data_flag)
     {
-        AEC_DATA_DUMP_BY_UART_DATA(aec_info_pr->out_addr, aec_info_pr->samp_rate_points*2);
+        //AEC_DATA_DUMP_BY_UART_DATA(aec_info_pr->out_addr, aec_info_pr->samp_rate_points*2);
+        DEBUG_DATA_DUMP_BY_UART_DATA(aec_info_pr->out_addr, aec_info_pr->samp_rate_points*2);
     }
     #endif
 

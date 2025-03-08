@@ -11,6 +11,12 @@ if (CONFIG_FATFS)
 	)
 endif()
 
+if (CONFIG_DEBUG_DUMP)
+	list(APPEND srcs
+		src/debug_dump.c
+	)
+endif()
+
 set(priv_req )
 
 
