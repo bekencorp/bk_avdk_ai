@@ -682,6 +682,7 @@ static bk_err_t onboard_mic_close(onboard_mic_record_priv_t *onboard_mic)
 
     /* deinit ringbuffer */
     rb_destroy(onboard_mic->rb);
+    onboard_mic->rb = NULL;
 
     return BK_OK;
 }

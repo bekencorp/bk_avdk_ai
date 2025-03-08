@@ -439,6 +439,7 @@ static bk_err_t aud_dac_dma_config(onboard_speaker_play_priv_t *onboard_spk)
     /* the pause address can not is the same as the end address of dma, so add 8 bytes to protect speaker ring buffer. */
     onboard_spk->dma_rb_addr = (int32_t *)psram_malloc(2 * onboard_spk->frame_size + DMA_CARRY_SPK_RINGBUF_SAFE_INTERVAL);
     ONBOARD_SPK_PLAY_CHECK_NULL(onboard_spk->dma_rb_addr);
+    os_memset(onboard_spk->dma_rb_addr, 0, 2 * onboard_spk->frame_size + DMA_CARRY_SPK_RINGBUF_SAFE_INTERVAL);
     ring_buffer_init(&onboard_spk->dma_rb, (uint8_t *)onboard_spk->dma_rb_addr, onboard_spk->frame_size * onboard_spk->frame_num + DMA_CARRY_SPK_RINGBUF_SAFE_INTERVAL, onboard_spk->dac_dma_id, RB_DMA_TYPE_READ);
     LOGI("%s, %d, dma_id: %d, dma_rb_addr: %p, dma_rb_size: %d \n", __func__, __LINE__, onboard_spk->dac_dma_id, onboard_spk->dma_rb_addr, onboard_spk->frame_size * onboard_spk->frame_num + DMA_CARRY_SPK_RINGBUF_SAFE_INTERVAL);
     /* init dma channel */
@@ -674,6 +675,7 @@ static bk_err_t onboard_speaker_close(onboard_speaker_play_priv_t *onboard_spk)
 
     /* deinit ringbuffer */
     rb_destroy(onboard_spk->rb);
+    onboard_spk->rb = NULL;
 
     return BK_OK;
 }
