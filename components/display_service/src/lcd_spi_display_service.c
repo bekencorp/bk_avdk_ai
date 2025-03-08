@@ -58,6 +58,8 @@ spi_config_t config = {0};
 #endif
 
 static uint8_t lcd_spi_gpio_is_init = 0;
+static uint8_t s_lcd_spi_flag = 1;
+static uint8_t lcd_spi_first_disp = 0;
 
 static void lcd_spi_device_gpio_init(void)
 {
@@ -148,8 +150,6 @@ static qspi_driver_t s_lcd_spi[SOC_QSPI_UNIT_NUM] = {
     }
 #endif
 };
-
-static uint8_t s_lcd_spi_flag = 1;
 
 static void lcd_spi_driver_init_with_qspi(qspi_id_t qspi_id, lcd_qspi_clk_t clk)
 {
@@ -437,8 +437,6 @@ void lcd_spi_init(uint8_t id, const lcd_device_t *device)
     } else {
         LCD_SPI_LOGE("lcd spi device init cmd is null\r\n");
     }
-
-    lcd_spi_backlight_open();
 }
 
 void lcd_spi_deinit(uint8_t id)
@@ -462,6 +460,11 @@ void lcd_spi_display_frame(uint8_t id, uint8_t *frame_buffer, uint32_t width, ui
     column_value[3] = (width & 0xFF) - 1,
     row_value[2] = (height >> 8) & 0xFF;
     row_value[3] = (height & 0xFF) - 1;
+
+    if (lcd_spi_first_disp == 0) {
+        lcd_spi_backlight_open();
+        lcd_spi_first_disp = 1;
+    }
 
     lcd_spi_send_cmd(id, LCD_SPI_DEVICE_CASET);
     lcd_spi_send_data(id, column_value, 4);
