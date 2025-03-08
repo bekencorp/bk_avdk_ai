@@ -8,6 +8,9 @@ typedef enum {
     JH_OUTPUT_YUYV,
 } JPEG_HW_OUTPUT_FMT_T;
 
+bk_err_t lv_dma2d_yuyv2rgb565_init(void);
+
+bk_err_t lv_dma2d_yuyv2rgb565_deinit(void);
 
 s32 lv_jpeg_hw_decode(frame_buffer_t *jpeg_frame, lv_img_dsc_t *img_dst);
 

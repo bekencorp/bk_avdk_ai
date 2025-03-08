@@ -77,27 +77,42 @@ static void lv_dma2d_transfer_complete(void)
     rtos_set_semaphore(&lv_dma2d_sem);
 }
 
+bk_err_t lv_dma2d_yuyv2rgb565_init(void)
+{
+    bk_err_t ret;
+
+    ret = rtos_init_semaphore_ex(&lv_dma2d_sem, 1, 0);
+    if (BK_OK != ret) {
+        os_printf("%s %d lv_dma2d_sem init failed\n", __func__, __LINE__);
+        return ret;
+    }
+
+    bk_dma2d_driver_init();
+    bk_dma2d_register_int_callback_isr(DMA2D_CFG_ERROR_ISR, lv_dma2d_config_error);
+    bk_dma2d_register_int_callback_isr(DMA2D_TRANS_ERROR_ISR, lv_dma2d_transfer_error);
+    bk_dma2d_register_int_callback_isr(DMA2D_TRANS_COMPLETE_ISR, lv_dma2d_transfer_complete);
+    bk_dma2d_int_enable(DMA2D_CFG_ERROR | DMA2D_TRANS_ERROR | DMA2D_TRANS_COMPLETE, 1);
+
+    return ret;
+}
+
+bk_err_t lv_dma2d_yuyv2rgb565_deinit(void)
+{
+    bk_err_t ret;
+
+    bk_dma2d_int_enable(DMA2D_CFG_ERROR | DMA2D_TRANS_ERROR | DMA2D_TRANS_COMPLETE, 0);
+    bk_dma2d_driver_deinit();
+    ret = rtos_deinit_semaphore(&lv_dma2d_sem);
+    if (BK_OK != ret) {
+        os_printf("%s %d lv_dma2d_sem deinit failed\n", __func__, __LINE__);
+    }
+
+    return ret;
+}
+
 static void lv_dma2d_yuyv2rgb565(void *src, const void *dst, uint16_t width, uint16_t height)
 {
     dma2d_memcpy_pfc_t dma2d_memcpy_pfc = {0};
-    static int flag = 0;
-
-    if (!flag) {
-        bk_err_t ret;
-
-        ret = rtos_init_semaphore_ex(&lv_dma2d_sem, 1, 0);
-        if (BK_OK != ret) {
-            os_printf("%s %d lv_dma2d_sem init failed\n", __func__, __LINE__);
-            return;
-        }
-
-        bk_dma2d_driver_init();
-        bk_dma2d_register_int_callback_isr(DMA2D_CFG_ERROR_ISR, lv_dma2d_config_error);
-        bk_dma2d_register_int_callback_isr(DMA2D_TRANS_ERROR_ISR, lv_dma2d_transfer_error);
-        bk_dma2d_register_int_callback_isr(DMA2D_TRANS_COMPLETE_ISR, lv_dma2d_transfer_complete);
-        bk_dma2d_int_enable(DMA2D_CFG_ERROR | DMA2D_TRANS_ERROR | DMA2D_TRANS_COMPLETE, 1);
-        flag = 1;
-    }
 
     dma2d_memcpy_pfc.input_addr = (char *)src;
     dma2d_memcpy_pfc.output_addr = (char *)dst;
@@ -269,11 +284,19 @@ void bk_jpeg_hw_decode_to_mem_init(void)
     bk_jpeg_dec_isr_register(DEC_ERR, lv_jpeg_hw_dec_err_cb);
     bk_jpeg_dec_isr_register(DEC_END_OF_FRAME, lv_jpeg_hw_dec_eof_cb);
     bk_jpeg_dec_out_format(PIXEL_FMT_YUYV);
+
+    lv_dma2d_yuyv2rgb565_init();
 }
 
 void bk_jpeg_hw_decode_to_mem_deinit(void)
 {
     bk_err_t ret = BK_FAIL;
+
+    bk_jpeg_dec_stop();
+    bk_jpeg_dec_driver_deinit();
+
+    bk_dma2d_stop_transfer();
+    lv_dma2d_yuyv2rgb565_deinit();
 
     if (rtos_is_oneshot_timer_init(&g_hw_decode_timer))
     {
@@ -295,37 +318,35 @@ void bk_jpeg_hw_decode_to_mem_deinit(void)
         }
         g_hw_decode_sem = NULL;
     }
-
-    bk_jpeg_dec_stop();
-    bk_jpeg_dec_driver_deinit();
-
-    if (g_dec_frame_data)
-    {
-        psram_free(g_dec_frame_data);
-    }
 }
 
 bk_err_t bk_jpeg_hw_decode_to_mem(uint8_t *src_addr, uint8_t *dst_addr, uint32_t src_size, uint16_t dst_width, uint16_t dst_height)
 {
     bk_err_t ret = BK_FAIL;
 
+    g_dec_frame_data = psram_malloc(dst_width * dst_height * 2);
     if (!g_dec_frame_data)
     {
-        g_dec_frame_data = psram_malloc(dst_width * dst_height * 2);
-        if (!g_dec_frame_data)
-        {
-            bk_printf("[%s][%d] malloc psram fail\r\n", __FUNCTION__, __LINE__);
-            ret = BK_ERR_NO_MEM;
-            return ret;
-        }
+        bk_printf("[%s][%d] malloc psram fail\r\n", __FUNCTION__, __LINE__);
+        ret = BK_ERR_NO_MEM;
+        return ret;
     }
 
     do {
-        ret = rtos_start_oneshot_timer(&g_hw_decode_timer);
-        if(ret != BK_OK)
-        {
-            bk_printf("[%s][%d] start timer fail\n", __FUNCTION__, __LINE__);
-            break;
+        if (!rtos_is_oneshot_timer_init(&g_hw_decode_timer)) {
+            ret = rtos_start_oneshot_timer(&g_hw_decode_timer);
+            if(ret != BK_OK)
+            {
+                bk_printf("[%s][%d] start timer fail\n", __FUNCTION__, __LINE__);
+                break;
+            }
+        } else {
+            ret = rtos_oneshot_reload_timer(&g_hw_decode_timer);
+            if(ret != BK_OK)
+            {
+                bk_printf("[%s][%d] reload timer fail\n", __FUNCTION__, __LINE__);
+                break;
+            }
         }
 
         ret = bk_jpeg_dec_hw_start(src_size, src_addr, g_dec_frame_data);
@@ -344,6 +365,12 @@ bk_err_t bk_jpeg_hw_decode_to_mem(uint8_t *src_addr, uint8_t *dst_addr, uint32_t
 
         lv_dma2d_yuyv2rgb565(g_dec_frame_data, dst_addr, dst_width, dst_height);
     }while(0);
+
+    if (g_dec_frame_data)
+    {
+        psram_free(g_dec_frame_data);
+        g_dec_frame_data = NULL;
+    }
 
     return ret;
 
