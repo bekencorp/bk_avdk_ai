@@ -54,12 +54,21 @@ typedef enum
 	APP_LCD_MCU,
 } app_lcd_type_t;
 
+typedef enum
+{
+	MEDIA_APP_EVT_ASR_WAKEUP_IND,
+	MEDIA_APP_EVT_ASR_STANDBY_IND,
+} media_app_evt_type_t;
+
+
 typedef int (*media_transfer_send_cb)(uint8_t *data, uint32_t length, uint16_t *retry_cnt);
 typedef int (*media_transfer_prepare_cb)(uint8_t *data, uint32_t length);
 typedef void* (*media_transfer_get_tx_buf_cb)(void);
 typedef int (*media_transfer_get_tx_size_cb)(void);
 typedef void (*frame_cb_t)(frame_buffer_t *frame);
 typedef bool (*media_transfer_drop_check_cb)(frame_buffer_t *frame,uint32_t count, uint16_t ext_size);
+
+typedef void (*media_app_asr_evt_cb_t)(media_app_evt_type_t event, uint32_t param);
 
 typedef struct {
 	media_transfer_send_cb send;
@@ -150,6 +159,9 @@ frame_buffer_t *media_app_frame_buffer_jpeg_malloc(void);
 frame_buffer_t *media_app_frame_buffer_h264_malloc(void);
 bk_err_t media_app_frame_buffer_push(frame_buffer_t *frame);
 bk_err_t media_app_frame_buffer_clear(frame_buffer_t *frame);
+
+/*Do not do anything blocking here */
+void media_app_asr_evt_register_callback(media_app_asr_evt_cb_t cb);
 
 #ifdef __cplusplus
 }

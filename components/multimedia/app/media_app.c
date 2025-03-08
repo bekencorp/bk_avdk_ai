@@ -52,6 +52,7 @@
 static app_camera_type_t app_camera_type = APP_CAMERA_INVALIED;
 static char *capture_name = NULL;
 static media_modules_state_t *media_modules_state = NULL;
+static media_app_asr_evt_cb_t media_app_asr_evt_cb = NULL;
 
 #if CONFIG_CHERRY_USB && CONFIG_USB_DEVICE
 extern void usbd_video_h264_init();
@@ -1459,6 +1460,33 @@ exit:
 	media_app_th_hd = NULL;
 	rtos_delete_thread(NULL);
 
+}
+
+void media_app_asr_evt_register_callback(media_app_asr_evt_cb_t cb)
+{
+    media_app_asr_evt_cb = cb;
+}
+
+void media_app_asr_evt_handle(media_mailbox_msg_t *msg)
+{
+    if (media_app_asr_evt_cb)
+    {
+        switch (msg->event)
+        {
+            case EVENT_ASR_WAKEUP_IND:
+                media_app_asr_evt_cb(MEDIA_APP_EVT_ASR_WAKEUP_IND, msg->param);
+                break;
+            case EVENT_ASR_STANDBY_IND:
+                media_app_asr_evt_cb(MEDIA_APP_EVT_ASR_STANDBY_IND, msg->param);
+                break;
+        }
+        msg_send_rsp_to_media_app_mailbox(msg, BK_OK);
+    }
+    else
+    {
+        LOGE("%s callback NULL\n", __func__);
+        msg_send_rsp_to_media_app_mailbox(msg, BK_FAIL);
+    }
 }
 
 bk_err_t media_app_init(void)

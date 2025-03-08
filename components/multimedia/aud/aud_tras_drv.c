@@ -66,7 +66,6 @@
 #include "cache.h"
 #endif
 
-
 #define AUD_TRAS_DRV_TAG "tras_drv"
 
 #define LOGI(...) BK_LOGI(AUD_TRAS_DRV_TAG, ##__VA_ARGS__)
@@ -4382,6 +4381,21 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
 					}
 					break;
 
+                case AUD_TRAS_ASR_WAKEUP_IND:
+                    LOGD("AUD_TRAS_ASR_WAKEUP_IND\n");
+                    if (BK_OK != msg_send_req_to_media_major_mailbox_sync(EVENT_ASR_WAKEUP_IND, APP_MODULE, 1, NULL))
+                    {
+                        LOGE("%s, %d, send asr wakeup fail\n", __func__, __LINE__);
+                    }
+                    break;
+                case AUD_TRAS_ASR_STANDBY_IND:
+                    LOGD("AUD_TRAS_ASR_STANDBY_IND\n");
+                    if (BK_OK != msg_send_req_to_media_major_mailbox_sync(EVENT_ASR_STANDBY_IND, APP_MODULE, 1, NULL))
+                    {
+                        LOGE("%s, %d, send asr standby fail\n", __func__, __LINE__);
+                    }
+                    break;
+
 				default:
 					break;
 			}
@@ -4584,9 +4598,19 @@ bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result)
     if (asr_result == HI_ARMINO) {
         gl_dialog_running = 1;
         LOGI("%s \n", "hi armino ");
+
+        if (aud_tras_drv_send_msg(AUD_TRAS_ASR_WAKEUP_IND, NULL) != BK_OK)
+        {
+            LOGE("%s, %d, send tras asr wakeup fail\n", __func__, __LINE__);
+        }
     } else if (asr_result == BYEBYE_ARMINO) {
         gl_dialog_running = 0;
         LOGI("%s \n", "byebye armino ");
+
+        if (aud_tras_drv_send_msg(AUD_TRAS_ASR_STANDBY_IND, NULL) != BK_OK)
+        {
+            LOGE("%s, %d, send tras asr wakeup fail\n", __func__, __LINE__);
+        }
     } else {
         //nothing todo
     }

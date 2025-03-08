@@ -69,6 +69,8 @@ static uint32_t cpu1_boot_request = 0;
 
 media_share_ptr_t *media_share_ptr = NULL;
 
+extern void media_app_asr_evt_handle(media_mailbox_msg_t *msg);
+
 static bk_err_t media_send_msg_to_queue(media_mailbox_msg_t *param, uint8_t ori);
 
 static bk_err_t msg_send_to_media_app_mailbox_list(media_mailbox_msg_t *msg)
@@ -514,6 +516,11 @@ static void media_app_mailbox_msg_handle(media_mailbox_msg_t *msg)
 			case EVENT_LCD_PICTURE_ECHO_NOTIFY:
 				ret = read_storage_file_to_mem_handle(msg);
 				break;
+
+            case EVENT_ASR_WAKEUP_IND:
+            case EVENT_ASR_STANDBY_IND:
+                media_app_asr_evt_handle(msg);
+                break;
 
 			case EVENT_MEDIA_CPU1_POWERUP_IND:
 			{

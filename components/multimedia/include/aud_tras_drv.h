@@ -95,6 +95,9 @@ typedef enum {
 
     AUD_AI_INIT,
 
+	AUD_TRAS_ASR_WAKEUP_IND,
+	AUD_TRAS_ASR_STANDBY_IND,
+
 	AUD_TRAS_DRV_MAX,
 } aud_tras_drv_op_t;
 
