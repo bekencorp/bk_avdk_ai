@@ -72,6 +72,24 @@ typedef struct prompt_tone_play *prompt_tone_play_handle_t;
     },                                                  \
 }
 
+#define DEFAULT_VFS_WAV_PROMPT_TONE_PLAY_CONFIG() {     \
+    .source_type = AUDIO_SOURCE_VFS,                    \
+    .source_cfg = {                                     \
+        .url = NULL,                                    \
+        .frame_size = DEFAULT_FRAME_SIZE,               \
+        .data_handle = NULL,                            \
+        .notify = NULL,                                 \
+        .usr_data = NULL,                               \
+    },                                                  \
+    .codec_type = AUDIO_CODEC_WAV,                      \
+    .codec_cfg = {                                      \
+        .chunk_size = DEFAULT_CHUNK_SIZE,               \
+        .pool_size = DEFAULT_POOL_SIZE,                 \
+        .data_handle = NULL,                            \
+        .empty_cb = NULL,                               \
+        .usr_data = NULL,                               \
+    },                                                  \
+}
 
 /**
  * @brief     Create mp3 player with config

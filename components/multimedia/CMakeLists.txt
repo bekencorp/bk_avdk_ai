@@ -222,6 +222,12 @@ if (CONFIG_PROMPT_TONE_CODEC_PCM)
 	)
 endif()
 
+if (CONFIG_PROMPT_TONE_CODEC_WAV)
+	list(APPEND srcs
+		prompt_tone_play/src/wav_codec.c
+	)
+endif()
+
 if (CONFIG_PROMPT_TONE_SOURCE_VFS)
 	list(APPEND srcs
 		prompt_tone_play/src/source_vfs.c

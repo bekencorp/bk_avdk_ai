@@ -32,7 +32,7 @@
 #define LOGD(...) BK_LOGD(VFS_SOURCE_TAG, ##__VA_ARGS__)
 
 
-//#define MOUNT_ENABLE
+#define MOUNT_ENABLE
 
 #define VFS_SOURCE_CHECK_NULL(ptr) do {\
         if (ptr == NULL) {\
@@ -180,18 +180,18 @@ static void vfs_data_read_task_main(beken_thread_arg_t param_data)
             switch (msg.op)
             {
                 case VFS_DATA_READ_IDLE:
-                    LOGI("%s, %d, VFS_DATA_READ_IDLE\n", __func__, __LINE__);
+                    LOGD("%s, %d, VFS_DATA_READ_IDLE\n", __func__, __LINE__);
                     vfs_source_priv->running = false;
                     wait_time = BEKEN_WAIT_FOREVER;
                     break;
 
                 case VFS_DATA_READ_EXIT:
-                    LOGI("%s, %d, VFS_DATA_READ_EXIT\n", __func__, __LINE__);
+                    LOGD("%s, %d, VFS_DATA_READ_EXIT\n", __func__, __LINE__);
                     goto vfs_data_read_exit;
                     break;
 
                 case VFS_DATA_READ_START:
-                    LOGI("%s, %d, VFS_DATA_READ_START\n", __func__, __LINE__);
+                    LOGD("%s, %d, VFS_DATA_READ_START\n", __func__, __LINE__);
                     vfs_source_priv->running = true;
                     wait_time = 0;
                     break;
@@ -439,7 +439,7 @@ fail:
     }
 
 #ifdef MOUNT_ENABLE
-    //vfs_source_unmount();
+    vfs_source_unmount();
 #endif
 
     return BK_FAIL;
@@ -467,7 +467,7 @@ static int vfs_source_close(audio_source_t *source)
     }
 
 #ifdef MOUNT_ENABLE
-    //vfs_source_unmount();
+    vfs_source_unmount();
 #endif
 
     if (vfs_source)

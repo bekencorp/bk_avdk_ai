@@ -223,6 +223,9 @@ menu "Media"
 
 		config PROMPT_TONE_CODEC_MP3
 		bool "Select MP3 Prompt Tone"
+
+		config PROMPT_TONE_CODEC_WAV
+		bool "Select WAV Prompt Tone"
 	endchoice
 
     config DEBUG_DUMP

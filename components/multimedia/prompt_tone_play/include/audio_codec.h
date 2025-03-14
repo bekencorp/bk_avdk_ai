@@ -33,6 +33,7 @@ typedef enum
 
     AUDIO_CODEC_MP3,
     AUDIO_CODEC_PCM,
+    AUDIO_CODEC_WAV,
 } audio_codec_type_t;
 
 typedef struct audio_info_s

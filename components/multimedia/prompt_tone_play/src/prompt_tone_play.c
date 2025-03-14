@@ -78,7 +78,7 @@ static int codec_out_data_handle_cb(audio_frame_info_t *frame_info, char *buffer
         {
             temp_w_len = len - w_len;
         }
-        ret = aud_tras_drv_write_prompt_tone_data(buffer + w_len, temp_w_len, BEKEN_WAIT_FOREVER);
+        ret = aud_tras_drv_write_prompt_tone_data(buffer + w_len, temp_w_len, 40);
         if (ret <= 0)
         {
             LOGE("%s, %d, aud_tras_drv_write_prompt_tone_data fail, ret: %d\n", __func__, __LINE__, ret);

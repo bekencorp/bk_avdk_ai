@@ -26,6 +26,10 @@
 #include "pcm_codec.h"
 #endif
 
+#if CONFIG_PROMPT_TONE_CODEC_WAV
+#include "wav_codec.h"
+#endif
+
 #define AUDIO_CODEC_TAG "aud_codec"
 
 #define LOGI(...) BK_LOGI(AUDIO_CODEC_TAG, ##__VA_ARGS__)
@@ -55,6 +59,12 @@ audio_codec_t *audio_codec_create(  audio_codec_type_t codec_type, audio_codec_c
 #if CONFIG_PROMPT_TONE_CODEC_PCM
         case AUDIO_CODEC_PCM:
             temp_ops = get_pcm_codec_ops();
+            break;
+#endif
+
+#if CONFIG_PROMPT_TONE_CODEC_WAV
+        case AUDIO_CODEC_WAV:
+            temp_ops = get_wav_codec_ops();
             break;
 #endif
 
