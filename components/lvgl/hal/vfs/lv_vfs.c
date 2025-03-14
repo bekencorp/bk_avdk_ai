@@ -80,7 +80,7 @@ bk_err_t lv_vfs_deinit(void)
         bk_printf("[%s][%d] unmount fail:%d\r\n", __FUNCTION__, __LINE__, ret);
     }
 
-    bk_printf("[%s][%d] unmount success\r\n");
+    bk_printf("[%s][%d] unmount success\r\n", __FUNCTION__, __LINE__);
 
     return ret;
 }
