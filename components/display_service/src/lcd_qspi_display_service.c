@@ -50,7 +50,7 @@ static void lcd_qspi_disp_task_entry(beken_thread_arg_t arg)
     }
 
     lcd_qspi_disp_thread_hdl = NULL;
-    rtos_set_semaphore(g_lcd_qspi_task_sem);
+    rtos_set_semaphore(&g_lcd_qspi_task_sem);
     rtos_delete_thread(NULL);
 }
 
@@ -107,11 +107,11 @@ void bk_lcd_qspi_disp_task_stop(void)
         return;
     }
 
-    lcd_qspi_disp_task_running == false;
+    lcd_qspi_disp_task_running = false;
 
     ret = rtos_get_semaphore(&g_lcd_qspi_task_sem, BEKEN_NEVER_TIMEOUT);
     if (BK_OK != ret) {
-        QSPI_DISP_LOGE("%s g_lcd_qspi_task_sem get failed\n");
+        QSPI_DISP_LOGE("%s g_lcd_qspi_task_sem get failed\n", __func__);
         return;
     }
 
@@ -119,13 +119,13 @@ void bk_lcd_qspi_disp_task_stop(void)
 
     ret = rtos_deinit_semaphore(&g_lcd_qspi_disp_sem);
     if (BK_OK != ret) {
-        QSPI_DISP_LOGE("%s g_lcd_qspi_disp_sem deinit failed\n");
+        QSPI_DISP_LOGE("%s g_lcd_qspi_disp_sem deinit failed\n", __func__);
         return;
     }
 
     ret = rtos_deinit_semaphore(&g_lcd_qspi_task_sem);
     if (BK_OK != ret) {
-        QSPI_DISP_LOGE("%s g_lcd_qspi_task_sem deinit failed\n");
+        QSPI_DISP_LOGE("%s g_lcd_qspi_task_sem deinit failed\n", __func__);
         return;
     }
 }
