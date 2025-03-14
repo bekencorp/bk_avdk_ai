@@ -18,8 +18,13 @@
 #include <os/str.h>
 #include "audio_source.h"
 
+#if CONFIG_PROMPT_TONE_SOURCE_ARRAY
 #include "source_array.h"
+#endif
 
+#if CONFIG_PROMPT_TONE_SOURCE_VFS
+#include "source_vfs.h"
+#endif
 
 #define AUDIO_SOURCE_TAG "aud_src"
 
@@ -58,13 +63,15 @@ audio_source_t *audio_source_create(  audio_source_type_t source_type, audio_sou
     /* check whether source type support */
     switch (source_type)
     {
+#if CONFIG_PROMPT_TONE_SOURCE_ARRAY
         case AUDIO_SOURCE_ARRAY:
             temp_ops = get_array_source_ops();
             break;
+#endif
 
-#if 0
-        case AUDIO_SOURCE_FILE:
-            temp_ops = get_file_source_ops();
+#if CONFIG_PROMPT_TONE_SOURCE_VFS
+        case AUDIO_SOURCE_VFS:
+            temp_ops = get_vfs_source_ops();
             break;
 #endif
 
@@ -125,7 +132,7 @@ bk_err_t audio_source_open(audio_source_t *source)
         return BK_FAIL;
     }
 
-    ret = source->ops->open(source, &source->config);
+    ret = source->ops->audio_source_open(source, &source->config);
     if (ret != BK_OK)
     {
         LOGE("%s, %d, audio_source_open fail, ret: %d\n", __func__, __LINE__, ret);
@@ -145,7 +152,7 @@ bk_err_t audio_source_close(audio_source_t *source)
         return BK_FAIL;
     }
 
-    ret = source->ops->close(source);
+    ret = source->ops->audio_source_close(source);
     if (ret != BK_OK)
     {
         LOGE("%s, %d, audio_source_close fail, ret: %d\n", __func__, __LINE__, ret);
@@ -155,24 +162,12 @@ bk_err_t audio_source_close(audio_source_t *source)
     return BK_OK;
 }
 
-#if 0
-int audio_source_read_data(audio_source_t *source, char *buffer, int len)
-{
-    if (!source || !buffer || !len)
-    {
-        return BK_FAIL;
-    }
-
-    return source->ops->read(source, buffer, len);
-}
-#endif
-
 int audio_source_seek(audio_source_t *source, int offset, uint32_t whence)
 {
-    if (!source || !source->ops->seek)
+    if (!source || !source->ops->audio_source_seek)
     {
         return BK_FAIL;
     }
 
-    return source->ops->seek(source, offset, whence);
+    return source->ops->audio_source_seek(source, offset, whence);
 }

@@ -117,6 +117,12 @@ prompt_tone_play_handle_t prompt_tone_play_create(  prompt_tone_play_cfg_t *conf
 {
     LOGI("%s\n", __func__);
 
+    if (!config)
+    {
+        LOGE("%s, %d, config is NULL\n", __func__, __LINE__);
+        return NULL;
+    }
+
     prompt_tone_play_handle_t handle = (prompt_tone_play_handle_t)psram_malloc(sizeof(struct prompt_tone_play));
     if (!handle)
     {
@@ -136,7 +142,7 @@ prompt_tone_play_handle_t prompt_tone_play_create(  prompt_tone_play_cfg_t *conf
     /* create source */
     config->source_cfg.data_handle = source_out_data_handle_cb;
     config->source_cfg.usr_data = handle;
-    handle->source = audio_source_create(AUDIO_SOURCE_ARRAY, &config->source_cfg);
+    handle->source = audio_source_create(config->source_type, &config->source_cfg);
     if (!handle->source)
     {
         LOGE("%s, %d, create audio source handle fail\n", __func__, __LINE__);
@@ -148,7 +154,7 @@ prompt_tone_play_handle_t prompt_tone_play_create(  prompt_tone_play_cfg_t *conf
     config->codec_cfg.usr_data = handle;
     config->codec_cfg.chunk_size = 640;
     config->codec_cfg.pool_size = config->codec_cfg.chunk_size * 4;
-    handle->codec = audio_codec_create(AUDIO_CODEC_PCM, &config->codec_cfg);
+    handle->codec = audio_codec_create(config->codec_type, &config->codec_cfg);
     if (!handle->codec)
     {
         LOGE("%s, %d, create audio codec handle fail\n", __func__, __LINE__);

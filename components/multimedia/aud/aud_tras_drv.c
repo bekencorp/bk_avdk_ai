@@ -53,7 +53,9 @@
 #include "psram_mem_slab.h"
 
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+#if CONFIG_PROMPT_TONE_SOURCE_ARRAY
 #include "prompt_tone.h"
+#endif
 #include "ring_buffer.h"
 #include "prompt_tone_play.h"
 #endif
@@ -157,6 +159,24 @@ typedef struct
     uint32_t total_len;
 } prommpt_tone_info_t;
 static prommpt_tone_info_t prommpt_tone_info = {0};
+
+#if CONFIG_PROMPT_TONE_SOURCE_VFS
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+static char start_config_network_mp3_prompt_tone_path[] = "/start_config_network_16k_mono_16bit.mp3";
+static char config_network_success_mp3_prompt_tone_path[] = "/config_network_success_16k_mono_16bit.mp3";
+static char config_network_fail_mp3_prompt_tone_path[] = "/config_network_fail_16k_mono_16bit.mp3";
+static char network_disconnect_mp3_prompt_tone_path[] = "/network_disconnect_16k_mono_16bit.mp3";
+static char asr_wakeup_mp3_prompt_tone_path[] = "/asr_wakeup_16k_mono_16bit.mp3";
+static char asr_standby_mp3_prompt_tone_path[] = "/asr_standby_16k_mono_16bit.mp3";
+#else
+static char start_config_network_pcm_prompt_tone_path[] = "/start_config_network_16k_mono_16bit.pcm";
+static char config_network_success_pcm_prompt_tone_path[] = "/config_network_success_16k_mono_16bit.pcm";
+static char config_network_fail_pcm_prompt_tone_path[] = "/config_network_fail_16k_mono_16bit.pcm";
+static char network_disconnect_pcm_prompt_tone_path[] = "/network_disconnect_16k_mono_16bit.pcm";
+static char asr_wakeup_pcm_prompt_tone_path[] = "/asr_wakeup_16k_mono_16bit.pcm";
+static char asr_standby_pcm_prompt_tone_path[] = "/asr_standby_16k_mono_16bit.pcm";
+#endif
+#endif  //CONFIG_PROMPT_TONE_SOURCE_VFS
 #endif
 
 #if CONFIG_AI_ASR_MODE_CPU2
@@ -4415,10 +4435,25 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
                 case AUD_TRAS_PLAY_PROMPT_TONE:
                     LOGI("AUD_TRAS_PLAY_PROMPT_TONE\n");
+#if CONFIG_PROMPT_TONE_SOURCE_VFS
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+                    //TODO
+#else
                     prommpt_tone_info_t *prommpt_tone = (prommpt_tone_info_t *)msg.param;
-                    prompt_tone_play_cfg_t config = DEFAULT_PROMPT_TONE_PLAY_CONFIG();
+                    prompt_tone_play_cfg_t config = DEFAULT_VFS_PCM_PROMPT_TONE_PLAY_CONFIG();
                     config.source_cfg.url = (char *)prommpt_tone->url;
                     config.source_cfg.total_size = prommpt_tone->total_len;
+#endif
+#else   //array
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+                    //TODO
+#else
+                    prommpt_tone_info_t *prommpt_tone = (prommpt_tone_info_t *)msg.param;
+                    prompt_tone_play_cfg_t config = DEFAULT_ARRAY_PCM_PROMPT_TONE_PLAY_CONFIG();
+                    config.source_cfg.url = (char *)prommpt_tone->url;
+                    config.source_cfg.total_size = prommpt_tone->total_len;
+#endif
+#endif
                     /* stop play */
                     if (gl_prompt_tone_play_handle)
                     {
@@ -4456,23 +4491,75 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
                     switch (prompt_tone)
                     {
                         case AUD_INTF_VOC_START_CONFIG_NETWORK:
+#if CONFIG_PROMPT_TONE_SOURCE_VFS
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+                            prommpt_tone_info.url = start_config_network_mp3_prompt_tone_path;
+#else
+                            prommpt_tone_info.url = start_config_network_pcm_prompt_tone_path;
+#endif
+#else
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+                            prommpt_tone_info.url = (char *)start_config_network_16k_16bit_mono_mp3;
+                            prommpt_tone_info.total_len = sizeof(start_config_network_16k_16bit_mono_mp3);
+#else
                             prommpt_tone_info.url = (char *)start_config_network_16k_16bit_mono_pcm;
                             prommpt_tone_info.total_len = sizeof(start_config_network_16k_16bit_mono_pcm);
+#endif
+#endif
                             break;
 
                         case AUD_INTF_VOC_CONFIG_NETWORK_SUCCESS:
+#if CONFIG_PROMPT_TONE_SOURCE_VFS
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+                            prommpt_tone_info.url = config_network_success_mp3_prompt_tone_path;
+#else
+                            prommpt_tone_info.url = config_network_success_pcm_prompt_tone_path;
+#endif
+#else
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+                            prommpt_tone_info.url = (char *)config_network_success_16k_16bit_mono_mp3;
+                            prommpt_tone_info.total_len = sizeof(config_network_success_16k_16bit_mono_mp3);
+#else
                             prommpt_tone_info.url = (char *)config_network_success_16k_16bit_mono_pcm;
                             prommpt_tone_info.total_len = sizeof(config_network_success_16k_16bit_mono_pcm);
+#endif
+#endif
                             break;
 
                         case AUD_INTF_VOC_CONFIG_NETWORK_FAIL:
+#if CONFIG_PROMPT_TONE_SOURCE_VFS
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+                            prommpt_tone_info.url = config_network_fail_mp3_prompt_tone_path;
+#else
+                            prommpt_tone_info.url = config_network_fail_pcm_prompt_tone_path;
+#endif
+#else
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+                            prommpt_tone_info.url = (char *)config_network_fail_16k_16bit_mono_mp3;
+                            prommpt_tone_info.total_len = sizeof(config_network_fail_16k_16bit_mono_mp3);
+#else
                             prommpt_tone_info.url = (char *)config_network_fail_16k_16bit_mono_pcm;
                             prommpt_tone_info.total_len = sizeof(config_network_fail_16k_16bit_mono_pcm);
+#endif
+#endif
                             break;
 
                         case AUD_INTF_VOC_NETWORK_DISCONNECT:
+#if CONFIG_PROMPT_TONE_SOURCE_VFS
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+                            prommpt_tone_info.url = network_disconnect_mp3_prompt_tone_path;
+#else
+                            prommpt_tone_info.url = network_disconnect_pcm_prompt_tone_path;
+#endif
+#else
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+                            prommpt_tone_info.url = (char *)network_disconnect_16k_16bit_mono_mp3;
+                            prommpt_tone_info.total_len = sizeof(network_disconnect_16k_16bit_mono_mp3);
+#else
                             prommpt_tone_info.url = (char *)network_disconnect_16k_16bit_mono_pcm;
                             prommpt_tone_info.total_len = sizeof(network_disconnect_16k_16bit_mono_pcm);
+#endif
+#endif
                             break;
 
                         default:
@@ -4716,8 +4803,21 @@ bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result)
         }
 
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+#if CONFIG_PROMPT_TONE_SOURCE_VFS
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+        prommpt_tone_info.url = asr_wakeup_mp3_prompt_tone_path;
+#else
+        prommpt_tone_info.url = asr_wakeup_pcm_prompt_tone_path;
+#endif
+#else
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+        prommpt_tone_info.url = (char *)armino_16k_16bit_mono_mp3;
+        prommpt_tone_info.total_len = sizeof(armino_16k_16bit_mono_mp3);
+#else
         prommpt_tone_info.url = (char *)armino_16k_16bit_mono_pcm;
         prommpt_tone_info.total_len = sizeof(armino_16k_16bit_mono_pcm);
+#endif
+#endif
         if (aud_tras_drv_send_msg(AUD_TRAS_PLAY_PROMPT_TONE, (void *)&prommpt_tone_info) != BK_OK)
         {
             LOGE("%s, %d, send tras play prompt tone fail\n", __func__, __LINE__);
@@ -4733,8 +4833,21 @@ bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result)
         }
 
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+#if CONFIG_PROMPT_TONE_SOURCE_VFS
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+        prommpt_tone_info.url = asr_standby_mp3_prompt_tone_path;
+#else
+        prommpt_tone_info.url = asr_standby_pcm_prompt_tone_path;
+#endif
+#else
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+        prommpt_tone_info.url = (char *)byebye_16k_16bit_mono_mp3;
+        prommpt_tone_info.total_len = sizeof(byebye_16k_16bit_mono_mp3);
+#else
         prommpt_tone_info.url = (char *)byebye_16k_16bit_mono_pcm;
         prommpt_tone_info.total_len = sizeof(byebye_16k_16bit_mono_pcm);
+#endif
+#endif
         if (aud_tras_drv_send_msg(AUD_TRAS_PLAY_PROMPT_TONE, (void *)&prommpt_tone_info) != BK_OK)
         {
             LOGE("%s, %d, send tras play prompt tone fail\n", __func__, __LINE__);

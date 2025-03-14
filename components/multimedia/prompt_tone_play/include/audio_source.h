@@ -24,8 +24,8 @@ typedef enum
 {
     AUDIO_SOURCE_UNKNOWN = 0,
 
-    AUDIO_SOURCE_FILE,
     AUDIO_SOURCE_ARRAY,
+    AUDIO_SOURCE_VFS,
 } audio_source_type_t;
 
 typedef enum
@@ -65,10 +65,9 @@ typedef struct
 
 typedef struct audio_source_ops_s
 {
-    int (*open)(audio_source_t *codec, audio_source_cfg_t *config);
-//    int (*read)(audio_source_t *source, char *buffer, uint32_t len);
-    int (*seek)(audio_source_t *source, int offset, uint32_t whence);
-    int (*close)(audio_source_t *source);
+    int (*audio_source_open)(audio_source_t *codec, audio_source_cfg_t *config);
+    int (*audio_source_seek)(audio_source_t *source, int offset, uint32_t whence);
+    int (*audio_source_close)(audio_source_t *source);
 } audio_source_ops_t;
 
 struct audio_source_s

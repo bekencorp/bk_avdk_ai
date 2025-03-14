@@ -201,6 +201,30 @@ menu "Media"
         bool "Enable supoort prompt tone"
         default n
 
+	choice PROMPT_TONE_SOURCE
+		depends on AUD_INTF_SUPPORT_PROMPT_TONE
+		prompt "Select Prompt Tone Source"
+		default PROMPT_TONE_SOURCE_ARRAY
+
+		config PROMPT_TONE_SOURCE_ARRAY
+		bool "Select Prompt Tone stored in array"
+
+		config PROMPT_TONE_SOURCE_VFS
+		bool "Select Prompt Tone stored in vfs file system"
+	endchoice
+
+	choice PROMPT_TONE_CODEC_TYPE
+		depends on AUD_INTF_SUPPORT_PROMPT_TONE
+		prompt "Select Prompt Tone Codec Type"
+		default PROMPT_TONE_CODEC_PCM
+
+		config PROMPT_TONE_CODEC_PCM
+		bool "Select PCM Prompt Tone"
+
+		config PROMPT_TONE_CODEC_MP3
+		bool "Select MP3 Prompt Tone"
+	endchoice
+
     config DEBUG_DUMP
         bool "dump debug data"
         default n

@@ -26,28 +26,52 @@ extern "C" {
 
 typedef struct
 {
+    audio_source_type_t source_type;
     audio_source_cfg_t source_cfg;
+    audio_codec_type_t codec_type;
     audio_codec_cfg_t codec_cfg;
 } prompt_tone_play_cfg_t;
 
 typedef struct prompt_tone_play *prompt_tone_play_handle_t;
 
-#define DEFAULT_PROMPT_TONE_PLAY_CONFIG() {     \
-    .source_cfg = {                             \
-        .url = NULL,                            \
-        .frame_size = DEFAULT_FRAME_SIZE,       \
-        .data_handle = NULL,                    \
-        .notify = NULL,                         \
-        .usr_data = NULL,                       \
-    },                                          \
-    .codec_cfg = {                              \
-        .chunk_size = DEFAULT_CHUNK_SIZE,       \
-        .pool_size = DEFAULT_POOL_SIZE,         \
-        .data_handle = NULL,                    \
-        .empty_cb = NULL,                       \
-        .usr_data = NULL,                       \
-    },                                          \
+#define DEFAULT_ARRAY_PCM_PROMPT_TONE_PLAY_CONFIG() {   \
+    .source_type = AUDIO_SOURCE_ARRAY,                  \
+    .source_cfg = {                                     \
+        .url = NULL,                                    \
+        .frame_size = DEFAULT_FRAME_SIZE,               \
+        .data_handle = NULL,                            \
+        .notify = NULL,                                 \
+        .usr_data = NULL,                               \
+    },                                                  \
+    .codec_type = AUDIO_CODEC_PCM,                      \
+    .codec_cfg = {                                      \
+        .chunk_size = DEFAULT_CHUNK_SIZE,               \
+        .pool_size = DEFAULT_POOL_SIZE,                 \
+        .data_handle = NULL,                            \
+        .empty_cb = NULL,                               \
+        .usr_data = NULL,                               \
+    },                                                  \
 }
+
+#define DEFAULT_VFS_PCM_PROMPT_TONE_PLAY_CONFIG() {     \
+    .source_type = AUDIO_SOURCE_VFS,                    \
+    .source_cfg = {                                     \
+        .url = NULL,                                    \
+        .frame_size = DEFAULT_FRAME_SIZE,               \
+        .data_handle = NULL,                            \
+        .notify = NULL,                                 \
+        .usr_data = NULL,                               \
+    },                                                  \
+    .codec_type = AUDIO_CODEC_PCM,                      \
+    .codec_cfg = {                                      \
+        .chunk_size = DEFAULT_CHUNK_SIZE,               \
+        .pool_size = DEFAULT_POOL_SIZE,                 \
+        .data_handle = NULL,                            \
+        .empty_cb = NULL,                               \
+        .usr_data = NULL,                               \
+    },                                                  \
+}
+
 
 /**
  * @brief     Create mp3 player with config

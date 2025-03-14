@@ -20,6 +20,7 @@
 extern "C" {
 #endif
 
+#if CONFIG_PROMPT_TONE_CODEC_PCM
 const char armino_16k_16bit_mono_pcm[] =
 {
     0x00,
@@ -15113,8 +15114,40 @@ const char network_disconnect_16k_16bit_mono_pcm[] =
     0xFF, 0xFD, 0xFF, 0x02, 0x00, 0x04, 0x00, 0x02, 0x00, 0x07, 0x00, 0x0C, 0x00, 0x09, 0x00, 0x08, 
     0x00, 0x07, 0x00, 0x06, 0x00, 0x0D, 0x00, 0x09, 0x00, 0x09, 0x00, 0x0A, 0x00, 0x03, 0x00, 0x05, 
     0x00, 0x07, 0x00, 0x07, 0x00, 0x05, 0x00, 0x03, 0x00, 0xFF, 0xFF, 0xFE, 0xFF, 0x00, 0x00, 
-
 };
+#endif  //CONFIG_PROMPT_TONE_CODEC_PCM
+
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+const char armino_16k_16bit_mono_mp3[] =
+{
+    0x00,
+};
+
+const char byebye_16k_16bit_mono_mp3[] =
+{
+    0x00,
+};
+
+const char start_config_network_16k_16bit_mono_mp3[] =
+{
+    0x00,
+};
+
+const char config_network_success_16k_16bit_mono_mp3[] =
+{
+    0x00,
+};
+
+const char config_network_fail_16k_16bit_mono_mp3[] =
+{
+    0x00,
+};
+
+const char network_disconnect_16k_16bit_mono_mp3[] =
+{
+    0x00,
+};
+#endif  //CONFIG_PROMPT_TONE_CODEC_MP3
 
 #ifdef __cplusplus
 }

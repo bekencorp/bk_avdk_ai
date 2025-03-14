@@ -18,9 +18,13 @@
 #include <os/str.h>
 
 #include "audio_codec.h"
+#if CONFIG_PROMPT_TONE_CODEC_MP3
 #include "mp3_codec.h"
-#include "pcm_codec.h"
+#endif
 
+#if CONFIG_PROMPT_TONE_CODEC_PCM
+#include "pcm_codec.h"
+#endif
 
 #define AUDIO_CODEC_TAG "aud_codec"
 
@@ -42,13 +46,17 @@ audio_codec_t *audio_codec_create(  audio_codec_type_t codec_type, audio_codec_c
     /* check whether codec type support */
     switch (codec_type)
     {
+#if CONFIG_PROMPT_TONE_CODEC_MP3
         case AUDIO_CODEC_MP3:
             temp_ops = get_mp3_codec_ops();
             break;
+#endif
 
+#if CONFIG_PROMPT_TONE_CODEC_PCM
         case AUDIO_CODEC_PCM:
             temp_ops = get_pcm_codec_ops();
             break;
+#endif
 
         default:
             break;

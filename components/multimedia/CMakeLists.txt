@@ -207,18 +207,39 @@ if (CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE)
 	list(APPEND srcs
 		prompt_tone_play/src/audio_codec.c
 		prompt_tone_play/src/audio_source.c
-		prompt_tone_play/src/mp3_codec.c
-		prompt_tone_play/src/pcm_codec.c
 		prompt_tone_play/src/prompt_tone_play.c
+	)
+
+if (CONFIG_PROMPT_TONE_CODEC_MP3)
+	list(APPEND srcs
+		prompt_tone_play/src/mp3_codec.c
+	)
+endif()
+
+if (CONFIG_PROMPT_TONE_CODEC_PCM)
+	list(APPEND srcs
+		prompt_tone_play/src/pcm_codec.c
+	)
+endif()
+
+if (CONFIG_PROMPT_TONE_SOURCE_VFS)
+	list(APPEND srcs
+		prompt_tone_play/src/source_vfs.c
+	)
+endif()
+
+if (CONFIG_PROMPT_TONE_SOURCE_ARRAY)
+	list(APPEND srcs
 		prompt_tone_play/src/source_array.c
 	)
+endif()
 endif()
 endif()
 
 endif()# CONFIG_MEDIA
 
 endif() # CONFIG_SOC_BK7258
-armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES bk_cli lvgl net_transfer avdk_libs video unity media_utils  bk_draw_blend display_service avdk_utils)
+armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES bk_cli lvgl net_transfer avdk_libs video unity media_utils  bk_draw_blend display_service avdk_utils bk_vfs)
 
 if (CONFIG_SOC_BK7258) # CONFIG_SOC_BK7258
 if (CONFIG_MEDIA_MAJOR)

@@ -431,10 +431,9 @@ static int array_source_seek(audio_source_t *source, int offset, uint32_t whence
 
 audio_source_ops_t array_source_ops =
 {
-    .open = array_source_open,
-//    .read = array_source_read,
-    .seek = array_source_seek,
-    .close = array_source_close,
+    .audio_source_open = array_source_open,
+    .audio_source_seek = array_source_seek,
+    .audio_source_close = array_source_close,
 };
 
 audio_source_ops_t *get_array_source_ops(void)
