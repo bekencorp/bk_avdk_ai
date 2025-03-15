@@ -69,6 +69,7 @@ typedef struct {
 } jpeg_decode_pipeline_param_t;
 
 static jpeg_decode_pipeline_param_t jpeg_decode_pipeline_param = {0};
+static bool h264_pipeline_is_open = false;
 
 bk_err_t media_send_msg_sync(uint32_t event, uint32_t param)
 {
@@ -390,6 +391,12 @@ bk_err_t media_app_h264_pipeline_open(void)
 #endif
 #endif
 
+    if (h264_pipeline_is_open == true)
+    {
+        LOGI("%s has opened\n", __func__);
+        return BK_OK;
+    }
+
 	ret = media_send_msg_sync(EVENT_PIPELINE_SET_ROTATE_IND, jpeg_decode_pipeline_param.rotate);
 
 	LOGI("%s set rotate %x\n", __func__, ret);
@@ -398,15 +405,26 @@ bk_err_t media_app_h264_pipeline_open(void)
 
 	LOGI("%s complete %x\n", __func__, ret);
 
+    h264_pipeline_is_open = true;
+
 	return ret;
 }
 
 bk_err_t media_app_h264_pipeline_close(void)
 {
 	int ret = BK_OK;
+
+    if (h264_pipeline_is_open == false)
+    {
+        LOGI("%s has closed\n", __func__);
+        return BK_OK;
+    }
+
 	ret = media_send_msg_sync(EVENT_PIPELINE_H264_CLOSE_IND, 0);
 
 	LOGI("%s complete %x\n", __func__, ret);
+
+    h264_pipeline_is_open = false;
 
 	return ret;
 }
