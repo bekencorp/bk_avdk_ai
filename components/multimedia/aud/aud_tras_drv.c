@@ -1621,9 +1621,7 @@ static bk_err_t aud_tras_dec(void)
 	uint32_t size = 0;
 	uint32_t i = 0;
 
-#if CONFIG_AUD_INTF_SUPPORT_G722
     bool fill_slience_flag = false;
-#endif
 
 	if (aud_tras_drv_info.voc_info.status == AUD_TRAS_DRV_VOC_STA_NULL)
 		return BK_OK;
@@ -1724,15 +1722,52 @@ static bk_err_t aud_tras_dec(void)
 					size = ring_buffer_read(aud_tras_drv_info.voc_info.rx_info.decoder_rb, (uint8_t*)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
 					if (size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
 						LOGE("%s, %d, read decoder_ring_buff pcm data fail \n", __func__, __LINE__);
-						os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                        fill_slience_flag = true;
+						//os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
 					}
 				} else {
-					os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+				    fill_slience_flag = true;
+					//os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
 				}
+
+#if CONFIG_AUD_INTF_SUPPORT_AI_DIALOG_FREE
+                /* force fill slience when dialog not running */
+                if (!gl_dialog_running) {
+                    fill_slience_flag = true;
+                }
+#endif
 				/* dump rx data */
 				if (aud_tras_drv_info.voc_info.aud_tras_dump_rx_cb) {
 					aud_tras_drv_info.voc_info.aud_tras_dump_rx_cb((uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
 				}
+
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+                /* Check whether play prompt tone */
+                if (gl_prompt_tone_play_flag) {
+                    int r_size = aud_tras_drv_read_prompt_tone_data((char *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2, 0);
+                    if (r_size <= 0 && gl_prompt_tone_empty_notify) {
+                        /* prompt tone pool empty */
+                        gl_prompt_tone_empty_notify(gl_notify_user_data);
+                        os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                        /* send message to aud_tras_drv_main to stop prompt_tone play */
+                        if (aud_tras_drv_send_msg(AUD_TRAS_STOP_PROMPT_TONE, NULL) != BK_OK)
+                        {
+                            LOGE("%s, %d, send tras stop prompt tone fail\n", __func__, __LINE__);
+                        }
+                    } else {
+                        if (r_size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
+                            os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
+                        }
+                    }
+                } else {
+#endif
+                    if (fill_slience_flag) {
+                        os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                    }
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+                }
+#endif
+
 			} else {
 				if (ring_buffer_get_free_size(&aud_tras_drv_info.voc_info.speaker_rb) > aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
 					/* check the frame number in decoder_ring_buffer */

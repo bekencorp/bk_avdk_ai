@@ -6,4 +6,18 @@ menu "Bk_thirdparty::agora-iot-sdk"
 		help
 			Enable Agora iot sdk lib
 
+	choice AGORA_IOT_SDK_VERSION
+		depends on AGORA_IOT_SDK
+		prompt "Select Agora_IOT_SDK Version"
+		default AGORA_IOT_SDK_VERSION_DEFAULT
+
+		config AGORA_IOT_SDK_VERSION_DEFAULT
+		bool "Select Agora_IOT_SDK Default Version"
+
+		config AGORA_IOT_SDK_VERSION_1
+		bool "Select Agora_IOT_SDK Version 1"
+		help
+			Support audio codec
+	endchoice
+
 endmenu
