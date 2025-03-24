@@ -4303,6 +4303,7 @@ static bk_err_t aud_tras_drv_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_
     switch (prompt_tone)
     {
         case AUD_INTF_VOC_ASR_WAKEUP:
+            LOGI("[prompt_tone] ASR_WAKEUP\n");
 #if CONFIG_PROMPT_TONE_SOURCE_VFS
             prommpt_tone_info.url = asr_wakeup_prompt_tone_path;
 #endif
@@ -4313,6 +4314,7 @@ static bk_err_t aud_tras_drv_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_
             break;
 
         case AUD_INTF_VOC_ASR_STANDBY:
+            LOGI("[prompt_tone] ASR_STANDBY\n");
 #if CONFIG_PROMPT_TONE_SOURCE_VFS
             prommpt_tone_info.url = asr_standby_prompt_tone_path;
 #endif
@@ -4323,6 +4325,7 @@ static bk_err_t aud_tras_drv_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_
             break;
 
         case AUD_INTF_VOC_NETWORK_PROVISION:
+            LOGI("[prompt_tone] NETWORK_PROVISION\n");
 #if CONFIG_PROMPT_TONE_SOURCE_VFS
             prommpt_tone_info.url = network_provision_prompt_tone_path;
 #endif
@@ -4333,6 +4336,7 @@ static bk_err_t aud_tras_drv_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_
             break;
 
         case AUD_INTF_VOC_NETWORK_PROVISION_SUCCESS:
+            LOGI("[prompt_tone] NETWORK_PROVISION_SUCCESS\n");
 #if CONFIG_PROMPT_TONE_SOURCE_VFS
             prommpt_tone_info.url = network_provision_success_prompt_tone_path;
 #endif
@@ -4343,6 +4347,7 @@ static bk_err_t aud_tras_drv_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_
             break;
 
         case AUD_INTF_VOC_NETWORK_PROVISION_FAIL:
+            LOGI("[prompt_tone] NETWORK_PROVISION_FAIL\n");
 #if CONFIG_PROMPT_TONE_SOURCE_VFS
             prommpt_tone_info.url = network_provision_fail_prompt_tone_path;
 #endif
@@ -4353,6 +4358,7 @@ static bk_err_t aud_tras_drv_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_
             break;
 
         case AUD_INTF_VOC_RECONNECT_NETWORK:
+            LOGI("[prompt_tone] RECONNECT_NETWORK\n");
 #if CONFIG_PROMPT_TONE_SOURCE_VFS
             prommpt_tone_info.url = reconnect_network_prompt_tone_path;
 #endif
@@ -4363,6 +4369,7 @@ static bk_err_t aud_tras_drv_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_
             break;
 
         case AUD_INTF_VOC_RECONNECT_NETWORK_SUCCESS:
+            LOGI("[prompt_tone] RECONNECT_NETWORK_SUCCESS\n");
 #if CONFIG_PROMPT_TONE_SOURCE_VFS
             prommpt_tone_info.url = reconnect_network_success_prompt_tone_path;
 #endif
@@ -4373,6 +4380,7 @@ static bk_err_t aud_tras_drv_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_
             break;
 
         case AUD_INTF_VOC_RECONNECT_NETWORK_FAIL:
+            LOGI("[prompt_tone] RECONNECT_NETWORK_FAIL\n");
 #if CONFIG_PROMPT_TONE_SOURCE_VFS
             prommpt_tone_info.url = reconnect_network_fail_prompt_tone_path;
 #endif
@@ -4383,6 +4391,7 @@ static bk_err_t aud_tras_drv_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_
             break;
 
         case AUD_INTF_VOC_RTC_CONNECTION_LOST:
+            LOGI("[prompt_tone] CONNECTION_LOST\n");
 #if CONFIG_PROMPT_TONE_SOURCE_VFS
             prommpt_tone_info.url = rtc_connection_lost_prompt_tone_path;
 #endif
@@ -4393,6 +4402,7 @@ static bk_err_t aud_tras_drv_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_
             break;
 
         case AUD_INTF_VOC_AGENT_JOINED:
+            LOGI("[prompt_tone] AGENT_JOINED\n");
 #if CONFIG_PROMPT_TONE_SOURCE_VFS
             prommpt_tone_info.url = agent_joined_prompt_tone_path;
 #endif
@@ -4403,6 +4413,7 @@ static bk_err_t aud_tras_drv_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_
             break;
 
         case AUD_INTF_VOC_AGENT_OFFLINE:
+            LOGI("[prompt_tone] AGENT_OFFLINE\n");
 #if CONFIG_PROMPT_TONE_SOURCE_VFS
             prommpt_tone_info.url = agent_offline_prompt_tone_path;
 #endif
@@ -4413,6 +4424,7 @@ static bk_err_t aud_tras_drv_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_
             break;
 
         case AUD_INTF_VOC_LOW_VOLTAGE:
+            LOGI("[prompt_tone] LOW_VOLTAGE\n");
 #if CONFIG_PROMPT_TONE_SOURCE_VFS
             prommpt_tone_info.url = low_voltage_prompt_tone_path;
 #endif
@@ -4736,7 +4748,7 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
 
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
                 case AUD_TRAS_PLAY_PROMPT_TONE:
-                    LOGI("AUD_TRAS_PLAY_PROMPT_TONE\n");
+                    LOGD("AUD_TRAS_PLAY_PROMPT_TONE\n");
 
                     AUD_PLAY_PROMPT_TONE_START();
 
@@ -4787,7 +4799,7 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
                     break;
 
                 case AUD_TRAS_STOP_PROMPT_TONE:
-                    LOGI("AUD_TRAS_STOP_PROMPT_TONE\n");
+                    LOGD("AUD_TRAS_STOP_PROMPT_TONE\n");
 
                     AUD_STOP_PROMPT_TONE_START();
 
@@ -5053,6 +5065,7 @@ bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result)
         prommpt_tone_info.url = (char *)asr_wakeup_prompt_tone_array;
         prommpt_tone_info.total_len = sizeof(asr_wakeup_prompt_tone_array);
 #endif
+        LOGI("[prompt_tone] ASR_WAKEUP\n");
         if (aud_tras_drv_send_msg(AUD_TRAS_PLAY_PROMPT_TONE, (void *)&prommpt_tone_info) != BK_OK)
         {
             LOGE("%s, %d, send tras play prompt tone fail\n", __func__, __LINE__);
@@ -5075,6 +5088,7 @@ bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result)
         prommpt_tone_info.url = (char *)asr_standby_prompt_tone_array;
         prommpt_tone_info.total_len = sizeof(asr_standby_prompt_tone_array);
 #endif
+        LOGI("[prompt_tone] ASR_STANDBY\n");
         if (aud_tras_drv_send_msg(AUD_TRAS_PLAY_PROMPT_TONE, (void *)&prommpt_tone_info) != BK_OK)
         {
             LOGE("%s, %d, send tras play prompt tone fail\n", __func__, __LINE__);
