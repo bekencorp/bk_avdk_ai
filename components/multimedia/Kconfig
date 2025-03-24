@@ -168,7 +168,7 @@ menu "Media"
 	config AUD_RING_BUFF_SAFE_INTERVAL
 		int "Set Aud Ring Buff Safe Interval"
 		range 0 320
-		default 0
+		default 4
 		help
 			Audio ring buff safe interval
 

@@ -70,7 +70,7 @@ typedef struct vfs_source_priv_s
 } vfs_source_priv_t;
 
 #ifdef MOUNT_ENABLE
-static int vfs_source_mount(void)
+int vfs_source_mount(void)
 {
     int ret = BK_FAIL;
 
@@ -121,7 +121,7 @@ static int vfs_source_mount(void)
     }
 }
 
-static bk_err_t vfs_source_unmount(void)
+int vfs_source_unmount(void)
 {
     bk_err_t ret = BK_FAIL;
 
@@ -395,7 +395,7 @@ static int vfs_source_open(audio_source_t *source, audio_source_cfg_t *config)
     temp_vfs_source->read_buff_size = config->frame_size;
     os_memcpy(&temp_vfs_source->config, config, sizeof(audio_source_cfg_t));
 
-#ifdef MOUNT_ENABLE
+#if 0//def MOUNT_ENABLE
     /* mount file */
     ret = vfs_source_mount();
     if (ret != BK_OK)
@@ -438,7 +438,7 @@ fail:
         temp_vfs_source->fd = -1;
     }
 
-#ifdef MOUNT_ENABLE
+#if 0//def MOUNT_ENABLE
     vfs_source_unmount();
 #endif
 
@@ -466,7 +466,7 @@ static int vfs_source_close(audio_source_t *source)
         vfs_source->fd = -1;
     }
 
-#ifdef MOUNT_ENABLE
+#if 0//def MOUNT_ENABLE
     vfs_source_unmount();
 #endif
 

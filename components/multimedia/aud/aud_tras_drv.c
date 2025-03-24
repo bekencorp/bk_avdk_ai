@@ -103,6 +103,52 @@ static uart_util_t g_aec_data_uart_util = {0};
 
 #define AUD_MEDIA_SEM_ENABLE    0
 
+//#define VOICE_MODE_DEBUG   //GPIO debug
+
+#ifdef VOICE_MODE_DEBUG
+#define AUD_ADC_DMA_ISR_START()                 do { GPIO_DOWN(32); GPIO_UP(32);} while (0)
+#define AUD_ADC_DMA_ISR_END()                   do { GPIO_DOWN(32); } while (0)
+
+#define AUD_AEC_PROCESS_START()                 do { GPIO_DOWN(33); GPIO_UP(33);} while (0)
+#define AUD_AEC_PROCESS_END()                   do { GPIO_DOWN(33); } while (0)
+
+#define AUD_ENC_PROCESS_START()                 do { GPIO_DOWN(34); GPIO_UP(34);} while (0)
+#define AUD_ENC_PROCESS_END()                   do { GPIO_DOWN(34); } while (0)
+
+#define AUD_DAC_DMA_ISR_START()                 do { GPIO_DOWN(35); GPIO_UP(35);} while (0)
+#define AUD_DAC_DMA_ISR_END()                   do { GPIO_DOWN(35); } while (0)
+
+#define AUD_DEC_PROCESS_START()                 do { GPIO_DOWN(36); GPIO_UP(36);} while (0)
+#define AUD_DEC_PROCESS_END()                   do { GPIO_DOWN(36); } while (0)
+
+#define AUD_PLAY_PROMPT_TONE_START()            do { GPIO_DOWN(37); GPIO_UP(37);} while (0)
+#define AUD_PLAY_PROMPT_TONE_END()              do { GPIO_DOWN(37); } while (0)
+
+#define AUD_STOP_PROMPT_TONE_START()            do { GPIO_DOWN(38); GPIO_UP(38);} while (0)
+#define AUD_STOP_PROMPT_TONE_END()              do { GPIO_DOWN(38); } while (0)
+#else
+#define AUD_ADC_DMA_ISR_START()
+#define AUD_ADC_DMA_ISR_END()
+
+#define AUD_AEC_PROCESS_START()
+#define AUD_AEC_PROCESS_END()
+
+#define AUD_ENC_PROCESS_START()
+#define AUD_ENC_PROCESS_END()
+
+#define AUD_DAC_DMA_ISR_START()
+#define AUD_DAC_DMA_ISR_END()
+
+#define AUD_DEC_PROCESS_START()
+#define AUD_DEC_PROCESS_END()
+
+#define AUD_PLAY_PROMPT_TONE_START()
+#define AUD_PLAY_PROMPT_TONE_END()
+
+#define AUD_STOP_PROMPT_TONE_START()
+#define AUD_STOP_PROMPT_TONE_END()
+#endif
+
 
 #define CONFIG_AUD_TRAS_AEC_MIC_DELAY_POINTS   53
 //#define CONFIG_AUD_RING_BUFF_SAFE_INTERVAL    20
@@ -341,9 +387,9 @@ static void aud_tras_dac_pa_ctrl(bool en)
 #if CONFIG_AUD_TRAS_DAC_PA_CTRL
 	/* delay 2ms to avoid po audio data, and then open pa */
 	delay_ms(2);
-	/* open pa according to congfig */
-	gpio_dev_unmap(AUD_DAC_PA_CTRL_GPIO);
-	bk_gpio_enable_output(AUD_DAC_PA_CTRL_GPIO);
+    /* open pa according to congfig */
+    //gpio_dev_unmap(AUD_DAC_PA_CTRL_GPIO);
+    //bk_gpio_enable_output(AUD_DAC_PA_CTRL_GPIO);
 #if AUD_DAC_PA_ENABLE_LEVEL
 	bk_gpio_set_output_high(AUD_DAC_PA_CTRL_GPIO);
 #else
@@ -352,9 +398,6 @@ static void aud_tras_dac_pa_ctrl(bool en)
 #endif
 	} else {
 #if CONFIG_AUD_TRAS_DAC_PA_CTRL
-		/* open pa according to congfig */
-		//gpio_dev_unmap(AUD_DAC_PA_CTRL_GPIO);
-		//bk_gpio_enable_output(AUD_DAC_PA_CTRL_GPIO);
 #if AUD_DAC_PA_ENABLE_LEVEL
 		bk_gpio_set_output_low(AUD_DAC_PA_CTRL_GPIO);
 #else
@@ -621,7 +664,7 @@ static void aud_tras_drv_aec_decfg(void)
 static void aud_tras_adc_dma_finish_isr(void)
 {
 	bk_err_t ret = BK_OK;
-//	GPIO_UP(3);
+    AUD_ADC_DMA_ISR_START();
 
 	if (aud_tras_drv_info.work_mode == AUD_INTF_WORK_MODE_GENERAL) {
 		ret = aud_tras_drv_send_msg(AUD_TRAS_DRV_MIC_TX_DATA, NULL);
@@ -635,7 +678,8 @@ static void aud_tras_adc_dma_finish_isr(void)
 	if (ret != kNoErr) {
 		LOGE("%s, %d, send msg: AUD_TRAS_DRV_AEC fail \n", __func__, __LINE__);
 	}
-//	GPIO_DOWN(3);
+
+    AUD_ADC_DMA_ISR_END();
 }
 
 static bk_err_t aud_tras_adc_dma_config(dma_id_t dma_id, int32_t *ring_buff_addr, uint32_t ring_buff_size, uint32_t transfer_len, aud_intf_mic_chl_t mic_chl)
@@ -705,6 +749,7 @@ static bk_err_t aud_tras_adc_dma_config(dma_id_t dma_id, int32_t *ring_buff_addr
 static void aud_tras_dac_dma_finish_isr(void)
 {
 	bk_err_t ret = BK_OK;
+    AUD_DAC_DMA_ISR_START();
 
 	if (aud_tras_drv_info.work_mode == AUD_INTF_WORK_MODE_GENERAL)
 		/* send msg to notify app to write speaker data */
@@ -715,6 +760,8 @@ static void aud_tras_dac_dma_finish_isr(void)
 	if (ret != kNoErr) {
 		LOGE("%s, %d, dac send msg: AUD_TRAS_DRV_DECODER fail \n", __func__, __LINE__);
 	}
+
+    AUD_DAC_DMA_ISR_END();
 }
 
 static bk_err_t aud_tras_dac_dma_config(dma_id_t dma_id, int32_t *ring_buff_addr, uint32_t ring_buff_size, uint32_t transfer_len, aud_intf_spk_chl_t spk_chl)
@@ -791,6 +838,8 @@ static bk_err_t aud_tras_aec(void)
 
 	if (aud_tras_drv_info.voc_info.status == AUD_TRAS_DRV_VOC_STA_NULL)
 		return BK_OK;
+
+    AUD_AEC_PROCESS_START();
 
 	aec_info_t *aec_info_pr = aud_tras_drv_info.voc_info.aec_info;
 
@@ -1002,6 +1051,8 @@ static bk_err_t aud_tras_aec(void)
 		LOGE("%s, %d, send msg: AUD_TRAS_DRV_ENCODER fail \n", __func__, __LINE__);
 		return BK_FAIL;
 	}
+
+    AUD_AEC_PROCESS_END();
 
 	return ret;
 }
@@ -1371,6 +1422,8 @@ static bk_err_t aud_tras_enc(void)
 	if (aud_tras_drv_info.voc_info.status == AUD_TRAS_DRV_VOC_STA_NULL)
 		return BK_OK;
 
+    AUD_ENC_PROCESS_START();
+
 	if (aud_tras_drv_info.voc_info.mic_type == AUD_INTF_MIC_TYPE_BOARD) {
 		if (aud_tras_drv_info.voc_info.aec_enable) {
 			/* get data from aec_ring_buff */
@@ -1520,6 +1573,8 @@ static bk_err_t aud_tras_enc(void)
 	}
 #endif
 
+    AUD_ENC_PROCESS_END();
+
 	return ret;
 
 encoder_exit:
@@ -1571,6 +1626,8 @@ static bk_err_t aud_tras_dec(void)
 
 	if (aud_tras_drv_info.voc_info.status == AUD_TRAS_DRV_VOC_STA_NULL)
 		return BK_OK;
+
+    AUD_DEC_PROCESS_START();
 
 #if (CONFIG_CACHE_ENABLE)
 	flush_all_dcache();
@@ -1924,6 +1981,8 @@ static bk_err_t aud_tras_dec(void)
 	/* call callback to notify app */
 	if (aud_tras_drv_info.aud_tras_rx_spk_data)
 		aud_tras_drv_info.aud_tras_rx_spk_data((unsigned int)aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
+
+    AUD_DEC_PROCESS_END();
 
 	return BK_OK;
 
@@ -3552,7 +3611,7 @@ static bk_err_t aud_tras_drv_voc_start(void)
 
 			/* enable dac */
 			bk_aud_dac_start();
-			aud_tras_dac_pa_ctrl(true);
+            aud_tras_dac_pa_ctrl(true);
 
 			ret = bk_dma_start(aud_tras_drv_info.voc_info.dac_dma_id);
 			if (ret != BK_OK) {
@@ -4642,6 +4701,9 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
                 case AUD_TRAS_PLAY_PROMPT_TONE:
                     LOGI("AUD_TRAS_PLAY_PROMPT_TONE\n");
+
+                    AUD_PLAY_PROMPT_TONE_START();
+
 #if CONFIG_PROMPT_TONE_SOURCE_VFS
 #if CONFIG_PROMPT_TONE_CODEC_MP3
                     //TODO
@@ -4685,10 +4747,14 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
                         break;
                     }
                     prompt_tone_play_open(gl_prompt_tone_play_handle);
+                    AUD_PLAY_PROMPT_TONE_END();
                     break;
 
                 case AUD_TRAS_STOP_PROMPT_TONE:
                     LOGI("AUD_TRAS_STOP_PROMPT_TONE\n");
+
+                    AUD_STOP_PROMPT_TONE_START();
+
                     if (BK_OK != prompt_tone_play_close(gl_prompt_tone_play_handle, 0))
                     {
                         LOGE("%s, %d, prompt_tone_play_close fail\n", __func__, __LINE__);
@@ -4698,6 +4764,9 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
                         LOGE("%s, %d, prompt_tone_play_destroy fail\n", __func__, __LINE__);
                     }
                     gl_prompt_tone_play_handle = NULL;
+
+                    AUD_STOP_PROMPT_TONE_END();
+
                     break;
 
                 case AUD_TRAS_PLAY_PROMPT_TONE_REQ:
@@ -4800,6 +4869,11 @@ bk_err_t aud_tras_drv_init(aud_intf_drv_config_t *setup_cfg)
 {
 	bk_err_t ret = BK_OK;
 
+#if CONFIG_PROMPT_TONE_SOURCE_VFS
+    extern int vfs_source_mount(void);
+    vfs_source_mount();
+#endif
+
 #if AUD_MEDIA_SEM_ENABLE
 	/* init semaphore used to  */
 	if (!mailbox_media_aud_mic_sem) {
@@ -4864,6 +4938,10 @@ bk_err_t aud_tras_drv_init(aud_intf_drv_config_t *setup_cfg)
 
 fail:
 	//LOGE("%s, %d, aud_tras_drv_init fail, ret: %d \n", __func__, __LINE__, ret);
+#if 0//CONFIG_PROMPT_TONE_SOURCE_VFS
+    extern int vfs_source_unmount(void);
+    vfs_source_unmount();
+#endif
 
 	if(aud_tras_drv_task_sem)
 	{
@@ -4878,6 +4956,11 @@ bk_err_t aud_tras_drv_deinit(void)
 {
 	bk_err_t ret;
 	aud_tras_drv_msg_t msg;
+
+#if CONFIG_PROMPT_TONE_SOURCE_VFS
+    extern int vfs_source_unmount(void);
+    vfs_source_unmount();
+#endif
 
 	msg.op = AUD_TRAS_DRV_EXIT;
 	if (aud_trs_drv_int_msg_que) {
