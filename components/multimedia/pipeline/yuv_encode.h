@@ -49,6 +49,7 @@ typedef enum {
 	JPEGDEC_SET_ROTATE_ANGLE,
 	JPEGDEC_RESET,
 	JPEGDEC_RESET_RESTART,
+	JPEGDEC_USER_NOTIFY,
 } jdec_msg_type_t;
 
 typedef enum {

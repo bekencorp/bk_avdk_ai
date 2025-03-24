@@ -33,6 +33,7 @@ typedef enum
 	MODULE_DECODER_CP1,
 	MODULE_LCD,
 	MODULE_CAPTURE,
+	MODULE_USER,
 	MODULE_MAX,
 } frame_module_t;
 

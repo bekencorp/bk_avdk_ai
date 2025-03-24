@@ -138,10 +138,11 @@ static void jpeg_decode_line_complete_handler(jpeg_dec_res_t *result);
 static bk_err_t jpeg_h264_line_request_callback(void *param);
 static bk_err_t jpeg_rotate_line_request_callback(void *param);
 static bk_err_t jpeg_scale_line_request_callback(void *param);
+static bk_err_t jpeg_user_request_callback(void *param);
 static bk_err_t h264_reset_request_callback(void *param);
 static bk_err_t scale_reset_request_callback(void *param);
 static bk_err_t rotate_reset_request_callback(void *param);
-
+static bk_err_t user_reset_request_callback(void *param);
 
 #if CONFIG_LVGL
 extern uint8_t lvgl_disp_enable;
@@ -153,9 +154,10 @@ static jdec_info_t *jdec_info = NULL;
 media_mailbox_msg_t jdec_msg = {0};
 
 const mux_callback_t mux_callback[PIPELINE_MOD_LINE_MAX] = {
-	jpeg_h264_line_request_callback,
-	jpeg_rotate_line_request_callback,
-	jpeg_scale_line_request_callback,
+	[PIPELINE_MOD_H264] = jpeg_h264_line_request_callback,
+	[PIPELINE_MOD_ROTATE] = jpeg_rotate_line_request_callback,
+	[PIPELINE_MOD_SCALE] = jpeg_scale_line_request_callback,
+	[PIPELINE_MOD_USER] = jpeg_user_request_callback,
 };
 
 void jpeg_decode_get_next_frame();
@@ -292,7 +294,7 @@ static bk_err_t jpeg_h264_line_request_callback(void *param)
 }
 
 static bk_err_t jpeg_rotate_line_request_callback(void *param)
-{   
+{
     ROTATE_DECODE_NOTIFY();
 	LOGD("%s\n", __func__);
 	return jpeg_decode_task_send_msg(JPEGDEC_ROTATE_NOTIFY, (uint32_t)param);
@@ -303,6 +305,12 @@ static bk_err_t jpeg_scale_line_request_callback(void *param)
     SCALE_DECODE_NOTIFY();
 	LOGD("%s\n", __func__);
 	return jpeg_decode_task_send_msg(JPEGDEC_SCALE_NOTIFY, (uint32_t)param);
+}
+
+static bk_err_t jpeg_user_request_callback(void *param)
+{
+    LOGD("%s\n", __func__);
+    return jpeg_decode_task_send_msg(JPEGDEC_USER_NOTIFY, (uint32_t)param);
 }
 
 static bk_err_t h264_reset_request_callback(void *param)
@@ -316,6 +324,11 @@ static bk_err_t scale_reset_request_callback(void *param)
 static bk_err_t rotate_reset_request_callback(void *param)
 {
     return jpeg_decode_task_send_msg(JPEGDEC_RESET_RESTART, PIPELINE_MOD_ROTATE);
+}
+
+static bk_err_t user_reset_request_callback(void *param)
+{
+    return jpeg_decode_task_send_msg(JPEGDEC_RESET_RESTART, PIPELINE_MOD_USER);
 }
 
 static void jpeg_decode_reset_restart(uint32_t param)
@@ -335,14 +348,19 @@ static void jpeg_decode_reset_restart(uint32_t param)
         jdec_config->module[PIPELINE_MOD_SCALE].start = 0;
         LOGD("%s scale \n", __func__);
     }
+    if (param == PIPELINE_MOD_USER)
+    {
+        jdec_config->module[PIPELINE_MOD_USER].start = 0;
+        LOGD("%s user \n", __func__);
+    }
 
-	if ((jdec_config->module[PIPELINE_MOD_H264].start == 0) 
+	if ((jdec_config->module[PIPELINE_MOD_H264].start == 0)
         && (jdec_config->module[PIPELINE_MOD_SCALE].start == 0)
-        && (jdec_config->module[PIPELINE_MOD_ROTATE].start == 0))
+        && (jdec_config->module[PIPELINE_MOD_ROTATE].start == 0)
+        && (jdec_config->module[PIPELINE_MOD_USER].start == 0))
 	{
         LOGI("%s restart\n", __func__);
         jpeg_get_task_send_msg(JPEGDEC_START, MODULE_DECODER);
-        
 	}
 }
 
@@ -844,7 +862,7 @@ static void jpeg_decode_start_handle(frame_buffer_t *jpeg_frame, frame_module_t 
 static void jpeg_decode_line_done_handle(uint32_t param)
 {
 	pipeline_mux_buf_t *mux_buf = (pipeline_mux_buf_t*)param;
-	pipeline_encode_request_t request;
+	pipeline_encode_request_t request = {0};
 
 	if (rtos_is_oneshot_timer_running(&jdec_config->decoder_timer))
 	{
@@ -1005,7 +1023,7 @@ static void jpeg_decode_task_deinit(void)
 			jdec_config->mux_buf[0].buffer.data = NULL;
 			jdec_config->mux_buf[1].buffer.data = NULL;
 		}
- 
+
 		if (jdec_config->jpeg_frame)
 		{
 			LOGD("%s free jpeg_frame\n", __func__);
@@ -1443,6 +1461,9 @@ static void jpeg_decode_main(beken_thread_arg_t data)
 					jpeg_decode_h264_frame_notify(decoder_buffer);
 					break;
 				}
+				case JPEGDEC_USER_NOTIFY:
+				    jpeg_decode_notify_handle(msg.param, PIPELINE_MOD_USER);
+				    break;
 
 				case JPEGDEC_RESET:
                     jpeg_decode_reset();
@@ -1457,6 +1478,10 @@ static void jpeg_decode_main(beken_thread_arg_t data)
 					if(jdec_config->module[PIPELINE_MOD_ROTATE].enable)
 					{
 						jdec_config->reset_cb[PIPELINE_MOD_ROTATE](rotate_reset_request_callback);
+					}
+					if(jdec_config->module[PIPELINE_MOD_USER].enable)
+					{
+					    jdec_config->reset_cb[PIPELINE_MOD_USER](user_reset_request_callback);
 					}
 					break;
 
@@ -1753,7 +1778,7 @@ bk_err_t jpeg_decode_task_close()
 
 void bk_jdec_buffer_request_register(pipeline_module_t module, mux_request_callback_t cb, mux_reset_callback_t reset_cb)
 {
-	LOGI("%s module: %d\n", __func__, module);
+	LOGI("%s module: %d %p\n", __func__, module, jdec_config);
 
 	rtos_lock_mutex(&jdec_info->lock);
 
@@ -1809,6 +1834,10 @@ void bk_jdec_buffer_request_deregister(pipeline_module_t module)
 			{
 				event = JPEGDEC_SCALE_NOTIFY;
 			}
+            else if (module == PIPELINE_MOD_USER)
+            {
+                event = JPEGDEC_USER_NOTIFY;
+            }
 
 			if (event != -1)
 			{
