@@ -37,6 +37,11 @@ if (CONFIG_WANSON_ASR_WORDS_VERSION_V2)
     )
 endif()
 
+if (CONFIG_WANSON_ASR_GROUP_VERSION)
+    list(APPEND incs
+				bk7258/group_version
+    )
+endif()
 endif()
 
 endif()	#(CONFIG_WANSON_ASR)
@@ -52,9 +57,15 @@ if ("${ARMINO_SOC}" STREQUAL "bk7256" OR "${ARMINO_SOC}" STREQUAL "bk7256_cp1")
 endif()
 
 if ("${ARMINO_SOC}" STREQUAL "bk7236" OR "${ARMINO_SOC}" STREQUAL "bk7258" OR "${ARMINO_SOC}" STREQUAL "bk7258_cp1" OR "${ARMINO_SOC}" STREQUAL "bk7258_cp2")
+if (CONFIG_WANSON_ASR_GROUP_VERSION)
+	get_filename_component(lib_name ${CMAKE_CURRENT_SOURCE_DIR}/bk7258/libasrfst.a NAME)
+	add_prebuilt_library(${lib_name} "${CMAKE_CURRENT_SOURCE_DIR}/bk7258/libasrfst.a")
+	target_link_libraries(${COMPONENT_LIB} INTERFACE ${lib_name})
+else()
 	get_filename_component(lib_name ${CMAKE_CURRENT_SOURCE_DIR}/bk7258/libasrbase.a NAME)
 	add_prebuilt_library(${lib_name} "${CMAKE_CURRENT_SOURCE_DIR}/bk7258/libasrbase.a")
 	target_link_libraries(${COMPONENT_LIB} INTERFACE ${lib_name})
+endif()
 endif()
 
 endif()

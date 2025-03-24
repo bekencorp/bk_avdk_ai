@@ -5,13 +5,23 @@
 extern "C" {
 #endif
 
+#if(CONFIG_WANSON_ASR_GROUP_VERSION)
+#include "fst_01.h"
+#include "fst_02.h"
+#include "fst_types.h"
+#else
 #include "fst_graph.h"
 #include "fst_words.h"
+#endif
 
 // Return value   : 0 - OK, -1 - Error
 int  Wanson_ASR_Init();
 
+#if(CONFIG_WANSON_ASR_GROUP_VERSION)
+void Wanson_ASR_Set_Fst(Fst *fst);
+#else
 void Wanson_ASR_Reset();
+#endif
 
 /*****************************************
 * Input:
