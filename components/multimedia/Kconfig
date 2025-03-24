@@ -165,6 +165,22 @@ menu "Media"
 		help
 			Audio Transfer DAC PA Control Enable
 
+	config AUD_TRAS_DAC_PA_OPEN_DELAY
+		depends on AUD_TRAS_DAC_PA_CTRL
+		int "Set the delay time(ms) after enabling the audio DAC before enabling the PA."
+		range 0 320
+		default 2
+		help
+			Delay opening the PA to ensure DAC stability and avoid pop noise.
+
+	config AUD_TRAS_DAC_PA_CLOSE_DELAY
+		depends on AUD_TRAS_DAC_PA_CTRL
+		int "Set the delay time(ms) after disabling the PA before disabling the audio DAC."
+		range 0 320
+		default 2
+		help
+			Delay closing the audio dac	to ensure PA stability and avoid pop noise.
+
 	config AUD_RING_BUFF_SAFE_INTERVAL
 		int "Set Aud Ring Buff Safe Interval"
 		range 0 320

@@ -385,8 +385,8 @@ static void aud_tras_dac_pa_ctrl(bool en)
 {
 	if (en) {
 #if CONFIG_AUD_TRAS_DAC_PA_CTRL
-	/* delay 2ms to avoid po audio data, and then open pa */
-	delay_ms(2);
+	/* delay XXms to avoid po audio data, and then open pa */
+	delay_ms(CONFIG_AUD_TRAS_DAC_PA_OPEN_DELAY);
     /* open pa according to congfig */
     //gpio_dev_unmap(AUD_DAC_PA_CTRL_GPIO);
     //bk_gpio_enable_output(AUD_DAC_PA_CTRL_GPIO);
@@ -403,6 +403,7 @@ static void aud_tras_dac_pa_ctrl(bool en)
 #else
 		bk_gpio_set_output_high(AUD_DAC_PA_CTRL_GPIO);
 #endif
+	    delay_ms(CONFIG_AUD_TRAS_DAC_PA_CLOSE_DELAY);
 #endif
 	}
 }
@@ -2301,8 +2302,8 @@ static bk_err_t aud_tras_drv_spk_deinit(void)
 {
 	if (aud_tras_drv_info.spk_info.spk_type == AUD_INTF_SPK_TYPE_BOARD) {
 		/* disable audio dac */
-		bk_aud_dac_stop();
 		aud_tras_dac_pa_ctrl(false);
+		bk_aud_dac_stop();
 		bk_dma_stop(aud_tras_drv_info.spk_info.spk_dma_id);
 		bk_dma_deinit(aud_tras_drv_info.spk_info.spk_dma_id);
 		bk_dma_free(DMA_DEV_AUDIO, aud_tras_drv_info.spk_info.spk_dma_id);
@@ -2437,8 +2438,8 @@ static bk_err_t aud_tras_drv_spk_pause(void)
 
 	if (aud_tras_drv_info.spk_info.spk_type == AUD_INTF_SPK_TYPE_BOARD) {
 		/* disable adc */
-		bk_aud_dac_stop();
 		aud_tras_dac_pa_ctrl(false);
+		bk_aud_dac_stop();
 //		bk_dma_stop(aud_tras_drv_info.spk_info.spk_dma_id);
 	} else {
 		bk_aud_uac_stop_spk();
@@ -2459,8 +2460,8 @@ static bk_err_t aud_tras_drv_spk_stop(void)
 
 	if (aud_tras_drv_info.spk_info.spk_type == AUD_INTF_SPK_TYPE_BOARD) {
 		/* disable adc */
-		bk_aud_dac_stop();
 		aud_tras_dac_pa_ctrl(false);
+		bk_aud_dac_stop();
 		bk_dma_stop(aud_tras_drv_info.spk_info.spk_dma_id);
 	} else {
 		ret = bk_aud_uac_stop_spk();
@@ -2914,8 +2915,8 @@ static bk_err_t aud_tras_drv_voc_deinit(void)
 
 	/* disable spk */
 	if (aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_BOARD) {
-		bk_aud_dac_stop();
 		aud_tras_dac_pa_ctrl(false);
+		bk_aud_dac_stop();
 		bk_aud_dac_deinit();
 		if (aud_tras_drv_info.voc_info.dac_config) {
 			audio_tras_drv_free(aud_tras_drv_info.voc_info.dac_config);
@@ -3735,8 +3736,8 @@ static bk_err_t aud_tras_drv_voc_stop(void)
 
 	if (aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_BOARD) {
 		/* disable dac */
-		bk_aud_dac_stop();
 		aud_tras_dac_pa_ctrl(false);
+		bk_aud_dac_stop();
 		bk_aud_dac_deinit();
 	}
 
@@ -3892,8 +3893,8 @@ static bk_err_t aud_tras_drv_voc_ctrl_spk(aud_intf_voc_spk_ctrl_t spk_en)
 	} else if (spk_en == AUD_INTF_VOC_SPK_CLOSE) {
 		if (aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_BOARD) {
 			LOGI("%s, %d, open onboard spk \n", __func__, __LINE__);
-			bk_aud_dac_stop();
 			aud_tras_dac_pa_ctrl(false);
+			bk_aud_dac_stop();
 			bk_dma_stop(aud_tras_drv_info.voc_info.dac_dma_id);
 		} else {
 			LOGI("%s, %d, close uac spk \n", __func__, __LINE__);
@@ -3923,8 +3924,8 @@ voc_ctrl_spk_fail:
 
 	if (spk_en == AUD_INTF_VOC_SPK_OPEN) {
 		if (aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_BOARD) {
-			bk_aud_dac_stop();
 			aud_tras_dac_pa_ctrl(false);
+			bk_aud_dac_stop();
 			bk_dma_stop(aud_tras_drv_info.voc_info.dac_dma_id);
 		} else {
 			bk_aud_uac_stop_spk();
@@ -4073,8 +4074,8 @@ static bk_err_t aud_tras_drv_spk_set_samp_rate(uint32_t samp_rate)
 {
 	bk_err_t ret = BK_ERR_AUD_INTF_OK;
 
-	bk_aud_dac_stop();
 	aud_tras_dac_pa_ctrl(false);
+	bk_aud_dac_stop();
 	ret = bk_aud_dac_set_samp_rate(samp_rate);
 	bk_aud_dac_start();
 	bk_aud_dac_start();
