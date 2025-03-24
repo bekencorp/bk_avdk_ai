@@ -75,6 +75,7 @@ static const lcd_spi_t lcd_spi_gc9d01_config =
     .clk = LCD_QSPI_60M,
     .init_cmd = gc9d01_init_cmds,
     .device_init_cmd_len = sizeof(gc9d01_init_cmds) / sizeof (lcd_qspi_init_cmd_t),
+    .frame_len = (PPI_160X160 >> 16) * (PPI_160X160 & 0xFFFF) * 2,
 };
 
 const lcd_device_t lcd_device_gc9d01 =

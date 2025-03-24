@@ -22,10 +22,6 @@
 #endif
 #if (CONFIG_LCD_SPI_DISPLAY)
 #include <lcd_spi_display_service.h>
-
-#if (LCD_SPI_DEVICE_NUM > 1)
-uint8_t lcd_spi_disp_index = 0;
-#endif
 #endif
 
 #define TAG "LVGL_DISP"
