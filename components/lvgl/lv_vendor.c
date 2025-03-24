@@ -42,6 +42,36 @@ void lv_vendor_disp_unlock(void)
     rtos_unlock_mutex(&g_disp_mutex);
 }
 
+void lv_vendor_fs_init(void)
+{
+#if (CONFIG_VFS)
+    bk_err_t ret = lv_vfs_init();
+    if (ret != BK_OK) {
+        LOGE("%s lv_vfs_init failed\n", __func__);
+        return;
+    }
+#else
+#if (CONFIG_FATFS) && (LV_USE_FS_FATFS)
+    lv_fatfs_init();
+#endif
+#endif
+}
+
+void lv_vendor_fs_deinit(void)
+{
+#if (CONFIG_VFS)
+    bk_err_t ret = lv_vfs_deinit();
+    if (ret != BK_OK) {
+        LOGE("%s lv_vfs_deinit fail\n", __func__);
+        return;
+    }
+#else
+#if (CONFIG_FATFS) && (LV_USE_FS_FATFS)
+    lv_fatfs_deinit();
+#endif
+#endif
+}
+
 void lv_vendor_init(lv_vnd_config_t *config)
 {
     bk_err_t ret;
@@ -76,20 +106,6 @@ void lv_vendor_init(lv_vnd_config_t *config)
         return;
     }
 
-#if (CONFIG_VFS)
-    ret = lv_vfs_init();
-    if (ret != BK_OK) {
-        LOGE("%s lv_vfs_init failed\n", __func__);
-        rtos_deinit_mutex(&g_disp_mutex);
-        rtos_deinit_semaphore(&lvgl_sem);
-        return;
-    }
-#else
-    #if (CONFIG_FATFS) && (LV_USE_FS_FATFS)
-        lv_fatfs_init();
-    #endif
-#endif
-
     lv_vendor_initialized = true;
 
     LOGI("%s complete\n", __func__);
@@ -105,18 +121,6 @@ void lv_vendor_deinit(void)
     lv_port_disp_deinit();
 
     lv_port_indev_deinit();
-
-#if (CONFIG_VFS)
-    bk_err_t ret = lv_vfs_deinit();
-    if (ret != BK_OK) {
-        LOGE("%s lv_vfs_deinit fail\n", __func__);
-        return;
-    }
-#else
-    #if (CONFIG_FATFS) && (LV_USE_FS_FATFS)
-        lv_fatfs_deinit();
-    #endif
-#endif
 
     rtos_deinit_mutex(&g_disp_mutex);
 
