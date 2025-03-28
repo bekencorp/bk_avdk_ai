@@ -214,7 +214,7 @@ static int wav_codec_ctrl(audio_codec_t *codec, audio_codec_ctrl_op_t op, void *
         case AUDIO_CODEC_CTRL_STOP:
             /* Notify codec wav decode complete. Need parse header when receive next file. */
             priv->head_parse = false;
-            LOGI("%s, head_parse = false\n", __func__);
+            LOGD("%s, head_parse = false\n", __func__);
             break;
 
         default:

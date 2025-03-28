@@ -146,6 +146,9 @@ static uart_util_t g_spk_data_uart_util = {0};
 
 #define AUD_STOP_PROMPT_TONE_START()            do { GPIO_DOWN(38); GPIO_UP(38);} while (0)
 #define AUD_STOP_PROMPT_TONE_END()              do { GPIO_DOWN(38); } while (0)
+
+#define AUD_SET_SPK_SOURCE_START()              do { GPIO_DOWN(31); GPIO_UP(31);} while (0)
+#define AUD_SET_SPK_SOURCE_END()                do { GPIO_DOWN(31); } while (0)
 #else
 #define AUD_ADC_DMA_ISR_START()
 #define AUD_ADC_DMA_ISR_END()
@@ -167,6 +170,9 @@ static uart_util_t g_spk_data_uart_util = {0};
 
 #define AUD_STOP_PROMPT_TONE_START()
 #define AUD_STOP_PROMPT_TONE_END()
+
+#define AUD_SET_SPK_SOURCE_START()
+#define AUD_SET_SPK_SOURCE_END()
 #endif
 
 
@@ -281,6 +287,17 @@ static beken_semaphore_t gl_aud_cp2_ready_sem = NULL;
 #define HI_ARMINO       (1)
 #define BYEBYE_ARMINO   (2)
 #endif  //CONFIG_AI_ASR_MODE_CPU2
+
+#if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
+static spk_source_type_t spk_source_type = SPK_SOURCE_TYPE_VOICE;
+static bk_err_t aud_tras_drv_set_spk_source_type(spk_source_type_t type);
+#endif
+
+#if CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP
+#define A2DP_MUSIC_SAMPLE_RATE      (44100)
+static int32_t *a2dp_read_buff = NULL;
+static uint32_t a2dp_frame_size = 0;
+#endif
 
 
 #ifdef CONFIG_UAC_MIC_SPK_COUNT_DEBUG
@@ -592,7 +609,6 @@ static bk_err_t aud_tras_drv_aec_cfg(void)
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_NS_PARA, temp_aec_info->aec_config->ns_para);							//只能取值0,1,2; 降噪由弱到强，建议默认值
 	/* drc(输出音量相关) */
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_DRC, temp_aec_info->aec_config->drc);									//建议取值范围0x10~0x1f;   越大输出声音越大
-
 
 #if CONFIG_AEC_VERSION_V3
 #define AEC_NS_FILTER 1
@@ -1972,82 +1988,77 @@ static bk_err_t aud_tras_dec(void)
 					aud_tras_drv_info.voc_info.aud_tras_dump_rx_cb(aud_tras_drv_info.voc_info.decoder_temp.law_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2);
 				}
 
-#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
-                /* Check whether play prompt tone */
-                if (gl_prompt_tone_play_flag) {
+#if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
+                int r_size = 0;
 
-                    int r_size = aud_tras_drv_read_prompt_tone_data((char *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2, 0);
-                    //LOGI("%s tone, r_size %d gl_prompt_tone_empty_notify %d\n", __func__, r_size, gl_prompt_tone_empty_notify);
-                    if (r_size <= 0 && gl_prompt_tone_empty_notify) {
-                        /* prompt tone pool empty */
-                        gl_prompt_tone_empty_notify(gl_notify_user_data);
-                        os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
-                        /* send message to aud_tras_drv_main to stop prompt_tone play */
-                        if (aud_tras_drv_send_msg(AUD_TRAS_STOP_PROMPT_TONE, NULL) != BK_OK)
-                        {
-                            LOGE("%s, %d, send tras stop prompt tone fail\n", __func__, __LINE__);
-                        }
-                    } else {
-                        if (r_size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
-                            os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
-                        }
-                    }
-                    SPK_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
-                } else {
-#endif
-                    if (fill_slience_flag) {
-                        os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
-                    } else {
-                        /* G722 decoding g722 data to pcm data*/
-                        int dec_size = g722_decode(&g722_dec, aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.decoder_temp.law_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2);
-                        LOGD("%s, %d, len: %d, dec_size: %d \n", __func__, __LINE__, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2, dec_size * 2);
-                    }
+                switch (spk_source_type)
+                {
+                    case SPK_SOURCE_TYPE_PROMPT_TONE:
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+                        //LOGI("%s, %d, read prompt tone data\n", __func__, __LINE__);
+                        r_size = aud_tras_drv_read_prompt_tone_data((char *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2, 0);
+                        if (r_size <= 0 && gl_prompt_tone_empty_notify) {
+                            /* prompt tone pool empty */
+                            gl_prompt_tone_empty_notify(gl_notify_user_data);
+                            os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                            /* send message to aud_tras_drv_main to stop prompt_tone play */
+                            if (aud_tras_drv_send_msg(AUD_TRAS_STOP_PROMPT_TONE, NULL) != BK_OK)
+                            {
+                                LOGE("%s, %d, send tras stop prompt tone fail\n", __func__, __LINE__);
+                            }
+                        } else {
+                            if (r_size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
+                                os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
+                            }
+                        }
+                        SPK_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
+#else
+                        LOGW("%s, SPK_SOURCE_TYPE_PROMPT_TONE not support, please enable CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE\n", __func__);
+#endif
+                        break;
+
+                    case SPK_SOURCE_TYPE_A2DP:
+#if CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP
+                        /* play a2dp music */
+                        //LOGI("%s, %d, read a2dp music data\n", __func__, __LINE__);
+                        r_size = aud_tras_drv_read_prompt_tone_data((char *)a2dp_read_buff, a2dp_frame_size, 0);
+                        if (r_size <= 0) {
+                            /* prompt tone pool empty */
+                            if (r_size != a2dp_frame_size) {
+                                os_memset(a2dp_read_buff, 0, a2dp_frame_size);
+                            }
+                        }
+                        SPK_DATA_DUMP_BY_UART_DATA(a2dp_read_buff, a2dp_frame_size);
+#else
+                        LOGW("%s, SPK_SOURCE_TYPE_A2DP not support, please enable CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP\n", __func__);
+#endif
+                        break;
+
+                    case SPK_SOURCE_TYPE_VOICE:
+                        if (fill_slience_flag) {
+                            os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                        } else {
+                            /* G722 decoding g722 data to pcm data*/
+                            int dec_size = g722_decode(&g722_dec, aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.decoder_temp.law_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2);
+                            LOGD("%s, %d, len: %d, dec_size: %d \n", __func__, __LINE__, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2, dec_size * 2);
+                        }
+                        break;
+
+                    default:
+                        break;
+                }
+#else
+                if (fill_slience_flag) {
+                    os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                } else {
+                    /* G722 decoding g722 data to pcm data*/
+                    int dec_size = g722_decode(&g722_dec, aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.decoder_temp.law_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2);
+                    LOGD("%s, %d, len: %d, dec_size: %d \n", __func__, __LINE__, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2, dec_size * 2);
                 }
 #endif
 			} else {
 			    LOGE("%s, %d, not support uac, need TODO\n", __func__, __LINE__);
-#if 0
-				if (ring_buffer_get_free_size(&aud_tras_drv_info.voc_info.speaker_rb) > aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
-					/* check the frame number in decoder_ring_buffer */
-					if (ring_buffer_get_fill_size(aud_tras_drv_info.voc_info.rx_info.decoder_rb) >= aud_tras_drv_info.voc_info.speaker_samp_rate_points) {
-						//os_printf("decoder process \r\n", size);
-						/* get G711A data from decoder_ring_buff */
-						//addAON_GPIO_Reg0x9 = 2;
-						size = ring_buffer_read(aud_tras_drv_info.voc_info.rx_info.decoder_rb, (uint8_t*)aud_tras_drv_info.voc_info.decoder_temp.law_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points);
-						if (size != aud_tras_drv_info.voc_info.speaker_samp_rate_points) {
-							LOGE("%s, %d, read decoder_ring_buff G711A data fail \n", __func__, __LINE__);
-							if (aud_tras_drv_info.voc_info.data_type == AUD_INTF_VOC_DATA_TYPE_G711U)
-								os_memset(aud_tras_drv_info.voc_info.decoder_temp.law_data, 0xFF, aud_tras_drv_info.voc_info.speaker_samp_rate_points);
-							else
-								os_memset(aud_tras_drv_info.voc_info.decoder_temp.law_data, 0xD5, aud_tras_drv_info.voc_info.speaker_samp_rate_points);
-						}
-						//addAON_GPIO_Reg0x9 = 0;
-					} else {
-						if (aud_tras_drv_info.voc_info.data_type == AUD_INTF_VOC_DATA_TYPE_G711U)
-							os_memset(aud_tras_drv_info.voc_info.decoder_temp.law_data, 0xFF, aud_tras_drv_info.voc_info.speaker_samp_rate_points);
-						else
-							os_memset(aud_tras_drv_info.voc_info.decoder_temp.law_data, 0xD5, aud_tras_drv_info.voc_info.speaker_samp_rate_points);
-					}
-
-					/* dump rx data */
-					if (aud_tras_drv_info.voc_info.aud_tras_dump_rx_cb) {
-						aud_tras_drv_info.voc_info.aud_tras_dump_rx_cb(aud_tras_drv_info.voc_info.decoder_temp.law_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points);
-					}
-
-					if (aud_tras_drv_info.voc_info.data_type == AUD_INTF_VOC_DATA_TYPE_G711U) {
-						/* G711U decoding u-law data to pcm data*/
-						for (i=0; i<aud_tras_drv_info.voc_info.speaker_samp_rate_points; i++) {
-							aud_tras_drv_info.voc_info.decoder_temp.pcm_data[i] = ulaw2linear(aud_tras_drv_info.voc_info.decoder_temp.law_data[i]);
-						}
-					} else {
-						/* G711A decoding a-law data to pcm data*/
-						for (i=0; i<aud_tras_drv_info.voc_info.speaker_samp_rate_points; i++) {
-							aud_tras_drv_info.voc_info.decoder_temp.pcm_data[i] = alaw2linear(aud_tras_drv_info.voc_info.decoder_temp.law_data[i]);
-						}
-					}
-				}
-#endif
+                //TODO
             }
         }
 			break;
@@ -2124,6 +2135,24 @@ static bk_err_t aud_tras_dec(void)
 	/* save the data after G711A processed to encoder_ring_buffer */
 		if ((ring_buffer_get_free_size(&(aud_tras_drv_info.voc_info.speaker_rb)) == aud_tras_drv_info.voc_info.speaker_rb.capacity))
 		{
+#if CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP
+            if (spk_source_type == SPK_SOURCE_TYPE_A2DP)
+            {
+				size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)a2dp_read_buff, a2dp_frame_size);
+				if (size != a2dp_frame_size) {
+					LOGE("%s, %d, the data writeten to speaker_ring_buff is not a frame, size=%d \n", __func__, __LINE__, size);
+					goto decoder_exit;
+				}
+                //SPK_DATA_DUMP_BY_UART_DATA(a2dp_read_buff, a2dp_frame_size);
+				size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)a2dp_read_buff, a2dp_frame_size);
+				if (size != a2dp_frame_size) {
+					LOGE("%s, %d, the data writeten to speaker_ring_buff is not a frame, size=%d \n", __func__, __LINE__, size);
+					goto decoder_exit;
+				}
+                //SPK_DATA_DUMP_BY_UART_DATA(a2dp_read_buff, a2dp_frame_size);
+			}
+            else
+#endif
 			{
 				size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
 				if (size != aud_tras_drv_info.voc_info.speaker_samp_rate_points*2) {
@@ -2150,17 +2179,34 @@ static bk_err_t aud_tras_dec(void)
 			}
 			aud_tras_drv_info.voc_info.rx_info.aud_trs_read_seq++;
 		}else {
-			if (ring_buffer_get_free_size(&(aud_tras_drv_info.voc_info.speaker_rb)) > aud_tras_drv_info.voc_info.speaker_samp_rate_points*2) {
-
-				size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
-				if (size != aud_tras_drv_info.voc_info.speaker_samp_rate_points*2) {
-					LOGE("%s, %d, the data writeten to speaker_ring_buff is not a frame, size=%d \n", __func__, __LINE__, size);
-					goto decoder_exit;
-				}
-                //SPK_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
-				aud_tras_drv_info.voc_info.rx_info.aud_trs_read_seq++;
-			}
+#if CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP
+            if (spk_source_type == SPK_SOURCE_TYPE_A2DP) {
+                if (ring_buffer_get_free_size(&(aud_tras_drv_info.voc_info.speaker_rb)) > a2dp_frame_size) {
+                    size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)a2dp_read_buff, a2dp_frame_size);
+                    if (size != a2dp_frame_size) {
+                        LOGE("%s, %d, the data writeten to speaker_ring_buff is not a frame, size=%d \n", __func__, __LINE__, size);
+                        goto decoder_exit;
+                    }
+                    //SPK_DATA_DUMP_BY_UART_DATA(a2dp_read_buff, a2dp_frame_size);
+                    aud_tras_drv_info.voc_info.rx_info.aud_trs_read_seq++;
+                    LOGD("write a2dp data to audio dac\n");
+                }
+            }
+            else
+#endif
+            {
+    			if (ring_buffer_get_free_size(&(aud_tras_drv_info.voc_info.speaker_rb)) > aud_tras_drv_info.voc_info.speaker_samp_rate_points*2) {
+    				size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
+    				if (size != aud_tras_drv_info.voc_info.speaker_samp_rate_points*2) {
+    					LOGE("%s, %d, the data writeten to speaker_ring_buff is not a frame, size=%d \n", __func__, __LINE__, size);
+    					goto decoder_exit;
+    				}
+                    //SPK_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
+    				aud_tras_drv_info.voc_info.rx_info.aud_trs_read_seq++;
+    			}
+            }
 		}
+
 		if (aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_UAC) {
 			size = ring_buffer_read(&aud_tras_drv_info.voc_info.speaker_rb, (uint8_t *)aud_tras_drv_info.voc_info.uac_spk_buff, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
 			if (size != aud_tras_drv_info.voc_info.speaker_samp_rate_points*2) {
@@ -2168,7 +2214,8 @@ static bk_err_t aud_tras_dec(void)
 				os_memset(aud_tras_drv_info.voc_info.uac_spk_buff, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
 			}
 		}
-	}
+    }
+
 	/* call callback to notify app */
 	if (aud_tras_drv_info.aud_tras_rx_spk_data)
 		aud_tras_drv_info.aud_tras_rx_spk_data((unsigned int)aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
@@ -5019,6 +5066,12 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
                     break;
 #endif
 
+#if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
+                case AUD_TRAS_SET_SPK_SOURCE_TYPE:
+                    aud_tras_drv_set_spk_source_type((spk_source_type_t)msg.param);
+                    break;
+#endif
+
 				default:
 					break;
 			}
@@ -5228,49 +5281,21 @@ bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result)
         {
             LOGE("%s, %d, send tras asr wakeup fail\n", __func__, __LINE__);
         }
-
-#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
-#if CONFIG_PROMPT_TONE_SOURCE_VFS
-        prompt_tone_info.url = asr_wakeup_prompt_tone_path;
-#endif
-#if CONFIG_PROMPT_TONE_SOURCE_ARRAY
-        prompt_tone_info.url = (char *)asr_wakeup_prompt_tone_array;
-        prompt_tone_info.total_len = sizeof(asr_wakeup_prompt_tone_array);
-#endif
-        LOGI("[prompt_tone] ASR_WAKEUP\n");
-        if (aud_tras_drv_send_msg(AUD_TRAS_PLAY_PROMPT_TONE, (void *)&prompt_tone_info) != BK_OK)
-        {
-            LOGE("%s, %d, send tras play prompt tone fail\n", __func__, __LINE__);
-        }
-#endif
     } else if (asr_result == BYEBYE_ARMINO) {
         gl_dialog_running = false;
         LOGI("%s \n", "byebye armino ");
 
-        if (false == aud_tras_drv_get_prompt_tone_play_state())
+#if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
+        if (aud_tras_drv_get_spk_source_type() == SPK_SOURCE_TYPE_VOICE)
         {
             aud_tras_dac_pa_ctrl(false, false);
         }
+#endif
 
         if (aud_tras_drv_send_msg(AUD_TRAS_ASR_STANDBY_IND, NULL) != BK_OK)
         {
             LOGE("%s, %d, send tras asr wakeup fail\n", __func__, __LINE__);
         }
-
-#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
-#if CONFIG_PROMPT_TONE_SOURCE_VFS
-        prompt_tone_info.url = asr_standby_prompt_tone_path;
-#endif
-#if CONFIG_PROMPT_TONE_SOURCE_ARRAY
-        prompt_tone_info.url = (char *)asr_standby_prompt_tone_array;
-        prompt_tone_info.total_len = sizeof(asr_standby_prompt_tone_array);
-#endif
-        LOGI("[prompt_tone] ASR_STANDBY\n");
-        if (aud_tras_drv_send_msg(AUD_TRAS_PLAY_PROMPT_TONE, (void *)&prompt_tone_info) != BK_OK)
-        {
-            LOGE("%s, %d, send tras play prompt tone fail\n", __func__, __LINE__);
-        }
-#endif
     } else {
         //nothing todo
     }
@@ -5278,6 +5303,7 @@ bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result)
     return BK_OK;
 }
 #endif
+
 
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
 int aud_tras_drv_read_prompt_tone_data(char *buffer, uint32_t len, uint32_t timeout)
@@ -5305,33 +5331,7 @@ bk_err_t aud_tras_drv_register_prompt_tone_pool_empty_notify(prompt_tone_pool_em
 
     return BK_OK;
 }
-
-bk_err_t aud_tras_drv_control_prompt_tone_play(bool en)
-{
-    LOGI("%s current flag %d, now %d\n", __func__, gl_prompt_tone_play_flag, en);
-    gl_prompt_tone_play_flag = en;
-
-    if (gl_prompt_tone_play_flag) {
-        aud_tras_dac_pa_ctrl(true, false);
-    } else {
-        /* check whether wakeup,
-            wakeup: not close pa
-            others: close pa
-         */
-        if (!gl_dialog_running) {
-            aud_tras_dac_pa_ctrl(false, false);
-        }
-    }
-
-    return BK_OK;
-}
-
-bool aud_tras_drv_get_prompt_tone_play_state(void)
-{
-    return gl_prompt_tone_play_flag;
-}
 #endif
-
 
 #if CONFIG_AI_ASR_MODE_CPU2
 void aud_cp2_ready_notify(void)
@@ -5340,6 +5340,309 @@ void aud_cp2_ready_notify(void)
 	{
 		rtos_set_semaphore(&gl_aud_cp2_ready_sem);
 	}
+}
+#endif
+
+#if CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP
+static bk_err_t aud_tras_drv_close_voc_spk_source(void)
+{
+    LOGI("%s\n", __func__);
+
+    /* stop dac and dac dma */
+	if (aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_BOARD) {
+		bk_dma_stop(aud_tras_drv_info.voc_info.dac_dma_id);
+        /* disable dac */
+        aud_tras_dac_pa_ctrl(false, true);
+        bk_aud_dac_stop();
+	} else {
+        //not support
+        //TODO
+	}
+
+    /* reconfig speaker ringbuffer and dma */
+    if (aud_tras_drv_info.voc_info.speaker_ring_buff) {
+        /* clear dac ring buffer */
+        ring_buffer_clear(&(aud_tras_drv_info.voc_info.speaker_rb));
+        audio_tras_drv_free(aud_tras_drv_info.voc_info.speaker_ring_buff);
+        aud_tras_drv_info.voc_info.speaker_ring_buff = NULL;
+    }
+
+    bk_dma_deinit(aud_tras_drv_info.voc_info.dac_dma_id);
+
+    return BK_OK;
+}
+
+static bk_err_t aud_tras_drv_open_voc_spk_source(void)
+{
+    bk_err_t ret = BK_OK;
+
+    LOGI("%s\n", __func__);
+
+    /* recover speaker sample rate */
+    bk_aud_dac_set_samp_rate(aud_tras_drv_info.voc_info.dac_config->samp_rate);
+
+	aud_tras_drv_info.voc_info.speaker_ring_buff = (int32_t *)audio_tras_drv_malloc(aud_tras_drv_info.voc_info.speaker_samp_rate_points*2*aud_tras_drv_info.voc_info.speaker_frame_number + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
+	if (aud_tras_drv_info.voc_info.speaker_ring_buff == NULL) {
+		LOGE("%s, %d, malloc speaker ring buffer fail \n", __func__, __LINE__);
+		goto fail;
+	}
+
+    /* config audio dac dma to carry dac data to "speaker_ring_buff" */
+    ret = aud_tras_dac_dma_config(aud_tras_drv_info.voc_info.dac_dma_id, aud_tras_drv_info.voc_info.speaker_ring_buff, (aud_tras_drv_info.voc_info.speaker_samp_rate_points*2)*aud_tras_drv_info.voc_info.speaker_frame_number + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2, AUD_INTF_SPK_CHL_LEFT);
+    if (ret != BK_OK) {
+        LOGE("%s, %d, config audio adc dma fail \n", __func__, __LINE__);
+		goto fail;
+    }
+
+    ring_buffer_init(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t*)aud_tras_drv_info.voc_info.speaker_ring_buff, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2*aud_tras_drv_info.voc_info.speaker_frame_number + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, aud_tras_drv_info.voc_info.dac_dma_id, RB_DMA_TYPE_READ);
+
+    /* write two frame data to speaker and ref ring buffer */
+    os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
+    int size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
+    if (size != aud_tras_drv_info.voc_info.speaker_samp_rate_points*2) {
+        LOGE("%s, %d, the data write to speaker_ring_buff error, size: %d \n", __func__, __LINE__, size);
+		goto fail;
+    }
+    size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
+    if (size != aud_tras_drv_info.voc_info.speaker_samp_rate_points*2) {
+        LOGE("%s, %d, the data write to speaker_ring_buff error, size: %d \n", __func__, __LINE__, size);
+		goto fail;
+    }
+
+    /* enable dac */
+    bk_aud_dac_start();
+    aud_tras_dac_pa_ctrl(true, true);
+
+    ret = bk_dma_start(aud_tras_drv_info.voc_info.dac_dma_id);
+    if (ret != BK_OK) {
+        LOGE("%s, %d, start dac dma fail \n", __func__, __LINE__);
+		goto fail;
+    }
+
+    return BK_OK;
+
+fail:
+
+    return BK_FAIL;
+}
+
+
+static bk_err_t aud_tras_drv_open_spk_a2dp_source(uint32_t sample_rate)
+{
+    bk_err_t ret = BK_OK;
+
+    LOGI("%s\n", __func__);
+
+    /* update speaker sample rate */
+    bk_aud_dac_set_samp_rate(sample_rate);
+
+    /* two frame(20ms data) */
+    a2dp_frame_size = sample_rate * 2 * 20 / 1000;
+    LOGD("%s, a2dp_frame_size: %d\n", __func__, a2dp_frame_size);
+	aud_tras_drv_info.voc_info.speaker_ring_buff = (int32_t *)audio_tras_drv_malloc(a2dp_frame_size * 2 + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
+	if (!aud_tras_drv_info.voc_info.speaker_ring_buff) {
+		LOGE("%s, %d, malloc speaker ring buffer: %d fail \n", __func__, __LINE__, a2dp_frame_size * 2 + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
+        goto fail;
+	}
+
+	/* config audio dac dma to carry dac data to "speaker_ring_buff" */
+	ret = aud_tras_dac_dma_config(aud_tras_drv_info.voc_info.dac_dma_id, aud_tras_drv_info.voc_info.speaker_ring_buff, a2dp_frame_size * 2 + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, a2dp_frame_size, AUD_INTF_SPK_CHL_LEFT);
+	if (ret != BK_OK) {
+		LOGE("%s, %d, config audio adc dma fail \n", __func__, __LINE__);
+        goto fail;
+	}
+	ring_buffer_init(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t*)aud_tras_drv_info.voc_info.speaker_ring_buff, a2dp_frame_size * 2 + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, aud_tras_drv_info.voc_info.dac_dma_id, RB_DMA_TYPE_READ);
+
+    /* start audio dac */
+    if (a2dp_read_buff) {
+        audio_tras_drv_free(a2dp_read_buff);
+        a2dp_read_buff = NULL;
+    }
+    a2dp_read_buff = (int32_t *)audio_tras_drv_malloc(a2dp_frame_size);
+    if (!a2dp_read_buff) {
+        LOGE("%s, %d, malloc a2dp_read_buff: %d fail \n", __func__, __LINE__, a2dp_frame_size);
+        goto fail;
+    }
+    os_memset(a2dp_read_buff, 0, a2dp_frame_size);
+    /* write two frame data to speaker and ref ring buffer */
+    int size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)a2dp_read_buff, a2dp_frame_size);
+    if (size != a2dp_frame_size) {
+        LOGE("%s, %d, the data write to speaker_ring_buff error, size: %d \n", __func__, __LINE__, size);
+        goto fail;
+    }
+    size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)a2dp_read_buff, a2dp_frame_size);
+    if (size != a2dp_frame_size) {
+        LOGE("%s, %d, the data write to speaker_ring_buff error, size: %d \n", __func__, __LINE__, size);
+        goto fail;
+    }
+
+    bk_aud_dac_start();
+    aud_tras_dac_pa_ctrl(true, true);
+
+    ret = bk_dma_start(aud_tras_drv_info.voc_info.dac_dma_id);
+    if (ret != BK_OK) {
+        LOGE("%s, %d, start dac dma fail \n", __func__, __LINE__);
+        goto fail;
+    }
+
+    return BK_OK;
+
+fail:
+
+    return BK_FAIL;
+}
+
+static bk_err_t aud_tras_drv_close_spk_a2dp_source(void)
+{
+    LOGI("%s\n", __func__);
+
+    /* recover speaker sample rate */
+    bk_aud_dac_set_samp_rate(aud_tras_drv_info.voc_info.dac_config->samp_rate);
+
+    /* stop dac and dac dma */
+	if (aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_BOARD) {
+		bk_dma_stop(aud_tras_drv_info.voc_info.dac_dma_id);
+        /* disable dac */
+        aud_tras_dac_pa_ctrl(false, true);
+        bk_aud_dac_stop();
+	} else {
+        //not support
+        //TODO
+	}
+
+    if (aud_tras_drv_info.voc_info.speaker_ring_buff) {
+        /* clear dac ring buffer */
+        ring_buffer_clear(&(aud_tras_drv_info.voc_info.speaker_rb));
+        audio_tras_drv_free(aud_tras_drv_info.voc_info.speaker_ring_buff);
+        aud_tras_drv_info.voc_info.speaker_ring_buff = NULL;
+    }
+
+    bk_dma_deinit(aud_tras_drv_info.voc_info.dac_dma_id);
+
+    if (a2dp_read_buff) {
+        audio_tras_drv_free(a2dp_read_buff);
+        a2dp_read_buff = NULL;
+    }
+
+    /* free ringbuffer */
+    if (gl_prompt_tone_rb)
+    {
+        rb_reset(gl_prompt_tone_rb);
+    }
+
+    return BK_OK;
+}
+#endif
+
+#if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
+bk_err_t aud_tras_drv_voc_set_spk_source_type(spk_source_type_t type)
+{
+    if (aud_tras_drv_send_msg(AUD_TRAS_SET_SPK_SOURCE_TYPE, (void *)type) != BK_OK)
+    {
+        LOGE("%s, %d, send set spk source type fail\n", __func__, __LINE__);
+    }
+
+    return BK_OK;
+}
+
+static bk_err_t aud_tras_drv_set_spk_source_type(spk_source_type_t type)
+{
+#if CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP
+    bk_err_t ret = BK_OK;
+#endif
+
+    if (spk_source_type == type)
+    {
+        LOGD("spk source type not need change\n");
+        return BK_OK;
+    }
+
+    LOGI("%s, type: %d\n", __func__, type);
+
+    AUD_SET_SPK_SOURCE_START();
+
+    switch (type)
+    {
+        case SPK_SOURCE_TYPE_VOICE:
+        {
+#if CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP
+            spk_source_type_t spk_source_type_old = spk_source_type;
+            spk_source_type = type;
+            if (spk_source_type_old == SPK_SOURCE_TYPE_A2DP)
+            {
+                /* stop a2dp music */
+                LOGI("stop play a2dp music\n");
+                aud_tras_drv_close_spk_a2dp_source();
+                ret = aud_tras_drv_open_voc_spk_source();
+                if (ret != BK_OK)
+                {
+                    LOGE("%s, %d, open voice speaker source fail, ret: %d\n", __func__, __LINE__, ret);
+                    return BK_FAIL;
+                }
+            }
+#else
+            spk_source_type = type;
+#endif
+            /* check whether wakeup,
+                wakeup: not close pa
+                others: close pa
+             */
+            if (!gl_dialog_running) {
+                aud_tras_dac_pa_ctrl(false, false);
+            }
+            break;
+        }
+
+        case SPK_SOURCE_TYPE_PROMPT_TONE:
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+            spk_source_type = type;
+            aud_tras_dac_pa_ctrl(true, false);
+#else
+            LOGW("%s, SPK_SOURCE_TYPE_PROMPT_TONE not support, please enable CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE\n", __func__);
+#endif
+            break;
+
+        case SPK_SOURCE_TYPE_A2DP:
+#if CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP
+            spk_source_type = type;
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+            /* check whether playing prompt_tone */
+            if (spk_source_type == SPK_SOURCE_TYPE_PROMPT_TONE)
+            {
+                /* stop prompt tone, and then change speaker source type to A2DP music */
+                LOGI("stop play prompt tone\n");
+                prompt_tone_play_stop(gl_prompt_tone_play_handle);
+                rtos_delay_milliseconds(10);
+                //wait prompt tone stop, and spk_source_type change to "SPK_SOURCE_TYPE_VOICE"
+                //TODO
+            }
+#endif
+            aud_tras_drv_close_voc_spk_source();
+            ret = aud_tras_drv_open_spk_a2dp_source(A2DP_MUSIC_SAMPLE_RATE);
+            if (ret != BK_OK)
+            {
+                LOGE("%s, %d, open a2dp speaker source fail\n", __func__, __LINE__);
+                return BK_FAIL;
+            }
+#else
+            LOGW("%s, SPK_SOURCE_TYPE_A2DP not support, please enable CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP\n", __func__);
+#endif
+            break;
+
+        default:
+            LOGE("%s, %d, type: %d not support\n", __func__, __LINE__, type);
+            return BK_FAIL;
+            break;
+    }
+
+    AUD_SET_SPK_SOURCE_END();
+
+    return BK_OK;
+}
+
+spk_source_type_t aud_tras_drv_get_spk_source_type(void)
+{
+    return spk_source_type;
 }
 #endif
 

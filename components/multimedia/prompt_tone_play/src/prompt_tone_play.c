@@ -94,9 +94,9 @@ static int codec_out_data_handle_cb(audio_frame_info_t *frame_info, char *buffer
         w_len += ret;
 
         /* start prompt tone play after write frame data to prompt tone ringbuffer pool to avoid read prompt tone fail */
-        if (false == aud_tras_drv_get_prompt_tone_play_state())
+        if (SPK_SOURCE_TYPE_PROMPT_TONE != aud_tras_drv_get_spk_source_type())
         {
-            aud_tras_drv_control_prompt_tone_play(true);
+            aud_tras_drv_voc_set_spk_source_type(SPK_SOURCE_TYPE_PROMPT_TONE);
         }
     }
 
@@ -114,7 +114,7 @@ static int prompt_tone_pool_empty_notify_cb(void *params)
         rtos_set_semaphore(&handle->play_finish_sem);
     }
 
-    aud_tras_drv_control_prompt_tone_play(false);
+    aud_tras_drv_voc_set_spk_source_type(SPK_SOURCE_TYPE_VOICE);
 
     audio_codec_ctrl(handle->codec, AUDIO_CODEC_CTRL_STOP, NULL);
 

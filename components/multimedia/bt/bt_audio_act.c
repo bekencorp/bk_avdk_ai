@@ -154,7 +154,7 @@ static void bt_audio_task(void *arg)
                 if (!final)
                 {
                     write_count = 0;
-                    ret = aud_tras_drv_control_prompt_tone_play(final);
+                    ret = aud_tras_drv_voc_set_spk_source_type(SPK_SOURCE_TYPE_VOICE);
                     tone_status = TONE_STATUS_IDLE;
                 }
 
@@ -210,8 +210,7 @@ static void bt_audio_task(void *arg)
                 if (write_count >= 2 && tone_status == TONE_STATUS_WAIT_ENABLE)
                 {
                     LOGI("try aud_tras_drv_control_prompt_tone_play");
-                    ret = aud_tras_drv_control_prompt_tone_play(1);
-
+                    ret = aud_tras_drv_voc_set_spk_source_type(SPK_SOURCE_TYPE_A2DP);
                     if (ret)
                     {
                         LOGE("aud_tras_drv_control_prompt_tone_play enable err %d !!!", ret);

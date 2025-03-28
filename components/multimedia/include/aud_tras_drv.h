@@ -100,6 +100,10 @@ typedef enum {
 	AUD_TRAS_ASR_WAKEUP_IND,
 	AUD_TRAS_ASR_STANDBY_IND,
 
+#if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
+    AUD_TRAS_SET_SPK_SOURCE_TYPE,
+#endif
+
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
     AUD_TRAS_PLAY_PROMPT_TONE,
     AUD_TRAS_STOP_PROMPT_TONE,
@@ -523,12 +527,22 @@ bk_err_t aud_tras_drv_register_aec_ouput_callback(aud_tras_drv_aec_output_callba
 bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result);
 #endif
 
+#if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
+typedef enum {
+	SPK_SOURCE_TYPE_VOICE = 0,
+	SPK_SOURCE_TYPE_PROMPT_TONE,
+	SPK_SOURCE_TYPE_A2DP,
+	SPK_SOURCE_TYPE_MAX,
+} spk_source_type_t;
+
+bk_err_t aud_tras_drv_voc_set_spk_source_type(spk_source_type_t type);
+spk_source_type_t aud_tras_drv_get_spk_source_type(void);
+#endif
+
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
 typedef int (*prompt_tone_pool_empty_notify)(void *user_data);
 
 bk_err_t aud_tras_drv_register_prompt_tone_pool_empty_notify(prompt_tone_pool_empty_notify notify, void *user_data);
-bk_err_t aud_tras_drv_control_prompt_tone_play(bool en);
-bool aud_tras_drv_get_prompt_tone_play_state(void);
 int aud_tras_drv_read_prompt_tone_data(char *buffer, uint32_t len, uint32_t timeout);
 int aud_tras_drv_write_prompt_tone_data(char *buffer, uint32_t len, uint32_t timeout);
 #endif
