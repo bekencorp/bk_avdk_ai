@@ -36,6 +36,13 @@ typedef enum
     AUDIO_CODEC_WAV,
 } audio_codec_type_t;
 
+typedef enum
+{
+    AUDIO_CODEC_CTRL_START = 0,
+    AUDIO_CODEC_CTRL_STOP,
+    AUDIO_CODEC_CTRL_MAX,
+} audio_codec_ctrl_op_t;
+
 typedef struct audio_info_s
 {
     int channel_number;
@@ -77,6 +84,7 @@ typedef struct
     //int (*get_frame_info)(audio_codec_t *codec);
     int (*write)(audio_codec_t *codec, char *buffer, uint32_t len);
     int (*close)(audio_codec_t *codec);
+    int (*ctrl)(audio_codec_t *codec, audio_codec_ctrl_op_t op, void *params);
 } audio_codec_ops_t;
 
 struct audio_codec
@@ -122,7 +130,7 @@ bk_err_t audio_codec_destroy(audio_codec_t *codec);
 /**
  * @brief      Open audio decoder
  *
- * This API open audio decoder and start decode.
+ * This API open audio decoder.
  *
  *
  * @param[in] codec  The audio decoder handle
@@ -163,6 +171,23 @@ bk_err_t audio_codec_close(audio_codec_t *codec);
  *    - Others: failed
  */
 bk_err_t audio_codec_write_data(audio_codec_t *codec, char *buffer, uint32_t len);
+
+/**
+ * @brief      Control audio decoder
+ *
+ * This API control audio decoder to start or stop work.
+ *
+ *
+ * @param[in] codec     The audio decoder handle
+ * @param[in] op        The opcode
+ * @param[in] params    The parameters
+ *
+ * @return
+ *    - BK_OK: success
+ *    - Others: failed
+ */
+bk_err_t audio_codec_ctrl(audio_codec_t *codec, audio_codec_ctrl_op_t op, void *params);
+
 
 /**
  * @brief      get audio decoder frame information

@@ -28,12 +28,21 @@
 #define LOGD(...) BK_LOGD(PROMPT_TONE_PLAY_TAG, ##__VA_ARGS__)
 
 
+typedef enum
+{
+    PROMPT_TONE_PLAY_STA_NULL = 0,
+    PROMPT_TONE_PLAY_STA_IDLE,
+    PROMPT_TONE_PLAY_STA_PLAYING,
+    PROMPT_TONE_PLAY_STA_MAX,
+} prompt_tone_play_sta_t;
+
 struct prompt_tone_play
 {
     audio_source_t *source;
     audio_codec_t *codec;
     prompt_tone_play_cfg_t config;
     beken_semaphore_t play_finish_sem;
+    prompt_tone_play_sta_t status;
 };
 
 
@@ -62,8 +71,6 @@ static int codec_out_data_handle_cb(audio_frame_info_t *frame_info, char *buffer
 {
     LOGD("channel_number: %d, sample_rate: %d, sample_bits: %d\n", frame_info->channel_number, frame_info->sample_rate, frame_info->sample_bits);
 
-    bool prompt_tonne_play_flag = false;
-
     uint32_t temp_w_len = 0;
     uint32_t w_len = 0;
     int ret = 0;
@@ -87,7 +94,7 @@ static int codec_out_data_handle_cb(audio_frame_info_t *frame_info, char *buffer
         w_len += ret;
 
         /* start prompt tone play after write frame data to prompt tone ringbuffer pool to avoid read prompt tone fail */
-        if (!prompt_tonne_play_flag)
+        if (false == aud_tras_drv_get_prompt_tone_play_state())
         {
             aud_tras_drv_control_prompt_tone_play(true);
         }
@@ -98,7 +105,7 @@ static int codec_out_data_handle_cb(audio_frame_info_t *frame_info, char *buffer
 
 static int prompt_tone_pool_empty_notify_cb(void *params)
 {
-    LOGI("%s, %d, params: %p\n", __func__, __LINE__, params);
+    LOGD("%s, %d, params: %p\n", __func__, __LINE__, params);
 
     prompt_tone_play_handle_t handle = (prompt_tone_play_handle_t)params;
 
@@ -108,6 +115,10 @@ static int prompt_tone_pool_empty_notify_cb(void *params)
     }
 
     aud_tras_drv_control_prompt_tone_play(false);
+
+    audio_codec_ctrl(handle->codec, AUDIO_CODEC_CTRL_STOP, NULL);
+
+    prompt_tone_play_stop(handle);
 
     return BK_OK;
 }
@@ -224,11 +235,21 @@ bk_err_t prompt_tone_play_destroy(prompt_tone_play_handle_t handle)
 
 bk_err_t prompt_tone_play_open(prompt_tone_play_handle_t handle)
 {
+    bk_err_t ret = BK_OK;
+
     if (!handle)
     {
         LOGE("%s, %d, handle is NULL\n", __func__, __LINE__);
         return BK_FAIL;
     }
+
+    if (handle->status != PROMPT_TONE_PLAY_STA_NULL)
+    {
+        LOGW("%s, %d, prompt_tone_play already open\n", __func__, __LINE__);
+        return BK_OK;
+    }
+
+    LOGI("%s\n", __func__);
 
     if (!handle->source || !handle->codec)
     {
@@ -238,22 +259,47 @@ bk_err_t prompt_tone_play_open(prompt_tone_play_handle_t handle)
 
     aud_tras_drv_register_prompt_tone_pool_empty_notify(prompt_tone_pool_empty_notify_cb, handle);
 
-    audio_codec_open(handle->codec);
+    ret = audio_codec_open(handle->codec);
+    if (ret != BK_OK)
+    {
+        LOGE("%s, %d, audio codec open fail\n", __func__, __LINE__);
+        goto fail;
+    }
 
-    audio_source_open(handle->source);
+    ret = audio_source_open(handle->source);
+    if (ret != BK_OK)
+    {
+        LOGE("%s, %d, audio source open fail\n", __func__, __LINE__);
+        goto fail;
+    }
+
+    handle->status = PROMPT_TONE_PLAY_STA_IDLE;
 
     return BK_OK;
+
+fail:
+    aud_tras_drv_register_prompt_tone_pool_empty_notify(NULL, NULL);
+    audio_source_close(handle->source);
+    audio_codec_close(handle->codec);
+
+    return BK_FAIL;
 }
 
 bk_err_t prompt_tone_play_close(prompt_tone_play_handle_t handle, bool wait_play_finish)
 {
-    LOGI("%s\n", __func__);
-
     if (!handle)
     {
         LOGE("%s, %d, handle is NULL\n", __func__, __LINE__);
         return BK_FAIL;
     }
+
+    if (handle->status == PROMPT_TONE_PLAY_STA_NULL)
+    {
+        LOGW("%s, %d, prompt_tone_play already close\n", __func__, __LINE__);
+        return BK_OK;
+    }
+
+    LOGI("%s\n", __func__);
 
     if (wait_play_finish)
     {
@@ -281,6 +327,136 @@ bk_err_t prompt_tone_play_close(prompt_tone_play_handle_t handle, bool wait_play
 
     aud_tras_drv_register_prompt_tone_pool_empty_notify(NULL, NULL);
 
+    handle->status = PROMPT_TONE_PLAY_STA_NULL;
+
     return BK_OK;
+}
+
+bk_err_t prompt_tone_play_set_url(prompt_tone_play_handle_t handle, url_info_t *url_info)
+{
+    if (!handle || !url_info || !url_info->url)
+    {
+        LOGE("%s, %d, handle: %p, url_info: %p, url_info->url: %p\n", __func__, __LINE__, handle, url_info, url_info->url);
+        return BK_FAIL;
+    }
+
+    if (handle->status == PROMPT_TONE_PLAY_STA_NULL)
+    {
+        LOGE("%s, %d, prompt_tone_play not open\n", __func__, __LINE__);
+        return BK_FAIL;
+    }
+
+    LOGD("%s\n", __func__);
+
+    if (handle->source)
+    {
+        return audio_source_set_url(handle->source, url_info);
+    }
+    else
+    {
+        return BK_FAIL;
+    }
+}
+
+bk_err_t prompt_tone_play_start(prompt_tone_play_handle_t handle)
+{
+    bk_err_t ret = BK_OK;
+
+    if (!handle)
+    {
+        LOGE("%s, %d, handle is null\n", __func__, __LINE__, handle);
+        return BK_FAIL;
+    }
+
+    if (handle->status == PROMPT_TONE_PLAY_STA_NULL)
+    {
+        LOGE("%s, %d, prompt_tone_play not open\n", __func__, __LINE__);
+        return BK_FAIL;
+    }
+
+    if (handle->status == PROMPT_TONE_PLAY_STA_PLAYING)
+    {
+        LOGW("%s, %d, prompt_tone_play already start\n", __func__, __LINE__);
+        return BK_OK;
+    }
+
+    LOGI("%s\n", __func__);
+
+    if (handle->codec)
+    {
+        ret = audio_codec_ctrl(handle->codec, AUDIO_CODEC_CTRL_START, NULL);
+        if (ret != BK_OK)
+        {
+            LOGE("%s, %d, audio codec stop fail\n", __func__, __LINE__);
+            return BK_FAIL;
+        }
+    }
+
+    if (handle->source)
+    {
+        ret = audio_source_ctrl(handle->source, AUDIO_SOURCE_CTRL_START, NULL);
+        if (ret != BK_OK)
+        {
+            LOGE("%s, %d, audio source stop fail\n", __func__, __LINE__);
+            goto fail;
+        }
+    }
+
+    handle->status = PROMPT_TONE_PLAY_STA_PLAYING;
+
+fail:
+    audio_codec_ctrl(handle->codec, AUDIO_CODEC_CTRL_STOP, NULL);
+
+    return BK_FAIL;
+}
+
+bk_err_t prompt_tone_play_stop(prompt_tone_play_handle_t handle)
+{
+    bk_err_t ret = BK_OK;
+    bk_err_t err = BK_OK;
+
+    if (!handle)
+    {
+        LOGE("%s, %d, handle is null\n", __func__, __LINE__, handle);
+        return BK_FAIL;
+    }
+
+    if (handle->status == PROMPT_TONE_PLAY_STA_NULL)
+    {
+        LOGE("%s, %d, prompt_tone_play not open\n", __func__, __LINE__);
+        return BK_FAIL;
+    }
+
+    if (handle->status == PROMPT_TONE_PLAY_STA_IDLE)
+    {
+        LOGW("%s, %d, prompt_tone_play already stop\n", __func__, __LINE__);
+        return BK_OK;
+    }
+
+    LOGI("%s\n", __func__);
+
+    if (handle->source)
+    {
+        ret = audio_source_ctrl(handle->source, AUDIO_SOURCE_CTRL_STOP, NULL);
+        if (ret != BK_OK)
+        {
+            LOGE("%s, %d, audio source stop fail\n", __func__, __LINE__);
+            err = BK_FAIL;
+        }
+    }
+
+    if (handle->codec)
+    {
+        ret = audio_codec_ctrl(handle->codec, AUDIO_CODEC_CTRL_STOP, NULL);
+        if (ret != BK_OK)
+        {
+            LOGE("%s, %d, audio codec stop fail\n", __func__, __LINE__);
+            err = BK_FAIL;
+        }
+    }
+
+    handle->status = PROMPT_TONE_PLAY_STA_IDLE;
+
+    return err;
 }
 

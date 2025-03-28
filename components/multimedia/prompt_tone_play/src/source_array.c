@@ -428,12 +428,74 @@ static int array_source_seek(audio_source_t *source, int offset, uint32_t whence
     return BK_OK;
 }
 
+static int array_source_set_url(audio_source_t *source, url_info_t *url_info)
+{
+    ARRAY_SOURCE_CHECK_NULL(url_info);
+    ARRAY_SOURCE_CHECK_NULL(url_info->url);
+    ARRAY_SOURCE_CHECK_NULL(source);
+    array_source_priv_t *array_source = (array_source_priv_t *)source->source_ctx;
+    ARRAY_SOURCE_CHECK_NULL(array_source);
+
+    LOGI("%s, url: %s \n", __func__, url_info->url);
+
+    /* update new url */
+    array_source->config.url = url_info->url;
+    array_source->config.total_size = url_info->total_len;
+
+    return BK_OK;
+}
+
+static int array_source_ctrl(audio_source_t *source, audio_source_ctrl_op_t op, void *params)
+{
+    ARRAY_SOURCE_CHECK_NULL(source);
+    array_source_priv_t *array_source = (array_source_priv_t *)source->source_ctx;
+    ARRAY_SOURCE_CHECK_NULL(array_source);
+
+    bk_err_t ret = BK_FAIL;
+
+    LOGD("%s, op: %d \n", __func__, op);
+
+    switch (op)
+    {
+        case AUDIO_SOURCE_CTRL_START:
+            ret = array_data_read_send_msg(array_source->array_data_read_msg_que, ARRAY_DATA_READ_IDLE, NULL);
+            if (ret != BK_OK)
+            {
+                LOGE("%s, %d, send msg to stop read old array data fail\n", __func__, __LINE__);
+                break;
+            }
+            ret = array_data_read_send_msg(array_source->array_data_read_msg_que, ARRAY_DATA_READ_START, NULL);
+            if (ret != BK_OK)
+            {
+                LOGE("%s, %d, send msg to start read new array data fail\n", __func__, __LINE__);
+            }
+            break;
+
+        case AUDIO_SOURCE_CTRL_STOP:
+            ret = array_data_read_send_msg(array_source->array_data_read_msg_que, ARRAY_DATA_READ_IDLE, NULL);
+            if (ret != BK_OK)
+            {
+                LOGE("%s, %d, send msg to stop read old array data fail\n", __func__, __LINE__);
+                break;
+            }
+            break;
+
+        default:
+            ret = BK_FAIL;
+            break;
+    }
+
+    return ret;
+}
+
 
 audio_source_ops_t array_source_ops =
 {
     .audio_source_open = array_source_open,
     .audio_source_seek = array_source_seek,
     .audio_source_close = array_source_close,
+    .audio_source_set_url = array_source_set_url,
+    .audio_source_ctrl = array_source_ctrl,
 };
 
 audio_source_ops_t *get_array_source_ops(void)

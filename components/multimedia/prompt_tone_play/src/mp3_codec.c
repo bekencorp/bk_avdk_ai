@@ -811,6 +811,53 @@ static int mp3_codec_write(audio_codec_t *codec, char *buffer, uint32_t len)
     return len;
 }
 
+static int mp3_codec_ctrl(audio_codec_t *codec, audio_codec_ctrl_op_t op, void *params)
+{
+    if (!codec)
+    {
+        LOGE("%s, %d, codec: %p is null\n", __func__, __LINE__, codec);
+        return BK_FAIL;
+    }
+
+    mp3_codec_priv_t *priv = (mp3_codec_priv_t *)codec->codec_ctx;
+    MP3_CODEC_CHECK_NULL(priv);
+
+    bk_err_t ret = BK_OK;
+
+    LOGD("%s, op: %d \n", __func__, op);
+
+    switch (op)
+    {
+        case AUDIO_CODEC_CTRL_START:
+            ret = mp3_data_read_send_msg(priv->mp3_codec_msg_que, MP3_CODEC_IDLE, NULL);
+            if (ret != BK_OK)
+            {
+                LOGE("%s, %d, send msg to stop mp3 decode fail\n", __func__, __LINE__);
+                break;
+            }
+            ret = mp3_data_read_send_msg(priv->mp3_codec_msg_que, MP3_CODEC_START NULL);
+            if (ret != BK_OK)
+            {
+                LOGE("%s, %d, send msg to start mp3 decode fail\n", __func__, __LINE__);
+            }
+            break;
+
+        case AUDIO_CODEC_CTRL_STOP:
+            ret = mp3_data_read_send_msg(priv->mp3_codec_msg_que, MP3_CODEC_IDLE, NULL);
+            if (ret != BK_OK)
+            {
+                LOGE("%s, %d, send msg to stop mp3 decode fail\n", __func__, __LINE__);
+                break;
+            }
+            break;
+
+        default:
+            ret = BK_FAIL;
+            break;
+    }
+
+    return ret;
+}
 
 
 audio_codec_ops_t mp3_codec_ops =
@@ -818,6 +865,7 @@ audio_codec_ops_t mp3_codec_ops =
     .open =           mp3_codec_open,
     .write =          mp3_codec_write,
     .close =          mp3_codec_close,
+    .ctrl =           mp3_codec_ctrl,
 };
 
 audio_codec_ops_t *get_mp3_codec_ops(void)

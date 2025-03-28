@@ -48,6 +48,8 @@ static int check_wav_head(wav_codec_priv_t *codec_priv, uint8_t *in_data, uint32
 {
     WAV_CODEC_CHECK_NULL(codec_priv);
 
+    LOGI("%s\n", __func__);
+
     codec_priv->head_parse = true;
 
     if (len < 44)
@@ -189,12 +191,47 @@ static int wav_codec_write(audio_codec_t *codec, char *buffer, uint32_t len)
     return len;
 }
 
+static int wav_codec_ctrl(audio_codec_t *codec, audio_codec_ctrl_op_t op, void *params)
+{
+    if (!codec)
+    {
+        LOGE("%s, %d, codec: %p is null\n", __func__, __LINE__, codec);
+        return BK_FAIL;
+    }
+
+    wav_codec_priv_t *priv = (wav_codec_priv_t *)codec->codec_ctx;
+    WAV_CODEC_CHECK_NULL(priv);
+
+    bk_err_t ret = BK_OK;
+
+    LOGD("%s, op: %d \n", __func__, op);
+
+    switch (op)
+    {
+        case AUDIO_CODEC_CTRL_START:
+            break;
+
+        case AUDIO_CODEC_CTRL_STOP:
+            /* Notify codec wav decode complete. Need parse header when receive next file. */
+            priv->head_parse = false;
+            LOGI("%s, head_parse = false\n", __func__);
+            break;
+
+        default:
+            ret = BK_FAIL;
+            break;
+    }
+
+    return ret;
+}
+
 
 audio_codec_ops_t wav_codec_ops =
 {
     .open = wav_codec_open,
     .write = wav_codec_write,
     .close = wav_codec_close,
+    .ctrl = wav_codec_ctrl,
 };
 
 audio_codec_ops_t *get_wav_codec_ops(void)

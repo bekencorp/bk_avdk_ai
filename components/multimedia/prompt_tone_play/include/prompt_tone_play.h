@@ -1,4 +1,4 @@
-// Copyright 2020-2021 Beken
+// Copyright 2025-2026 Beken
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -92,12 +92,12 @@ typedef struct prompt_tone_play *prompt_tone_play_handle_t;
 }
 
 /**
- * @brief     Create mp3 player with config
+ * @brief     Create prompt tone player with config
  *
- * This API create mp3 play handle according to config.
+ * This API create prompt tone player handle according to config.
  * This API should be called before other api.
  *
- * @param[in] config    Mp3 play config
+ * @param[in] config    Prompt tone play config
  *
  * @return
  *    - Not NULL: success
@@ -106,12 +106,12 @@ typedef struct prompt_tone_play *prompt_tone_play_handle_t;
 prompt_tone_play_handle_t prompt_tone_play_create(  prompt_tone_play_cfg_t *config);
 
 /**
- * @brief      Destroy mp3 play
+ * @brief      Destroy prompt tone player
  *
- * This API Destroy mp3 play according to mp3 play handle.
+ * This API Destroy prompt tone player according to prompt tone player handle.
  *
  *
- * @param[in] mp3_play  The mp3 play handle
+ * @param[in] handle    The prompt tone player handle
  *
  * @return
  *    - BK_OK: success
@@ -120,12 +120,12 @@ prompt_tone_play_handle_t prompt_tone_play_create(  prompt_tone_play_cfg_t *conf
 bk_err_t prompt_tone_play_destroy(prompt_tone_play_handle_t handle);
 
 /**
- * @brief      Open mp3 play
+ * @brief      Open prompt tone player
  *
- * This API open mp3 play and start decode speaker data to play.
+ * This API open prompt tone player.
  *
  *
- * @param[in] mp3_play  The mp3 play handle
+ * @param[in] handle    The prompt tone player handle
  *
  * @return
  *    - BK_OK: success
@@ -134,19 +134,63 @@ bk_err_t prompt_tone_play_destroy(prompt_tone_play_handle_t handle);
 bk_err_t prompt_tone_play_open(prompt_tone_play_handle_t handle);
 
 /**
- * @brief      Close mp3 play
+ * @brief      Close prompt tone player
  *
- * This API close mp3 play
+ * This API close prompt tone player
  *
  *
- * @param[in] mp3_play  The mp3 play handle
- * @param[in] wait_play_finish  The flag to declare whether waiting play pool data finish
+ * @param[in] handle            The prompt tone player handle
+ * @param[in] wait_play_finish  The flag to declare whether waiting play finish
  *
  * @return
  *    - BK_OK: success
  *    - Others: failed
  */
 bk_err_t prompt_tone_play_close(prompt_tone_play_handle_t handle, bool wait_play_finish);
+
+/**
+ * @brief      Set url information of prompt tone
+ *
+ * This API set url information of prompt tone
+ *
+ *
+ * @param[in] handle            The prompt tone player handle
+ * @param[in] wait_play_finish  The flag to declare whether waiting play finish
+ *
+ * @return
+ *    - BK_OK: success
+ *    - Others: failed
+ */
+bk_err_t prompt_tone_play_set_url(prompt_tone_play_handle_t handle, url_info_t *url_info);
+
+/**
+ * @brief      Start playing prompt tone
+ *
+ * This API start playing prompt tone
+ *
+ *
+ * @param[in] handle    The prompt tone player handle
+ *
+ * @return
+ *    - BK_OK: success
+ *    - Others: failed
+ */
+bk_err_t prompt_tone_play_start(prompt_tone_play_handle_t handle);
+
+/**
+ * @brief      Stop playing prompt tone
+ *
+ * This API stop playing prompt tone
+ *
+ *
+ * @param[in] handle    The prompt tone player handle
+ *
+ * @return
+ *    - BK_OK: success
+ *    - Others: failed
+ */
+bk_err_t prompt_tone_play_stop(prompt_tone_play_handle_t handle);
+
 
 #ifdef __cplusplus
 }

@@ -33,6 +33,7 @@
 
 
 #define MOUNT_ENABLE
+#define UNMOUNT_VFS_TIMER_INTERVAL      (3000)
 
 #define VFS_SOURCE_CHECK_NULL(ptr) do {\
         if (ptr == NULL) {\
@@ -66,13 +67,33 @@ typedef struct vfs_source_priv_s
     beken_semaphore_t sem;
     bool running;
 
+    bool mount_state;
+    beken2_timer_t unmount_timer;
+
     audio_source_cfg_t config;
 } vfs_source_priv_t;
 
 #ifdef MOUNT_ENABLE
-int vfs_source_mount(void)
+int vfs_source_mount(vfs_source_priv_t *vfs_source)
 {
     int ret = BK_FAIL;
+
+    /* check whether vfs already mount */
+    if (vfs_source->mount_state)
+    {
+        /* stop unmount timer */
+        ret = rtos_stop_oneshot_timer(&vfs_source->unmount_timer);
+        if (ret != BK_OK)
+        {
+            LOGE("%s, %d, stop unmount timer fail \n", __func__, __LINE__);
+        }
+
+        LOGI("%s, vfs already mount\n", __func__);
+
+        return BK_OK;
+    }
+
+    LOGI("%s\n", __func__);
 
 #if (CONFIG_FATFS)
     struct bk_fatfs_partition partition;
@@ -117,21 +138,45 @@ int vfs_source_mount(void)
     else
     {
         LOGI("mount success\n");
+        vfs_source->mount_state = true;
         return BK_OK;
     }
 }
 
-int vfs_source_unmount(void)
+static void vfs_unmount_timer_callback(void *param, void *param1)
 {
+    vfs_source_priv_t *vfs_source = (vfs_source_priv_t *)param;
     bk_err_t ret = BK_FAIL;
+
+    if (!vfs_source)
+    {
+        LOGE("%s, %d, vfs_source is null\n", __FUNCTION__, __LINE__);
+        return;
+    }
+
+    LOGI("%s\n", __func__);
 
     ret = umount("/");
     if (BK_OK != ret)
     {
         LOGE("%s, %d, unmount fail:%d\n", __FUNCTION__, __LINE__, ret);
     }
+    else
+    {
+        LOGI("unmount success\n");
+        vfs_source->mount_state = false;
+    }
+}
 
-    LOGI("unmount success\n");
+int vfs_source_unmount(vfs_source_priv_t *vfs_source)
+{
+    bk_err_t ret = BK_FAIL;
+
+    ret = rtos_start_oneshot_timer(&vfs_source->unmount_timer);
+    if (ret != BK_OK)
+    {
+        LOGE("%s, %d, start %s vfs unmount timer fail \n", __func__, __LINE__);
+    }
 
     return ret;
 }
@@ -183,6 +228,16 @@ static void vfs_data_read_task_main(beken_thread_arg_t param_data)
                     LOGD("%s, %d, VFS_DATA_READ_IDLE\n", __func__, __LINE__);
                     vfs_source_priv->running = false;
                     wait_time = BEKEN_WAIT_FOREVER;
+                    /* check whether file has been open, and close file */
+                    if (vfs_source_priv->fd >= 0)
+                    {
+                        close(vfs_source_priv->fd);
+                        vfs_source_priv->fd = -1;
+#ifdef MOUNT_ENABLE
+                        /* unmount vfs system after close file to avoid high power consumption */
+                        vfs_source_unmount(vfs_source_priv);
+#endif
+                    }
                     break;
 
                 case VFS_DATA_READ_EXIT:
@@ -192,13 +247,44 @@ static void vfs_data_read_task_main(beken_thread_arg_t param_data)
 
                 case VFS_DATA_READ_START:
                     LOGD("%s, %d, VFS_DATA_READ_START\n", __func__, __LINE__);
-                    vfs_source_priv->running = true;
-                    wait_time = 0;
+#ifdef MOUNT_ENABLE
+                    /* mount vfs system before open file to avoid high power consumption */
+                    /* mount file */
+                    ret = vfs_source_mount(vfs_source_priv);
+                    if (ret != BK_OK)
+                    {
+                        LOGE("%s, %d, mount fail\n", __func__, __LINE__);
+                        break;
+                    }
+#endif
+                    /* check whether url is valid, and open file */
+                    if (vfs_source_priv->config.url)
+                    {
+                        vfs_source_priv->fd = open(vfs_source_priv->config.url, O_RDONLY);
+                        if (vfs_source_priv->fd < 0)
+                        {
+                            LOGE("%s, %d, open :%s fail, fd: %d\n", __func__, __LINE__, vfs_source_priv->config.url, vfs_source_priv->fd);
+#ifdef MOUNT_ENABLE
+                            vfs_source_unmount(vfs_source_priv);
+#endif
+                        }
+                        else
+                        {
+                            vfs_source_priv->running = true;
+                            wait_time = 0;
+                        }
+                    }
+                    else
+                    {
+                        LOGE("%s, %d, url:%s is invalid\n", __func__, __LINE__, vfs_source_priv->config.url);
+                    }
                     break;
 
                 default:
                     break;
             }
+
+            continue;
         }
 
         /* read speaker data and write to dac fifo */
@@ -241,6 +327,13 @@ static void vfs_data_read_task_main(beken_thread_arg_t param_data)
 vfs_data_read_exit:
 
     vfs_source_priv->running = false;
+
+    /* check whether file has been open, and close file */
+    if (vfs_source_priv->fd >= 0)
+    {
+        close(vfs_source_priv->fd);
+        vfs_source_priv->fd = -1;
+    }
 
     /* delete msg queue */
     ret = rtos_deinit_queue(&vfs_source_priv->vfs_data_read_msg_que);
@@ -290,7 +383,7 @@ static bk_err_t vfs_data_read_task_init(vfs_source_priv_t *vfs_source_priv)
                              4,
                              "vfs_data_rd",
                              (beken_thread_function_t)vfs_data_read_task_main,
-                             1024,
+                             2048,
                              (beken_thread_arg_t)vfs_source_priv);
     if (ret != BK_OK)
     {
@@ -299,8 +392,6 @@ static bk_err_t vfs_data_read_task_init(vfs_source_priv_t *vfs_source_priv)
     }
 
     rtos_get_semaphore(&vfs_source_priv->sem, BEKEN_NEVER_TIMEOUT);
-
-    vfs_data_read_send_msg(vfs_source_priv->vfs_data_read_msg_que, VFS_DATA_READ_START, NULL);
 
     LOGI("init vfs data read task complete\n");
 
@@ -395,23 +486,14 @@ static int vfs_source_open(audio_source_t *source, audio_source_cfg_t *config)
     temp_vfs_source->read_buff_size = config->frame_size;
     os_memcpy(&temp_vfs_source->config, config, sizeof(audio_source_cfg_t));
 
-#if 0//def MOUNT_ENABLE
-    /* mount file */
-    ret = vfs_source_mount();
+#ifdef MOUNT_ENABLE
+    ret = rtos_init_oneshot_timer(&temp_vfs_source->unmount_timer, UNMOUNT_VFS_TIMER_INTERVAL, vfs_unmount_timer_callback, source->source_ctx, NULL);
     if (ret != BK_OK)
     {
-        LOGE("%s, %d, mount fail\n", __func__, __LINE__);
+        LOGE("%s, %d, init %s vfs unmount timer fail \n", __func__, __LINE__);
         goto fail;
     }
 #endif
-
-    /* open file */
-    temp_vfs_source->fd = open(config->url, O_RDONLY);
-    if (temp_vfs_source->fd < 0)
-    {
-        LOGE("%s, %d, open :%s fail, fd: %d\n", __func__, __LINE__, config->url, temp_vfs_source->fd);
-        goto fail;
-    }
 
     ret = vfs_data_read_task_init(source->source_ctx);
     if (ret != BK_OK)
@@ -432,14 +514,16 @@ fail:
         source->source_ctx = NULL;
     }
 
-    if (temp_vfs_source->fd >= 0)
+#ifdef MOUNT_ENABLE
+    if (temp_vfs_source && temp_vfs_source->unmount_timer.handle)
     {
-        close(temp_vfs_source->fd);
-        temp_vfs_source->fd = -1;
+        ret = rtos_deinit_oneshot_timer(&temp_vfs_source->unmount_timer);
+        if (ret != BK_OK)
+        {
+            LOGE("%s, %d, deinit vfs unmount timer fail \n", __func__, __LINE__);
+        }
+        temp_vfs_source->unmount_timer.handle = NULL;
     }
-
-#if 0//def MOUNT_ENABLE
-    vfs_source_unmount();
 #endif
 
     return BK_FAIL;
@@ -460,14 +544,19 @@ static int vfs_source_close(audio_source_t *source)
 
     vfs_data_read_task_deinit(vfs_source);
 
-    if (vfs_source->fd >= 0)
+#ifdef MOUNT_ENABLE
+    rtos_stop_oneshot_timer(&vfs_source->unmount_timer);
+
+    if (vfs_source->mount_state)
     {
-        close(vfs_source->fd);
-        vfs_source->fd = -1;
+        vfs_unmount_timer_callback(vfs_source, NULL);
     }
 
-#if 0//def MOUNT_ENABLE
-    vfs_source_unmount();
+    if (vfs_source->unmount_timer.handle)
+    {
+        rtos_deinit_oneshot_timer(&vfs_source->unmount_timer);
+        vfs_source->unmount_timer.handle = NULL;
+    }
 #endif
 
     if (vfs_source)
@@ -498,12 +587,74 @@ static int vfs_source_seek(audio_source_t *source, int offset, uint32_t whence)
     }
 }
 
+static int vfs_source_set_url(audio_source_t *source, url_info_t *url_info)
+{
+    VFS_SOURCE_CHECK_NULL(url_info);
+    VFS_SOURCE_CHECK_NULL(url_info->url);
+    VFS_SOURCE_CHECK_NULL(source);
+    vfs_source_priv_t *vfs_source = (vfs_source_priv_t *)source->source_ctx;
+    VFS_SOURCE_CHECK_NULL(vfs_source);
+
+    LOGI("%s, url: %s \n", __func__, url_info->url);
+
+    /* update new url */
+    vfs_source->config.url = url_info->url;
+    //vfs_source->config.total_size = url_info->total_len;
+
+    return BK_OK;
+}
+
+static int vfs_source_ctrl(audio_source_t *source, audio_source_ctrl_op_t op, void *params)
+{
+    VFS_SOURCE_CHECK_NULL(source);
+    vfs_source_priv_t *vfs_source = (vfs_source_priv_t *)source->source_ctx;
+    VFS_SOURCE_CHECK_NULL(vfs_source);
+
+    bk_err_t ret = BK_FAIL;
+
+    LOGD("%s, op: %d \n", __func__, op);
+
+    switch (op)
+    {
+        case AUDIO_SOURCE_CTRL_START:
+            ret = vfs_data_read_send_msg(vfs_source->vfs_data_read_msg_que, VFS_DATA_READ_IDLE, NULL);
+            if (ret != BK_OK)
+            {
+                LOGE("%s, %d, send msg to stop read old vfs file fail\n", __func__, __LINE__);
+                break;
+            }
+            ret = vfs_data_read_send_msg(vfs_source->vfs_data_read_msg_que, VFS_DATA_READ_START, NULL);
+            if (ret != BK_OK)
+            {
+                LOGE("%s, %d, send msg to start read new vfs file fail\n", __func__, __LINE__);
+            }
+            break;
+
+        case AUDIO_SOURCE_CTRL_STOP:
+            ret = vfs_data_read_send_msg(vfs_source->vfs_data_read_msg_que, VFS_DATA_READ_IDLE, NULL);
+            if (ret != BK_OK)
+            {
+                LOGE("%s, %d, send msg to stop read old vfs file fail\n", __func__, __LINE__);
+                break;
+            }
+            break;
+
+        default:
+            ret = BK_FAIL;
+            break;
+    }
+
+    return ret;
+}
+
 
 audio_source_ops_t vfs_source_ops =
 {
     .audio_source_open = vfs_source_open,
     .audio_source_seek = vfs_source_seek,
     .audio_source_close = vfs_source_close,
+    .audio_source_set_url = vfs_source_set_url,
+    .audio_source_ctrl = vfs_source_ctrl,
 };
 
 audio_source_ops_t *get_vfs_source_ops(void)

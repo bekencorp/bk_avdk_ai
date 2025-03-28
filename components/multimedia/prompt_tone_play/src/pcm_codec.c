@@ -140,12 +140,46 @@ static int pcm_codec_write(audio_codec_t *codec, char *buffer, uint32_t len)
     return len;
 }
 
+static int pcm_codec_ctrl(audio_codec_t *codec, audio_codec_ctrl_op_t op, void *params)
+{
+    if (!codec)
+    {
+        LOGE("%s, %d, codec: %p is null\n", __func__, __LINE__, codec);
+        return BK_FAIL;
+    }
+
+    pcm_codec_priv_t *priv = (pcm_codec_priv_t *)codec->codec_ctx;
+    PCM_CODEC_CHECK_NULL(priv);
+
+    bk_err_t ret = BK_OK;
+
+    LOGD("%s, op: %d \n", __func__, op);
+
+    switch (op)
+    {
+        case AUDIO_CODEC_CTRL_START:
+            //nothing todo
+            break;
+
+        case AUDIO_CODEC_CTRL_STOP:
+            //nothing todo
+            break;
+
+        default:
+            ret = BK_FAIL;
+            break;
+    }
+
+    return ret;
+}
+
 
 audio_codec_ops_t pcm_codec_ops =
 {
     .open =           pcm_codec_open,
     .write =          pcm_codec_write,
     .close =          pcm_codec_close,
+    .ctrl =           pcm_codec_ctrl,
 };
 
 audio_codec_ops_t *get_pcm_codec_ops(void)

@@ -166,6 +166,26 @@ bk_err_t audio_codec_write_data(audio_codec_t *codec, char *buffer, uint32_t len
     return codec->ops->write(codec, buffer, len);
 }
 
+bk_err_t audio_codec_ctrl(audio_codec_t *codec, audio_codec_ctrl_op_t op, void *params)
+{
+    bk_err_t ret = BK_OK;
+
+    if (!codec)
+    {
+        LOGE("%s, %d, param error, codec: %p\n", __func__, __LINE__, codec);
+        return BK_FAIL;
+    }
+
+    ret = codec->ops->ctrl(codec, op, params);
+    if (ret != BK_OK)
+    {
+        LOGE("%s, %d, op: %d fail, ret: %d\n", __func__, __LINE__, op, ret);
+        return BK_FAIL;
+    }
+
+    return BK_OK;
+}
+
 #if 0
 bk_err_t audio_codec_get_frame_info(audio_codec_t *codec)
 {

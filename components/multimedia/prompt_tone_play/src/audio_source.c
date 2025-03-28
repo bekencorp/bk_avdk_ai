@@ -34,23 +34,6 @@
 #define LOGD(...) BK_LOGD(AUDIO_SOURCE_TAG, ##__VA_ARGS__)
 
 
-#if 0
-static int audio_source_get_type(const char *URI)
-{
-    if (strstr(URI, "array"))
-    {
-        return AUDIO_SOURCE_ARRAY;
-    }
-
-    if (strstr(URI, ".mp3") || strstr(URI, ".pcm"))
-    {
-        return AUDIO_SOURCE_FILE;
-    }
-
-    return AUDIO_SOURCE_UNKNOWN;
-}
-#endif
-
 audio_source_t *audio_source_create(  audio_source_type_t source_type, audio_source_cfg_t *config)
 {
     audio_source_ops_t *temp_ops = NULL;
@@ -171,3 +154,24 @@ int audio_source_seek(audio_source_t *source, int offset, uint32_t whence)
 
     return source->ops->audio_source_seek(source, offset, whence);
 }
+
+int audio_source_set_url(audio_source_t *source, url_info_t *url_info)
+{
+    if (!source || !source->ops->audio_source_set_url)
+    {
+        return BK_FAIL;
+    }
+
+    return source->ops->audio_source_set_url(source, url_info);
+}
+
+int audio_source_ctrl(audio_source_t *source, audio_source_ctrl_op_t op, void *params)
+{
+    if (!source || !source->ops->audio_source_ctrl)
+    {
+        return BK_FAIL;
+    }
+
+    return source->ops->audio_source_ctrl(source, op, params);
+}
+
