@@ -262,6 +262,10 @@ menu "Media"
 
 		config AEC_VERSION_V2
 		bool "Enable AEC V2 Version"
+		
+		config AEC_VERSION_V3
+		bool "Enable AEC V3 Version"
+		
 	endchoice
 
 	choice AEC_ECHO_COLLECT_MODE

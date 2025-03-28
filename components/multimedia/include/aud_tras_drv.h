@@ -1,7 +1,9 @@
 #pragma once
 
 #include <driver/audio_ring_buff.h>
-#if CONFIG_AEC_VERSION_V2
+#if CONFIG_AEC_VERSION_V3
+#include <modules/aec_v3.h>
+#elif CONFIG_AEC_VERSION_V2
 #include <modules/aec_v2.h>
 #else
 #include <modules/aec.h>

@@ -27,7 +27,9 @@
 #include "aud_intf_private.h"
 #include "aud_tras_drv.h"
 #include <driver/psram.h>
-#if CONFIG_AEC_VERSION_V2
+#if CONFIG_AEC_VERSION_V3
+#include <modules/aec_v3.h>
+#elif CONFIG_AEC_VERSION_V2
 #include <modules/aec_v2.h>
 #else
 #include <modules/aec.h>
@@ -524,18 +526,21 @@ static bk_err_t aud_tras_drv_aec_cfg(void)
 	uint32_t val = 0;
 	aec_info_t *temp_aec_info = aud_tras_drv_info.voc_info.aec_info;
 	/* init aec context */
-#if CONFIG_AEC_VERSION_V2
-    LOGI("%s, %d, use AEC Version V2 \n", __func__, __LINE__);
+#if CONFIG_AEC_VERSION_V3
+    LOGI("%s, %d, use AEC Version V3 %d\n", __func__, __LINE__, aec_ver());
+	aec_context_size = aec_size(0);	
+#elif CONFIG_AEC_VERSION_V2
+    LOGI("%s, %d, use AEC Version V2 %d\n", __func__, __LINE__,aec_ver());
+		aec_context_size = aec_size(2000);
 #else
     LOGI("%s, %d, use AEC Version V1 \n", __func__, __LINE__);
+	aec_context_size = aec_size(1000);	
 #endif
 
 #if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
     LOGI("%s, %d, use AEC hardware mode \n", __func__, __LINE__);
-	aec_context_size = aec_size(2000);
 #else
     LOGI("%s, %d, use AEC software mode \n", __func__, __LINE__);
-	aec_context_size = aec_size(1000);
 #endif
 
 	LOGI("%s, %d, malloc aec size: %d \n", __func__, __LINE__, aec_context_size);
@@ -587,20 +592,53 @@ static bk_err_t aud_tras_drv_aec_cfg(void)
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_NS_PARA, temp_aec_info->aec_config->ns_para);							//只能取值0,1,2; 降噪由弱到强，建议默认值
 	/* drc(输出音量相关) */
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_DRC, temp_aec_info->aec_config->drc);									//建议取值范围0x10~0x1f;   越大输出声音越大
-#if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
-	LOGI("aec config:0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x\n",
+
+
+#if CONFIG_AEC_VERSION_V3
+#define AEC_NS_FILTER 1
+     aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_DELAY_BUFF, (uint32_t)temp_aec_info->aec->Abuf);
+
+#if (AEC_NS_FILTER)
+if(temp_aec_info->aec_config->init_flags & AEC_NS_FLAG_MSK)
+{
+        const uint32_t ex_size=93380;
+        uint8_t * gtbuff = (uint8_t*)psram_malloc(ex_size);
+        memset(gtbuff, 0 , ex_size);
+        aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_GTBUFF, (uint32_t)gtbuff);
+        aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_GTPROC, (uint32_t)gtcrn_proc);
+        aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_GTTEMP, (uint32_t)temp_aec_info->out_addr);
+        aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_EC_FILTER, 0x03);
+        aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_NS_FILTER, 0x80);
+}	
+else
+{
+        aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_NS_FILTER, 0x0);
+}
+
+	{
+	    temp_aec_info->aec->SPthr[1] = 20;//(aec_vad_get_start_threshold()/20)-4;//1:20ms    default:20
+	    temp_aec_info->aec->SPthr[2] = 50;//(aec_vad_get_stop_threshold()/20)+2;//20ms     default:50
+	    //silence
+	    temp_aec_info->aec->SPthr[6] = 160;//aec_vad_get_silence_threshold();
+	    temp_aec_info->aec->SPthr[5] = 10;//16 - aec_vad_get_silence_threshold()/24;
+		if(temp_aec_info->aec->SPthr[5] < 0)    
+		{    temp_aec_info->aec->SPthr[5] = 0;    }
+		if(temp_aec_info->aec->SPthr[5] > 16)     
+		{    temp_aec_info->aec->SPthr[5] = 16;    }
+	}
+
+#endif
+#endif
+	LOGI("aec config:0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x\r\n",
 		temp_aec_info->aec_config->init_flags, //0x1f
 		temp_aec_info->aec_config->mic_delay,//0x0
 		temp_aec_info->aec_config->ec_depth,//0x14
-		temp_aec_info->aec_config->TxRxThr,//0x1e
-		temp_aec_info->aec_config->TxRxFlr,//0x6
 		temp_aec_info->aec_config->ref_scale,//0x0
 		temp_aec_info->aec_config->voice_vol,//0xe
 		temp_aec_info->aec_config->ns_level,//0x2
 		temp_aec_info->aec_config->ns_para,//0x1
 		temp_aec_info->aec_config->drc//0xf
 		 );
-#endif
 	return BK_OK;
 }
 
@@ -846,6 +884,91 @@ static bk_err_t aud_tras_dac_dma_config(dma_id_t dma_id, int32_t *ring_buff_addr
 	return BK_OK;
 }
 
+#if CONFIG_AEC_VERSION_V3
+static void aud_aec_vad_process(void)
+{
+#if CONFIG_SYS_CPU1
+    aec_info_t *aec_info_pr = aud_tras_drv_info.voc_info.aec_info;
+    //extern int aec_vad_record_flag_get(void);
+    extern void aec_vad_status_send(int val);
+	
+    //if (!!aec_vad_record_flag_get())
+    //if(aec_info_pr->aec->test)
+    //if(!aud_get_production_mode())
+    {
+        static int aec_vad_flag=0;
+        //static int aec_vad_flag_mem=0;
+        static int aec_vad_mem=0;
+		       
+        static int badframe = 0;
+        int dc = aec_info_pr->aec->dc >> 14;
+        if (dc<0)
+		{
+			dc = -dc;
+		}
+        if ( (dc>800) && (aec_info_pr->aec->mic_max>10000) )
+        {
+            badframe = 10;
+        }
+        else
+        {
+            badframe--;
+            if (badframe < 0)
+            {
+                badframe = 0;
+			}
+        }
+        if (badframe)
+        {
+            aec_info_pr->aec->spcnt >>= 1;
+        }
+				
+        if(aec_info_pr->aec->test)
+        {
+            if(aec_vad_mem==0)
+            {
+                aec_vad_flag = 1;
+            }
+            else
+            {
+                if(aec_info_pr->aec->dcnt*20 == aec_info_pr->aec->SPthr[6])
+    			{
+    				aec_vad_flag = 3;
+    			}
+    			else
+    			{
+    				aec_vad_flag = 0;
+    			}
+            }
+            aec_vad_mem = aec_info_pr->aec->test;
+        }
+        else
+        {
+            if(0 == aec_vad_mem)
+            {
+                aec_vad_flag = 0;
+            }
+            if(aec_vad_mem > 0)
+            {
+                aec_vad_flag = 2;  // vad end
+            }
+            aec_vad_mem = aec_info_pr->aec->test;
+        }
+        
+        //if(aec_vad_flag-aec_vad_flag_mem)
+        //{
+        //  bk_printf("a.v.flag:%d,%d\n",aec_vad_flag,aec_vad_flag_mem);
+        //}
+        //aec_vad_flag_mem = aec_vad_flag;
+        
+       // aec_vad_status_send(aec_vad_flag);
+	   __maybe_unused_var(aec_vad_flag);
+    }
+#endif
+}
+#endif
+
+
 #if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
 int16_t temp_buf[640] = {0};
 //int16_t temp_ref_buf[640] = {0};
@@ -995,14 +1118,22 @@ static bk_err_t aud_tras_aec(void)
 
 #endif //CONFIG_AUD_TRAS_AEC_DUMP_DEBUG
 
-#if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
+
+#if CONFIG_AEC_VERSION_V3
+    aec_info_pr->aec->flags = 0x1f;
+#elif CONFIG_AEC_VERSION_V2
     aec_info_pr->aec->flags = 0x1d;
+#else
+
 #endif
+
 
 	/* aec process data */
 	//os_printf("ref_addr:%p, mic_addr:%p, out_addr:%p \r\n", aec_context_pr->ref_addr, aec_context_pr->mic_addr, aec_context_pr->out_addr);
 	aec_proc(aec_info_pr->aec, aec_info_pr->ref_addr, aec_info_pr->mic_addr, aec_info_pr->out_addr);
-
+#if CONFIG_AEC_VERSION_V3
+	aud_aec_vad_process(); 
+#endif
 	if (aud_tras_drv_info.voc_info.aud_tras_dump_aec_cb) {
 		aud_tras_drv_info.voc_info.aud_tras_dump_aec_cb((uint8_t *)aec_info_pr->out_addr, aec_info_pr->samp_rate_points*2);
 	}
