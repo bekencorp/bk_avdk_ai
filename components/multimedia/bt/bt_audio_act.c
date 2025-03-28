@@ -19,6 +19,7 @@
 #include "media_evt.h"
 #include "media_app.h"
 #include "bt_audio_act.h"
+#include "aud_tras_drv.h"
 
 #include <driver/media_types.h>
 #include <os/mem.h>
@@ -42,8 +43,8 @@ enum
 #define LOGE(format, ...) do{if(BT_AUDIO_DEBUG_LEVEL >= BT_AUDIO_DEBUG_LEVEL_ERROR)   BK_LOGE(TAG, "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
 #define LOGW(format, ...) do{if(BT_AUDIO_DEBUG_LEVEL >= BT_AUDIO_DEBUG_LEVEL_WARNING) BK_LOGW(TAG, "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
 #define LOGI(format, ...) do{if(BT_AUDIO_DEBUG_LEVEL >= BT_AUDIO_DEBUG_LEVEL_INFO)    BK_LOGI(TAG, "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
-#define LOGD(format, ...) do{if(BT_AUDIO_DEBUG_LEVEL >= BT_AUDIO_DEBUG_LEVEL_DEBUG)   BK_LOGI(TAG, "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
-#define LOGV(format, ...) do{if(BT_AUDIO_DEBUG_LEVEL >= BT_AUDIO_DEBUG_LEVEL_VERBOSE) BK_LOGI(TAG, "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
+#define LOGD(format, ...) do{if(BT_AUDIO_DEBUG_LEVEL >= BT_AUDIO_DEBUG_LEVEL_DEBUG)   BK_LOGD(TAG, "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
+#define LOGV(format, ...) do{if(BT_AUDIO_DEBUG_LEVEL >= BT_AUDIO_DEBUG_LEVEL_VERBOSE) BK_LOGV(TAG, "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
 
 
 typedef void (*camera_connect_state_t)(uint8_t state);
@@ -89,6 +90,45 @@ static void bt_audio_task(void *arg)
         case 0:
             continue;
             break;
+
+        case EVENT_BT_A2DP_STATUS_NOTI_REQ:
+        {
+            uint32_t a2dp_status_notif_status = (typeof(a2dp_status_notif_status))s_bt_audio_action_mailbox->param;
+
+            LOGW("EVENT_BT_A2DP_STATUS_NOTI_REQ %d", a2dp_status_notif_status);
+            ret = aud_tras_drv_control_prompt_tone_play(a2dp_status_notif_status ? 1 : 0);
+
+            if (ret)
+            {
+                LOGE("aud_tras_drv_control_prompt_tone_play to %d err %d !!!", a2dp_status_notif_status ? 1 : 0, ret);
+            }
+        }
+        break;
+
+        case EVENT_BT_PCM_WRITE_REQ:
+        {
+
+            bt_audio_write_req_t *req = (typeof(req))s_bt_audio_action_mailbox->param;
+#if 0
+            uint32_t w_len = 0;
+
+            while (w_len < req->data_len)
+            {
+                ret = aud_tras_drv_write_prompt_tone_data((char *)req->data + w_len, req->data_len - w_len, BEKEN_WAIT_FOREVER);
+
+                if (ret <= 0)
+                {
+                    LOGE("aud_tras_drv_write_prompt_tone_data fail, ret: %d", ret);
+                }
+
+                w_len += ret;
+                ret = 0;
+            }
+#else
+            LOGV("EVENT_BT_PCM_WRITE_REQ %d", req->data_len);
+#endif
+        }
+        break;
 
         case EVENT_BT_PCM_RESAMPLE_INIT_REQ:
             do
@@ -306,6 +346,8 @@ static bk_err_t bt_audio_init_handle(media_mailbox_msg_t *msg)
 
 end:
 
+    LOGI("init stat %d", ret);
+
     if (ret)
     {
         if (s_bt_audio_task)
@@ -352,6 +394,8 @@ static bk_err_t bt_audio_deinit_handle(media_mailbox_msg_t *msg)
 
 end:
 
+    LOGI("deinit stat %d", ret);
+
     if (ret)
     {
         if (s_bt_audio_task)
@@ -380,14 +424,18 @@ bk_err_t bt_audio_event_handle(media_mailbox_msg_t *msg)
     switch (msg->event)
     {
     case EVENT_BT_AUDIO_INIT_REQ:
+        //sync op
         ret = bt_audio_init_handle(msg);
         break;
 
     case EVENT_BT_AUDIO_DEINIT_REQ:
+        //sync op
         ret = bt_audio_deinit_handle(msg);
         break;
 
     default:
+
+        //async op
         if (!s_bt_audio_task || !s_bt_audio_sema)
         {
             LOGE("task not run");
@@ -395,7 +443,7 @@ bk_err_t bt_audio_event_handle(media_mailbox_msg_t *msg)
             break;
         }
 
-        if (EVENT_BT_PCM_RESAMPLE_REQ != msg->event && EVENT_BT_PCM_ENCODE_REQ != msg->event)
+        if (EVENT_BT_PCM_RESAMPLE_REQ != msg->event && EVENT_BT_PCM_ENCODE_REQ != msg->event && EVENT_BT_PCM_WRITE_REQ != msg->event)
         {
             LOGI("evt %d", msg->event);
         }
