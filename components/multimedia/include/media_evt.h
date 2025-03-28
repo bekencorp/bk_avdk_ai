@@ -76,6 +76,9 @@ typedef enum
 	MAJOR_COMM_EVENT,
 	FRAME_BUFFER_EVENT,
     AUD_ASR_EVENT,
+#if CONFIG_OTA_DISPLAY_PICTURE_DEMO
+	OTA_DISP_EVENT,
+#endif
 } media_mask_t;
 
 typedef enum
@@ -289,6 +292,10 @@ typedef enum
 
     EVENT_ASR_WAKEUP_IND = (AUD_ASR_EVENT << MEDIA_EVT_BIT), /* cpu1 -> cpu0 */
     EVENT_ASR_STANDBY_IND,
+#if CONFIG_OTA_DISPLAY_PICTURE_DEMO
+	EVENT_OTA_DISP_OPEN_IND = (OTA_DISP_EVENT << MEDIA_EVT_BIT), /*ota*/
+	EVENT_OTA_DISP_CLOSE_IND,
+#endif
 } media_event_t;
 
 typedef struct

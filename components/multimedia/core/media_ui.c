@@ -211,7 +211,6 @@ static void media_ui_frame_buffer_event_handle(media_mailbox_msg_t *msg)
 	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
 }
 
-
 static void media_ui_task_main(beken_thread_arg_t data)
 {
 	int ret = kNoErr;
@@ -313,6 +312,13 @@ static void media_ui_task_main(beken_thread_arg_t data)
 					media_ui_frame_buffer_event_handle((media_mailbox_msg_t *)msg.param);
 					break;
 
+#if CONFIG_OTA_DISPLAY_PICTURE_DEMO
+				extern void media_ui_ota_event_handle(media_mailbox_msg_t *msg);
+				case OTA_DISP_EVENT:
+					mb_msg = (media_mailbox_msg_t *)msg.param;
+					media_ui_ota_event_handle(mb_msg);
+					break;
+#endif
 				case EXIT_EVENT:
 					goto exit;
 					break;

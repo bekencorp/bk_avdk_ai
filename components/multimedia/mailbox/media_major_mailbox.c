@@ -519,7 +519,13 @@ void media_major_mailbox_msg_handle(media_mailbox_msg_t *msg)
 					media_msg.param = (uint32_t)msg;
 					media_send_msg(&media_msg);
 					break;
-
+#if CONFIG_OTA_DISPLAY_PICTURE_DEMO
+				case OTA_DISP_EVENT:
+					media_msg.event = msg->event;
+					media_msg.param = (uint32_t)msg;
+					media_send_msg(&media_msg);
+					break;
+#endif
 				default:
 					break;
 			}
@@ -612,11 +618,10 @@ void media_major_mailbox_msg_handle(media_mailbox_msg_t *msg)
 				}
 				break;
 #endif
-
 				default:
 					break;
 			}
-		}
+		}
 	}
 	else
 	{

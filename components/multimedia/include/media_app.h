@@ -163,6 +163,11 @@ bk_err_t media_app_frame_buffer_clear(frame_buffer_t *frame);
 /*Do not do anything blocking here */
 void media_app_asr_evt_register_callback(media_app_asr_evt_cb_t cb);
 
+#if CONFIG_OTA_DISPLAY_PICTURE_DEMO
+bk_err_t media_app_ota_disp_open(void);
+bk_err_t media_app_ota_disp_close(void);
+#endif
+
 #ifdef __cplusplus
 }
 #endif
