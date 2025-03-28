@@ -9,7 +9,7 @@ menu "Bk_thirdparty::Wanson"
 	choice WANSON_ASR_WORDS_VERSION
 		depends on WANSON_ASR
 		prompt "Select Words Version"
-		default WANSON_ASR_WORDS_VERSION_V1
+		default WANSON_ASR_GROUP_VERSION
 
 		config WANSON_ASR_WORDS_VERSION_V1
 		bool "Enable Words Version V1"

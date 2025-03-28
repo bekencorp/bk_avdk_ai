@@ -19,9 +19,8 @@ int  Wanson_ASR_Init();
 
 #if(CONFIG_WANSON_ASR_GROUP_VERSION)
 void Wanson_ASR_Set_Fst(Fst *fst);
-#else
-void Wanson_ASR_Reset();
 #endif
+void Wanson_ASR_Reset();
 
 /*****************************************
 * Input:
