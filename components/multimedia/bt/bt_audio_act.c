@@ -46,6 +46,7 @@ enum
 #define LOGD(format, ...) do{if(BT_AUDIO_DEBUG_LEVEL >= BT_AUDIO_DEBUG_LEVEL_DEBUG)   BK_LOGD(TAG, "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
 #define LOGV(format, ...) do{if(BT_AUDIO_DEBUG_LEVEL >= BT_AUDIO_DEBUG_LEVEL_VERBOSE) BK_LOGV(TAG, "%s:" format "\n", __func__, ##__VA_ARGS__);} while(0)
 
+#define USE_QUEUE 1
 
 typedef void (*camera_connect_state_t)(uint8_t state);
 
@@ -57,6 +58,13 @@ enum
 } BT_AUDIO_ACTION;
 
 
+enum
+{
+    TONE_STATUS_IDLE,
+    TONE_STATUS_WAIT_ENABLE,
+    TONE_STATUS_ENABLE,
+};
+
 typedef struct
 {
     uint32_t ret;
@@ -64,28 +72,60 @@ typedef struct
     uint32_t out_len;
 } bt_audio_resample_result_t;
 
+typedef struct
+{
+    uint32_t evt;
+    void *data;
+    uint16_t len;
+} bt_audio_msg_t;
+
 static uint8_t s_is_rsp_inited;
 
 
 static beken_thread_t s_bt_audio_task = NULL;
 static beken_semaphore_t s_bt_audio_sema = NULL;
 
-static volatile uint32_t s_bt_audio_action;
-static media_mailbox_msg_t *s_bt_audio_action_mailbox;
+#if USE_QUEUE
+#else
+    static volatile uint32_t s_bt_audio_action;
+    static media_mailbox_msg_t *s_bt_audio_action_mailbox;
+#endif
+
 static uint8_t s_bt_audio_task_run;
 static aud_rsp_cfg_t s_rsp_cfg_final;
+static beken_queue_t s_bt_audio_msg_que = NULL;
 
 static void bt_audio_task(void *arg)
 {
     int32_t ret = 0;
+    uint32_t write_count = 0;
+    uint8_t tone_status = TONE_STATUS_IDLE;
+    uint32_t evt = 0;
+    bt_audio_msg_t msg;
+    media_mailbox_msg_t *mb_msg = NULL;
 
     while (s_bt_audio_task_run)
     {
-        rtos_get_semaphore(&s_bt_audio_sema, 300);//BEKEN_WAIT_FOREVER);
+#if USE_QUEUE
+        ret = rtos_pop_from_queue(&s_bt_audio_msg_que, &msg, 300);//BEKEN_WAIT_FOREVER);
 
+        if (ret)
+        {
+            LOGV("pop queue err");
+            continue;
+        }
+
+        mb_msg = (typeof(mb_msg))msg.data;
+        evt = msg.evt;
+#else
+        rtos_get_semaphore(&s_bt_audio_sema, 300);//BEKEN_WAIT_FOREVER);
+        evt = s_bt_audio_action;
+        mb_msg = s_bt_audio_action_mailbox;
+#endif
         ret = 0;
 
-        switch (s_bt_audio_action)
+
+        switch (evt)
         {
         case 0:
             continue;
@@ -93,40 +133,99 @@ static void bt_audio_task(void *arg)
 
         case EVENT_BT_A2DP_STATUS_NOTI_REQ:
         {
-            uint32_t a2dp_status_notif_status = (typeof(a2dp_status_notif_status))s_bt_audio_action_mailbox->param;
+            uint32_t a2dp_status_notif_status = (typeof(a2dp_status_notif_status))mb_msg->param;
+            uint8_t final = (a2dp_status_notif_status ? 1 : 0);
 
-            LOGW("EVENT_BT_A2DP_STATUS_NOTI_REQ %d", a2dp_status_notif_status);
-            ret = aud_tras_drv_control_prompt_tone_play(a2dp_status_notif_status ? 1 : 0);
+            LOGW("EVENT_BT_A2DP_STATUS_NOTI_REQ %d status %d", final, tone_status);
+
+            switch (tone_status)
+            {
+            case TONE_STATUS_IDLE:
+                if (final)
+                {
+                    write_count = 0;
+                    tone_status = TONE_STATUS_WAIT_ENABLE;
+                }
+
+                break;
+
+            case TONE_STATUS_WAIT_ENABLE:
+            case TONE_STATUS_ENABLE:
+                if (!final)
+                {
+                    write_count = 0;
+                    ret = aud_tras_drv_control_prompt_tone_play(final);
+                    tone_status = TONE_STATUS_IDLE;
+                }
+
+                break;
+            }
 
             if (ret)
             {
-                LOGE("aud_tras_drv_control_prompt_tone_play to %d err %d !!!", a2dp_status_notif_status ? 1 : 0, ret);
+                LOGE("aud_tras_drv_control_prompt_tone_play to %d err %d !!!", final, ret);
             }
         }
         break;
 
         case EVENT_BT_PCM_WRITE_REQ:
         {
+            bt_audio_write_req_t *req = (typeof(req))mb_msg->param;
 
-            bt_audio_write_req_t *req = (typeof(req))s_bt_audio_action_mailbox->param;
-#if 0
-            uint32_t w_len = 0;
-
-            while (w_len < req->data_len)
+            switch (tone_status)
             {
-                ret = aud_tras_drv_write_prompt_tone_data((char *)req->data + w_len, req->data_len - w_len, BEKEN_WAIT_FOREVER);
+            case TONE_STATUS_WAIT_ENABLE:
+            case TONE_STATUS_ENABLE:
+            {
+                uint32_t w_len = 0;
+                uint32_t err_count = 0;
 
-                if (ret <= 0)
+                while (w_len < req->data_len && err_count <= 3)
                 {
-                    LOGE("aud_tras_drv_write_prompt_tone_data fail, ret: %d", ret);
+                    LOGV("start tone_data write len %d", req->data_len);
+                    ret = aud_tras_drv_write_prompt_tone_data((char *)req->data + w_len, req->data_len - w_len, 200 / 2);//BEKEN_WAIT_FOREVER);
+                    LOGV("end tone_data write ret %d", ret);
+
+                    if (ret <= 0)
+                    {
+                        err_count++;
+                        LOGE("aud_tras_drv_write_prompt_tone_data fail, ret: %d", ret);
+                    }
+
+                    if (ret >= 0)
+                    {
+                        w_len += ret;
+                    }
+
+                    ret = 0;
+
+                    write_count++;
                 }
 
-                w_len += ret;
-                ret = 0;
+                if (err_count > 3)
+                {
+                    LOGW("try write err_count reach limit %d !!", err_count);
+                }
+
+                if (write_count >= 2 && tone_status == TONE_STATUS_WAIT_ENABLE)
+                {
+                    LOGI("try aud_tras_drv_control_prompt_tone_play");
+                    ret = aud_tras_drv_control_prompt_tone_play(1);
+
+                    if (ret)
+                    {
+                        LOGE("aud_tras_drv_control_prompt_tone_play enable err %d !!!", ret);
+                    }
+
+                    tone_status = TONE_STATUS_ENABLE;
+                }
             }
-#else
-            LOGV("EVENT_BT_PCM_WRITE_REQ %d", req->data_len);
-#endif
+            break;
+
+            default:
+                LOGV("tone status not match %d, len %d", tone_status, req->data_len);
+                break;
+            }
         }
         break;
 
@@ -142,7 +241,7 @@ static void bt_audio_task(void *arg)
                 extern bk_err_t bk_audio_osi_funcs_init(void);
                 bk_audio_osi_funcs_init();
 
-                bt_audio_resample_init_req_t *cfg = (typeof(cfg))s_bt_audio_action_mailbox->param;
+                bt_audio_resample_init_req_t *cfg = (typeof(cfg))mb_msg->param;
 
                 os_memset(&s_rsp_cfg_final, 0, sizeof(s_rsp_cfg_final));
 
@@ -226,7 +325,7 @@ static void bt_audio_task(void *arg)
 
         case EVENT_BT_PCM_RESAMPLE_REQ:
         {
-            bt_audio_resample_req_t *param = (typeof(param))(s_bt_audio_action_mailbox->param);
+            bt_audio_resample_req_t *param = (typeof(param))(mb_msg->param);
 
             uint32_t in_len = *(param->in_bytes_ptr) / (s_rsp_cfg_final.src_bits / 8);
             uint32_t out_len = *(param->out_bytes_ptr) / (s_rsp_cfg_final.dest_bits / 8);
@@ -259,7 +358,7 @@ static void bt_audio_task(void *arg)
 
         case EVENT_BT_PCM_ENCODE_REQ:
         {
-            bt_audio_encode_req_t *param = (typeof(param))(s_bt_audio_action_mailbox->param);
+            bt_audio_encode_req_t *param = (typeof(param))(mb_msg->param);
 
             if (!param || !param->handle || !param->in_addr || !param->out_len_ptr)
             {
@@ -291,13 +390,17 @@ static void bt_audio_task(void *arg)
         break;
 
         default:
-            LOGE("unknow event 0x%x", s_bt_audio_action);
+            LOGE("unknow event 0x%x", evt);
             ret = -1;
             break;
         }
 
+#if USE_QUEUE
+#else
         s_bt_audio_action = 0;
-        msg_send_rsp_to_media_major_mailbox(s_bt_audio_action_mailbox, ret, APP_MODULE);
+#endif
+
+        msg_send_rsp_to_media_major_mailbox(mb_msg, ret, APP_MODULE);
     }
 
     LOGI("exit");
@@ -325,6 +428,18 @@ static bk_err_t bt_audio_init_handle(media_mailbox_msg_t *msg)
     if (ret)
     {
         LOGE("sema init failed");
+        ret = -1;
+        goto end;
+    }
+
+    ret = rtos_init_queue(&s_bt_audio_msg_que,
+                          "s_bt_audio_msg_que",
+                          sizeof(bt_audio_msg_t),
+                          60);
+
+    if (ret != kNoErr)
+    {
+        LOGE("bt_audio sink demo msg queue failed");
         ret = -1;
         goto end;
     }
@@ -362,6 +477,12 @@ end:
             rtos_deinit_semaphore(&s_bt_audio_sema);
             s_bt_audio_sema = NULL;
         }
+
+        if (s_bt_audio_msg_que)
+        {
+            rtos_deinit_queue(&s_bt_audio_msg_que);
+            s_bt_audio_msg_que = NULL;
+        }
     }
 
     msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
@@ -390,6 +511,26 @@ static bk_err_t bt_audio_deinit_handle(media_mailbox_msg_t *msg)
     {
         rtos_deinit_semaphore(&s_bt_audio_sema);
         s_bt_audio_sema = NULL;
+    }
+
+    if (s_bt_audio_msg_que)
+    {
+        bt_audio_msg_t msg;
+
+        while ( 0 == (ret = rtos_pop_from_queue(&s_bt_audio_msg_que, &msg, 0)))
+        {
+            if (ret)
+            {
+                break;
+            }
+
+            LOGI("free s_bt_audio_msg_que node");
+            msg_send_rsp_to_media_major_mailbox((media_mailbox_msg_t *)msg.data, 0, APP_MODULE);
+        }
+
+        ret = 0;
+        rtos_deinit_queue(&s_bt_audio_msg_que);
+        s_bt_audio_msg_que = NULL;
     }
 
 end:
@@ -448,6 +589,20 @@ bk_err_t bt_audio_event_handle(media_mailbox_msg_t *msg)
             LOGI("evt %d", msg->event);
         }
 
+#if USE_QUEUE
+        bt_audio_msg_t internal_msg = {0};
+
+        internal_msg.data = (typeof(internal_msg.data))msg;
+        internal_msg.evt = msg->event;
+
+        ret = rtos_push_to_queue(&s_bt_audio_msg_que, &internal_msg, BEKEN_WAIT_FOREVER);
+
+        if (ret)
+        {
+            LOGE("send queue failed");
+        }
+
+#else
         s_bt_audio_action_mailbox = msg;
         s_bt_audio_action = msg->event;
 
@@ -456,6 +611,7 @@ bk_err_t bt_audio_event_handle(media_mailbox_msg_t *msg)
             rtos_set_semaphore(&s_bt_audio_sema);
         }
 
+#endif
         break;
     }
 

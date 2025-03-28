@@ -211,7 +211,7 @@ static g722_decode_state_t g722_dec = {0};
 #endif
 
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
-#define PROMPT_TONE_RB_SIZE     (1280)
+#define PROMPT_TONE_RB_SIZE     (1280 * 8)
 static ringbuf_handle_t gl_prompt_tone_rb = NULL;
 static bool gl_prompt_tone_play_flag = false;
 static prompt_tone_pool_empty_notify gl_prompt_tone_empty_notify = NULL;
@@ -497,8 +497,8 @@ aud_dac_exit:
 }
 
 #if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
-const uint16_t EQTAB[257] = 
-{ 
+const uint16_t EQTAB[257] =
+{
   8638,10022,10662,10996,11263,11527,11804,12099,12390,12624,12825,13007,13178,13344,13510,13763,
   13981,14146,14310,14471,14629,14783,14930,15069,15199,15319,15428,15527,15614,15688,15749,15810,
   15870,15929,15986,16040,16092,16139,16183,16222,16256,16285,16309,16327,16339,16345,16345,16345,
@@ -588,7 +588,7 @@ static bk_err_t aud_tras_drv_aec_cfg(void)
 	/* drc(输出音量相关) */
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_DRC, temp_aec_info->aec_config->drc);									//建议取值范围0x10~0x1f;   越大输出声音越大
 #if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
-	LOGI("aec config:0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x\n", 
+	LOGI("aec config:0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x\n",
 		temp_aec_info->aec_config->init_flags, //0x1f
 		temp_aec_info->aec_config->mic_delay,//0x0
 		temp_aec_info->aec_config->ec_depth,//0x14
@@ -951,7 +951,7 @@ static bk_err_t aud_tras_aec(void)
         DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AEC_REF_DATA,1,aec_info_pr->samp_rate_points*2);
         DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AEC_OUT_DATA,2,aec_info_pr->samp_rate_points*2);
         #endif
-        
+
         DEBUG_DATA_DUMP_UPDATE_HEADER_TIMESTAMP(DUMP_TYPE_AEC_MIC_DATA);
         DEBUG_DATA_DUMP_BY_UART_HEADER(DUMP_TYPE_AEC_MIC_DATA);
         //AEC_DATA_DUMP_BY_UART_DATA((void *)&dump_header,sizeof(dump_header));
@@ -1844,7 +1844,9 @@ static bk_err_t aud_tras_dec(void)
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
                 /* Check whether play prompt tone */
                 if (gl_prompt_tone_play_flag) {
+
                     int r_size = aud_tras_drv_read_prompt_tone_data((char *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2, 0);
+                    //LOGI("%s tone, r_size %d gl_prompt_tone_empty_notify %d\n", __func__, r_size, gl_prompt_tone_empty_notify);
                     if (r_size <= 0 && gl_prompt_tone_empty_notify) {
                         /* prompt tone pool empty */
                         gl_prompt_tone_empty_notify(gl_notify_user_data);
@@ -1985,7 +1987,7 @@ static bk_err_t aud_tras_dec(void)
 			}
 			i += 8;
 		}
-	} else 
+	} else
 #endif
 	{
 	/* save the data after G711A processed to encoder_ring_buffer */
@@ -5175,6 +5177,7 @@ bk_err_t aud_tras_drv_register_prompt_tone_pool_empty_notify(prompt_tone_pool_em
 
 bk_err_t aud_tras_drv_control_prompt_tone_play(bool en)
 {
+    LOGI("%s current flag %d, now %d\n", __func__, gl_prompt_tone_play_flag, en);
     gl_prompt_tone_play_flag = en;
 
     if (gl_prompt_tone_play_flag) {
