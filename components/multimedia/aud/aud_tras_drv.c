@@ -3148,14 +3148,15 @@ static bk_err_t aud_tras_drv_voc_deinit(void)
 #endif
 
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
-    /* init ringbuffer */
+    /* close prompt tone */
+    aud_tras_drv_prompt_tone_play_close();
+
+    /* free ringbuffer */
     if (gl_prompt_tone_rb)
     {
         rb_destroy(gl_prompt_tone_rb);
         gl_prompt_tone_rb = NULL;
     }
-
-    aud_tras_drv_prompt_tone_play_close();
 #endif
 
 
