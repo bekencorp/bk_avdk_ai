@@ -18,6 +18,7 @@ set (blacklist_elem
     libscale[^.]*\.a
 	libaec.a
 	libaec_v2.a
+	libaec_v3.a
 )
 
 
