@@ -37,11 +37,20 @@ if (CONFIG_WANSON_ASR_WORDS_VERSION_V2)
     )
 endif()
 
-if (CONFIG_WANSON_ASR_GROUP_VERSION)
+if (CONFIG_WANSON_ASR_GROUP_VERSION_WORDS_V1)
     list(APPEND incs
-				bk7258/group_version
+				bk7258/group_version_words_v1/
     )
 endif()
+
+
+if (CONFIG_WANSON_ASR_GROUP_VERSION_WORDS_V2)
+    list(APPEND incs
+				bk7258/group_version_words_v2/
+    )
+endif()
+
+
 endif()
 
 endif()	#(CONFIG_WANSON_ASR)
