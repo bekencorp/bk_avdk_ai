@@ -5288,7 +5288,13 @@ bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result)
 #if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
         if (aud_tras_drv_get_spk_source_type() == SPK_SOURCE_TYPE_VOICE)
         {
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+            /* Do not close PA because the prompt tone is about to be played, which will reopen PA.
+                However, PA opening requires a stabilization time, and frequent switching will cause some prompt tones to be lost.
+             */
+#else
             aud_tras_dac_pa_ctrl(false, false);
+#endif
         }
 #endif
 
