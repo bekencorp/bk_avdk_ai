@@ -191,6 +191,7 @@ static beken_queue_t aud_trs_drv_int_msg_que = NULL;
 aud_tras_drv_info_t aud_tras_drv_info = DEFAULT_AUD_TRAS_DRV_INFO();
 static bool uac_mic_read_flag = false;
 static bool uac_spk_write_flag = false;
+static uint8_t spk_play_flag = 0;
 
 media_mailbox_msg_t uac_connect_state_msg = {0};
 
@@ -279,6 +280,7 @@ static char low_voltage_prompt_tone_path[] = "/low_voltage_16k_mono_16bit_en.pcm
 typedef struct {
     unsigned char *data;
     unsigned int size;
+	unsigned char spk_play_flag;
 } asr_data_t;
 
 static asr_data_t gl_asr_data = {0};
@@ -985,6 +987,37 @@ static void aud_aec_vad_process(void)
 #endif
 
 
+static uint32_t audio_silence_frame_cnt = 0;
+
+#define SILENCE_FRAME_THR 50*5
+
+uint8_t check_rx_spk_data_silence(int16_t *data, uint16_t size) {
+    uint8_t is_silence = 1;
+    for (uint16_t i = 0; i < size; i++) {
+	if ((data[i] > 64)||(data[i] < -64)) {
+		is_silence = 0;
+		break;
+	}
+
+    }
+
+    if (is_silence) {
+        audio_silence_frame_cnt++;
+    } else {
+		audio_silence_frame_cnt = 0;
+	}
+
+	if(audio_silence_frame_cnt >= SILENCE_FRAME_THR)
+	{
+		audio_silence_frame_cnt = SILENCE_FRAME_THR;
+		return 1;
+	}
+	else
+	{
+		return 0;
+	}
+}
+
 #if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
 int16_t temp_buf[640] = {0};
 //int16_t temp_ref_buf[640] = {0};
@@ -1143,7 +1176,7 @@ static bk_err_t aud_tras_aec(void)
 
 #endif
 
-
+	spk_play_flag = check_rx_spk_data_silence(aec_info_pr->ref_addr, 32);
 	/* aec process data */
 	//os_printf("ref_addr:%p, mic_addr:%p, out_addr:%p \r\n", aec_context_pr->ref_addr, aec_context_pr->mic_addr, aec_context_pr->out_addr);
 	aec_proc(aec_info_pr->aec, aec_info_pr->ref_addr, aec_info_pr->mic_addr, aec_info_pr->out_addr);
@@ -1157,6 +1190,7 @@ static bk_err_t aud_tras_aec(void)
 #if CONFIG_AI_ASR_MODE_CPU2
     gl_asr_data.data = (unsigned char *)aec_info_pr->out_addr;
     gl_asr_data.size = (unsigned int)aec_info_pr->samp_rate_points*2;
+	gl_asr_data.spk_play_flag = spk_play_flag;	
     gl_asr_data_msg.event = EVENT_ASR_DATA_NOTIFY;
     gl_asr_data_msg.param = (uint32_t)&gl_asr_data;
     msg_send_notify_to_media_major_mailbox(&gl_asr_data_msg, MINOR_MODULE);
