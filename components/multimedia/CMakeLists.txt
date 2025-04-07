@@ -249,6 +249,14 @@ armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES bk
 
 if (CONFIG_SOC_BK7258) # CONFIG_SOC_BK7258
 if (CONFIG_MEDIA_MAJOR)
+if (CONFIG_AEC_VERSION_V3)
+	set(avdk_lib $ENV{ARMINO_PATH}/../components/avdk_libs/${ARMINO_SOC}/libs)
+	get_filename_component(lib_name ${avdk_lib}/libaec_v3.a NAME)
+	add_prebuilt_library(${lib_name} "${avdk_lib}/libaec_v3.a")
+	target_link_libraries(${COMPONENT_LIB} INTERFACE ${lib_name})
+endif()
+
+
 if (CONFIG_AEC_VERSION_V2)
 	set(avdk_lib $ENV{ARMINO_PATH}/../components/avdk_libs/${ARMINO_SOC}/libs)
 	get_filename_component(lib_name ${avdk_lib}/libaec_v2.a NAME)

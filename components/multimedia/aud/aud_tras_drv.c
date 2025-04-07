@@ -539,6 +539,8 @@ const uint16_t EQTAB[257] =
  };
 #endif
 
+uint32 aec_gtbuf[94*1024/4] __attribute__((section(".aec_bss")));
+int16_t temp_buf[640] = {0};
 static bk_err_t aud_tras_drv_aec_cfg(void)
 {
 	uint32_t aec_context_size = 0;
@@ -620,7 +622,7 @@ static bk_err_t aud_tras_drv_aec_cfg(void)
 if(temp_aec_info->aec_config->init_flags & AEC_NS_FLAG_MSK)
 {
         const uint32_t ex_size=93380;
-        uint8_t * gtbuff = (uint8_t*)psram_malloc(ex_size);
+		uint8_t * gtbuff = (uint8_t*)aec_gtbuf;
         memset(gtbuff, 0 , ex_size);
         aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_GTBUFF, (uint32_t)gtbuff);
         aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_GTPROC, (uint32_t)gtcrn_proc);
@@ -1018,10 +1020,9 @@ uint8_t check_rx_spk_data_silence(int16_t *data, uint16_t size) {
 	}
 }
 
-#if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
-int16_t temp_buf[640] = {0};
-//int16_t temp_ref_buf[640] = {0};
-#endif
+
+
+
 
 static bk_err_t aud_tras_aec(void)
 {
@@ -1092,7 +1093,7 @@ static bk_err_t aud_tras_aec(void)
 #if CONFIG_AEC_ECHO_COLLECT_MODE_SOFTWARE
 	/* read ref data from ref_ring_buff */
 	if (ring_buffer_get_fill_size(&(aec_info_pr->ref_rb)) >= aec_info_pr->samp_rate_points*2) {
-		size = ring_buffer_read(&(aec_info_pr->ref_rb), (uint8_t*)aec_info_pr->ref_addr, aec_info_pr->samp_rate_points*2);
+		size = ring_buffer_read(&(aec_info_pr->ref_rb), (uint8_t*)temp_buf, aec_info_pr->samp_rate_points*2);
 		if (size != aec_info_pr->samp_rate_points*2) {
 			LOGE("%s, %d, the ref data readed from ref_ring_buff is not a frame \n", __func__, __LINE__);
 			//return BK_FAIL;
