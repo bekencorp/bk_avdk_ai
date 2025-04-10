@@ -292,4 +292,10 @@ menu "Media"
 			need connect speaker to mic2
 	endchoice
 
+	config AUD_SWEEP_TEST
+		bool "Enable AUD sweep test"
+		default n
+
+
+
 endmenu

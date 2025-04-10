@@ -219,6 +219,16 @@ static g722_encode_state_t g722_enc = {0};
 static g722_decode_state_t g722_dec = {0};
 #endif
 
+
+#if CONFIG_AUD_SWEEP_TEST
+Sweep_Info sweep_info;
+Sweep_Info *sweep = &sweep_info;
+int flag_mic_dac_sweep_mode = 1;
+static int aud_production_mode_init_flag = 0;
+#endif
+void aud_set_production_mode(int val);
+int aud_get_production_mode(void);
+
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
 #define PROMPT_TONE_RB_SIZE     (1280 * 8)
 static ringbuf_handle_t gl_prompt_tone_rb = NULL;
@@ -541,6 +551,171 @@ const uint16_t EQTAB[257] =
 
 uint32 aec_gtbuf[94*1024/4] __attribute__((section(".aec_bss")));
 int16_t temp_buf[640] = {0};
+
+void aud_production_mode_init()
+{
+	#if CONFIG_AUD_SWEEP_TEST
+	aec_info_t *aec_info_pr = aud_tras_drv_info.voc_info.aec_info;
+	if (aud_production_mode_init_flag)
+	{
+		return;
+	}
+	aud_production_mode_init_flag = 1;
+	aec_info_pr->aec->frame_cnt = 0;
+	if(aud_get_production_mode())
+	{		
+        sweep_init(sweep, 3, 16000, 25000);//扫频时间，采样率，信号最大幅值
+        aec_info_pr->aec->flags = 0;
+        aec_info_pr->aec->test = 1;
+	}
+	#endif
+}
+
+#if CONFIG_AUD_SWEEP_TEST
+static void aud_production_data_generate(Sweep_Info *sweep, int16_t * data, int32_t framelen)
+{
+
+	if(!aud_get_production_mode())
+		return ;
+
+    #define TEST_TONE   (400)
+	
+    static int state = 0;
+    if(sweep->status > 0)
+    {
+        memset(data, 0, sizeof(int16_t)*framelen);
+        sweep->status--;
+    }
+    else
+    {
+        sweep_generate(sweep, data, framelen);  //  sweep init的时候如果设置了3秒；那每生成完3秒的扫频信号；sweep->cycle+1
+    }
+    
+    if((sweep->cycle == 1)&&(state < 2))	// warning tone   (25+20 silence) *2
+    {
+        sweep->status = 20;
+        sweep->idx = 0;
+        sweep->increase = 0;
+        sweep->sign = 1;
+        sweep->cycle = 0;
+        sweep->fixdelta = 4 * sweep->time * TEST_TONE;
+        sweep->idx = sweep->cnt - ((sweep->cnt/sweep->time)/2); //sweep->cnt:48000 sample points  sweep->time:3s
+        state ++;
+    }
+	
+    if ((sweep->cycle == 1) && (state >= 2))
+    {
+        sweep->status = 20;
+        sweep->idx = 0;
+        sweep->increase = 0;
+        sweep->sign = 1;
+        sweep->cycle = 0;
+        sweep->fixdelta = 0;
+    }
+
+}
+#endif
+
+void aud_set_production_mode(int val)
+{
+#if CONFIG_AUD_SWEEP_TEST
+    flag_mic_dac_sweep_mode = val;
+	aud_production_mode_init_flag = (val == 1) ? 0 : 1;
+	
+	bk_printf("[%s:%d]:%d\r\n", __func__, __LINE__,flag_mic_dac_sweep_mode);
+#endif
+}
+int aud_get_production_mode(void)
+{
+#if CONFIG_AUD_SWEEP_TEST
+    return flag_mic_dac_sweep_mode;
+#else
+	return 0;
+#endif
+}
+
+
+static void aud_aec_production_result(void)
+{
+#if CONFIG_AUD_SWEEP_TEST
+	bool ret1 = false, ret2 = false;
+	if(aud_get_production_mode())
+	{
+		aec_info_t *aec_info_pr = aud_tras_drv_info.voc_info.aec_info;
+		
+	   // bk_printf("frame_cnt =%d\r\n",aec_info_pr->aec->frame_cnt);
+		if(aec_info_pr->aec->frame_cnt < 20)
+		{//advoid pop noise
+			os_memset((void *)aec_info_pr->ref_addr, 0, aec_info_pr->samp_rate_points*2);
+		}
+
+		//aec->Hold[1] retains the max val of this process,so...
+		//1. Test the air tightness of mic
+		if(170 == aec_info_pr->aec->frame_cnt)
+		{
+			bk_printf("aec Hold.1:%d, %d, %d, %d, %d\r\n",
+				aec_info_pr->aec->Hold[0]>>14,
+				aec_info_pr->aec->Hold[1],
+				aec_info_pr->aec->Hold[2]>>14,
+				aec_info_pr->aec->Hold[3],
+				aec_info_pr->aec->dc>>14);
+			
+			if(aec_info_pr->aec->Hold[1] > 16000)
+			{
+				bk_printf("Main MIC airtightness is not good...\r\n");
+				ret1 = false;
+			}
+			else
+			{
+				ret1 = true;
+			}
+
+			if((aec_info_pr->aec->Hold[1] < 16000) && (aec_info_pr->aec->Hold[3] > 4000) && (aec_info_pr->aec->Hold[3] < 10000))
+			{
+				bk_printf("Main MIC & HW Echo is ok...\r\n");//default:6050
+				ret2 = true;
+			}
+			else
+			{
+				bk_printf("Main MIC & HW Echo is not good...\r\n");//default:6050
+				ret2 = false;
+			}
+            //aec_factory_result_notify(1, ret1, ret2);
+			bk_printf("charles Main MIC & HW Echo is %d %d\r\n",ret1,ret2);
+		}
+		//2.Test whether the mic is good or bad 
+		if((170*2+90 == aec_info_pr->aec->frame_cnt)||(170*3+90 == aec_info_pr->aec->frame_cnt)||(170*4+90 == aec_info_pr->aec->frame_cnt))
+		{
+			bk_printf("aec Hold.2:%d, %d, %d\r\n",aec_info_pr->aec->Hold[0]>>14,aec_info_pr->aec->Hold[1],aec_info_pr->aec->dc>>14);
+			
+			if(aec_info_pr->aec->Hold[1] > 27000)
+			{
+				bk_printf("Main MIC is good...\r\n");
+				ret1 = true;
+			}
+			else
+			{
+				bk_printf("Main MIC is not good...\r\n");
+				ret1 = false;
+			}
+
+			if(ret1 == true)
+			{
+				//aec_factory_result_notify(2, true, true);
+				bk_printf("charles Main MIC is good...\r\n");
+			}
+			else
+			{
+				if((170*4+90 == aec_info_pr->aec->frame_cnt))
+					//aec_factory_result_notify(2, false, false);
+					bk_printf("charles Main MIC is not good...\r\n");
+			}
+		}
+	}
+#endif
+}
+
+
 static bk_err_t aud_tras_drv_aec_cfg(void)
 {
 	uint32_t aec_context_size = 0;
@@ -1176,6 +1351,13 @@ static bk_err_t aud_tras_aec(void)
 #else
 
 #endif
+#if CONFIG_AUD_SWEEP_TEST
+if(aud_get_production_mode())
+{
+    aec_info_pr->aec->flags = 0;
+    aud_aec_production_result();
+}
+#endif
 
 	spk_play_flag = check_rx_spk_data_silence(aec_info_pr->ref_addr, 32);
 	/* aec process data */
@@ -1253,7 +1435,7 @@ static bk_err_t aud_tras_aec(void)
 		LOGE("%s, %d, send msg: AUD_TRAS_DRV_ENCODER fail \n", __func__, __LINE__);
 		return BK_FAIL;
 	}
-
+	
     AUD_AEC_PROCESS_END();
 
 	return ret;
@@ -2111,6 +2293,11 @@ static bk_err_t aud_tras_dec(void)
 		mic_delay_num = 0;
 		LOGI("%s, %d, mic_delay_num \n", __func__, __LINE__);
 	}
+#endif
+
+#if CONFIG_AUD_SWEEP_TEST
+	aud_production_mode_init();
+	aud_production_data_generate(sweep, (int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points);			
 #endif
 
 #if CONFIG_AEC_ECHO_COLLECT_MODE_SOFTWARE
