@@ -1198,9 +1198,10 @@ bk_err_t media_app_avi_close(void)
 #if CONFIG_OTA_DISPLAY_PICTURE_DEMO
 bk_err_t media_app_ota_disp_open(void)
 {
-	int ret = BK_OK;
+	int ret = BK_FAIL;
 
 	LOGI("%s\n", __func__);
+	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_LCD, PM_POWER_MODULE_STATE_ON);
 	ret = media_send_msg_sync(EVENT_OTA_DISP_OPEN_IND, 1);
 	LOGI("%s complete %x\n", __func__, ret);
 
@@ -1209,11 +1210,15 @@ bk_err_t media_app_ota_disp_open(void)
 
 bk_err_t media_app_ota_disp_close(void)
 {
-	int ret = BK_OK;
+	int ret = BK_FAIL;
 
 	LOGI("%s\n", __func__);
 	ret = media_send_msg_sync(EVENT_OTA_DISP_CLOSE_IND, 0);
 	LOGI("%s complete %x\n", __func__, ret);
+	if(ret == BK_OK)
+	{
+		bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_LCD, PM_POWER_MODULE_STATE_OFF);
+	}
 
 	return ret;
 }
