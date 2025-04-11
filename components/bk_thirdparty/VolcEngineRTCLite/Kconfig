@@ -1,0 +1,10 @@
+#TODO remove all kconfigs which are defined in armino libs
+
+menu "VolcEngineRTCLite"
+
+	config VOLC_RTC_EN
+		bool "Enable Volc RTC"
+		default n
+		help
+			Enable Volc RTC
+endmenu
