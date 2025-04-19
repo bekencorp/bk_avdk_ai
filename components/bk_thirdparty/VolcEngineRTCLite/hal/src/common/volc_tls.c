@@ -73,11 +73,13 @@ int volc_tls_start(volc_tls_t tls, bool is_server, const char* host, volc_tls_se
     mbedtls_ssl_setup(&ctx->ssl_ctx, &ctx->ssl_ctx_config);
 
     mbedtls_ssl_set_hostname( &ctx->ssl_ctx, host);
-    mbedtls_ssl_set_bio(&ctx->ssl_ctx, custom_data, send_callback, recv_callback, NULL);
+    mbedtls_ssl_set_bio(&ctx->ssl_ctx, custom_data,
+                    (mbedtls_ssl_send_t *)send_callback,
+                    (mbedtls_ssl_recv_t *)recv_callback, NULL);
     /* init and send handshake */
     ret = mbedtls_ssl_handshake(&ctx->ssl_ctx);
 
-err_out_label:
+// err_out_label:
     return ret;
 }
 

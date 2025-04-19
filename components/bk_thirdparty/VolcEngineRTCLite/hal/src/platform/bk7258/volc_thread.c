@@ -1,14 +1,27 @@
+#include <common/bk_include.h>
+#include "FreeRTOS_POSIX.h"
+#include "posix/pthread.h"
+#include "os/os.h"
+
 #include "volc_thread.h"
 
 #include <unistd.h>
-#include <freertos/FreeRTOS.h>
 
 #include "volc_errno.h"
 #include "volc_memory.h"
 #include "volc_time.h"
 #include "volc_type.h"
 
+/* Keys for thread-specific data */
+typedef unsigned int pthread_key_t;
+typedef void (*pthread_destructor_t)(void*);
+
 volc_thread_local_t g_thread_local = NULL;
+
+int pthread_setspecific(pthread_key_t key, const void *value);
+void *pthread_getspecific(pthread_key_t key);
+int pthread_key_create(pthread_key_t *key, pthread_destructor_t destructor);
+int pthread_key_delete(pthread_key_t key);
 
 static void _volc_thread_local_delete_key(volc_thread_local_t local) {
     (void)local;
@@ -34,7 +47,7 @@ uint32_t volc_thread_create(volc_tid_t* thread, const volc_thread_param_t* param
     int ret = 0;
     int stack_size = 0;
     int priority = 0;
-    BaseType_t core_id = 0;
+    // BaseType_t core_id = 0;
     TaskHandle_t* handle = NULL;
     if (NULL == thread || NULL == start_routine) {
         return VOLC_FAILED;
@@ -43,18 +56,25 @@ uint32_t volc_thread_create(volc_tid_t* thread, const volc_thread_param_t* param
     if (NULL != param) {
         stack_size = param->stack_size < 0 ? 8192 : param->stack_size;
         priority = param->priority < 0 ? 3 : param->priority;
-        core_id = 1;
+        // core_id = 1;
     } else {
         stack_size = 8192;
         priority = 3;
-        core_id = tskNO_AFFINITY;
+        // core_id = -1;
     }
     handle = (TaskHandle_t *)volc_calloc(1, sizeof(TaskHandle_t));
     if (NULL == handle) {
         return VOLC_FAILED;
     }
     *thread = (volc_tid_t *)handle;
-    xTaskCreatePinnedToCore(start_routine, param->name, stack_size, args, priority, handle, core_id);
+    // xTaskCreate((TaskFunction_t)start_routine, param->name, stack_size, args, priority, handle);
+    ret = rtos_create_thread((beken_thread_t *)thread,
+                                priority,
+                                param->name,
+                                (beken_thread_function_t)start_routine,
+                                (unsigned short)stack_size,
+                                (beken_thread_arg_t)args);
+
     if (0 != ret) {
         return VOLC_FAILED;
     }
@@ -69,8 +89,11 @@ void volc_thread_destroy(volc_tid_t thread) {
 }
 
 void volc_thread_exit(volc_tid_t thread) {
-    (void)thread;
-    vTaskDelete(NULL);
+    if(thread != volc_thread_get_id()) {
+        rtos_delete_thread((beken_thread_t *)thread);
+    } else {
+        rtos_delete_thread(NULL);
+    }
 }
 
 void volc_thread_sleep(uint64_t time) {

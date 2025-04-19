@@ -1,3 +1,7 @@
+#include <common/bk_include.h>
+#include "FreeRTOS_POSIX.h"
+#include "posix/time.h"
+
 #include "volc_time.h"
 
 #include <stdio.h>
@@ -22,7 +26,7 @@ uint64_t volc_get_montionic_time(void){
 uint32_t volc_timestamp_format_with_ms_and_timezone(char* p_dest_buffer, uint32_t dest_buffer_len, uint64_t timestamp_milliseconds) {
     uint32_t str_len = 0;
     time_t seconds = timestamp_milliseconds / 1000;
-    long long milliseconds = (timestamp_milliseconds % 1000000) / 1000;
+    // long long milliseconds = (timestamp_milliseconds % 1000000) / 1000;
     struct tm *timeinfo = localtime(&seconds);
 
     str_len = sprintf(p_dest_buffer, "%d-%02d-%02d %02d:%02d:%02d.%03lld ", timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,

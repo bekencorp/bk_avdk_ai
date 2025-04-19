@@ -64,7 +64,7 @@ uint32_t volc_string_set(volc_string_t* str,char* src) {
     if (NULL == str || NULL == src) {
         return VOLC_FAILED;
     }
-    volc_string_set_with_length(str, src, strlen(src));
+    volc_string_set_with_length(str, (uint8_t *)src, strlen(src));
     return VOLC_SUCCESS;
 }
 
@@ -72,7 +72,7 @@ uint32_t volc_string2set(volc_string_t* str,volc_string_t* str2) {
     if (NULL == str || NULL == str2) {
         return VOLC_FAILED;
     }
-    return volc_string_set_with_length(str, volc_string_get(str2), volc_string_get_length(str2));
+    return volc_string_set_with_length(str, (uint8_t *)volc_string_get(str2), volc_string_get_length(str2));
 }
 
 uint32_t volc_string_append_with_length(volc_string_t* str, char* src,int32_t length) {

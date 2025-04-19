@@ -1,3 +1,6 @@
+#include <common/bk_include.h>
+#include <driver/trng.h>
+
 #include "volc_uuid.h"
 
 #include <stdlib.h>
@@ -16,7 +19,7 @@ void volc_uuid_generate(char* uuid)
 
     short_buffer = (uint16_t*) random_buffer;
     for (int i = 0; i < sizeof(random_buffer) / sizeof(uint16_t); i++) {
-        short_buffer[i] = rand() % 65535;
+        short_buffer[i] = (uint16_t)(bk_rand() & 0xFFFF);
     }
 
     byte_buffer = (uint8_t*) random_buffer;

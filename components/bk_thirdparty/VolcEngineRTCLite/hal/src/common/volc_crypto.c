@@ -1,8 +1,11 @@
+#include <common/bk_include.h>
+
 #include "volc_crypto.h"
 
 #include <stdlib.h>
 #include <string.h>
 
+#include <mbedtls/platform.h>
 #include <mbedtls/ssl.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/ctr_drbg.h>
@@ -163,7 +166,7 @@ uint32_t volc_encrypt_or_decrypt(bool encrypt, const char* key, uint64_t iv_numb
     mbedtls_cipher_init(&aes_ctr_128_ctr);
     mbedtls_cipher_setup(&aes_ctr_128_ctr, info);
     mbedtls_operation_t mode = encrypt ? MBEDTLS_ENCRYPT : MBEDTLS_DECRYPT;
-    mbedtls_cipher_setkey(&aes_ctr_128_ctr, key, VOLC_AES128_KEY_LENGTH * 8, mode);
+    mbedtls_cipher_setkey(&aes_ctr_128_ctr, (uint8_t*)key, VOLC_AES128_KEY_LENGTH * 8, mode);
     mbedtls_cipher_set_iv(&aes_ctr_128_ctr, (uint8_t*)iv, sizeof(iv));
 
     mbedtls_cipher_update(&aes_ctr_128_ctr, input, ilen, output, &size);
@@ -185,20 +188,20 @@ uint32_t volc_pk_verify(const char* pub_key, size_t pub_key_len, const char* cre
     const mbedtls_md_info_t* md_info = NULL;
 
     mbedtls_pk_init(&pk);
-    mbedtls_pk_parse_public_key(&pk, pub_key, pub_key_len);
+    mbedtls_pk_parse_public_key(&pk, (uint8_t*)pub_key, pub_key_len);
 
     md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
     if (md_info == NULL) {
         ret = VOLC_STATUS_INTERNAL_ERROR;
         goto err_out_label;
     }
-    ret = mbedtls_md(md_info, credential, credential_len, hash);
+    ret = mbedtls_md(md_info, (uint8_t*)credential, credential_len, hash);
     if (0 != ret) {
         ret = VOLC_STATUS_INTERNAL_ERROR;
         goto err_out_label;
     }
 
-    ret = mbedtls_pk_verify(&pk, mbedtls_md_get_type(md_info), hash, mbedtls_md_get_size(md_info), signature, signature_len);
+    ret = mbedtls_pk_verify(&pk, mbedtls_md_get_type(md_info), hash, mbedtls_md_get_size(md_info), (uint8_t*)signature, signature_len);
     if (ret != 0) {
         ret = VOLC_STATUS_LICENSE_ILLEGAL;
         goto err_out_label;

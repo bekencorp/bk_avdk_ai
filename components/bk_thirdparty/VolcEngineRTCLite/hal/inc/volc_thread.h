@@ -31,7 +31,7 @@ extern "C" {
  */
 #define VOLC_THREAD_NAME_MAX_LENGTH 16
 
-/**
+
 /**
  * @locale zh
  * @type keytype

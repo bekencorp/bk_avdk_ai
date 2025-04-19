@@ -1,6 +1,9 @@
-#include "volc_cond.h"
+#include <common/bk_include.h>
+#include "FreeRTOS_POSIX.h"
+#include "posix/pthread.h"
+#include "posix/time.h"
 
-#include <pthread.h>
+#include "volc_cond.h"
 
 #include "volc_errno.h"
 #include "volc_memory.h"
@@ -55,7 +58,7 @@ err_out_label:
 uint32_t volc_cond_wait(volc_cond_t cond, volc_mutex_t mutex, uint64_t timeout) {
     uint32_t ret_status = VOLC_SUCCESS;
     int32_t ret_val = 0;
-    struct timespec time_spec;
+    struct timespec time_spec = {0};
     uint64_t cur_time = volc_get_time();
     uint64_t time = timeout + cur_time;
     pthread_cond_t* p_cond = (pthread_cond_t *)cond;
@@ -75,7 +78,7 @@ uint32_t volc_cond_wait(volc_cond_t cond, volc_mutex_t mutex, uint64_t timeout) 
             return VOLC_FAILED;
         }
     }
-    return VOLC_SUCCESS;
+    return ret_status;
 }
 
 void volc_cond_destroy(volc_cond_t cond) {

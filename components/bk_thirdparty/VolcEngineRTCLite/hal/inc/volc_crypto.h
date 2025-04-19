@@ -21,7 +21,7 @@ extern "C" {
 #define __byte_rtc_api__ __declspec(dllimport)
 #endif
 #else
-#define __byte_rtc_api__ __attribute__((visibility("default")))
+#define __byte_rtc_api__  __attribute__((visibility("default")))
 #endif
 
 /**

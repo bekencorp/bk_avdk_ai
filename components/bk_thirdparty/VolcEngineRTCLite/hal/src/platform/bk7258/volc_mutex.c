@@ -1,6 +1,10 @@
+#include <common/bk_include.h>
+#include "FreeRTOS_POSIX.h"
+#include "posix/pthread.h"
+
 #include "volc_mutex.h"
 
-#include <pthread.h>
+// #include <pthread.h>
 
 #include "volc_errno.h"
 #include "volc_memory.h"

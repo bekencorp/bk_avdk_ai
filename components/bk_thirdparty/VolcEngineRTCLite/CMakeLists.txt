@@ -1,13 +1,13 @@
 set(incs)
 set(srcs)
 
-if (CONFIG_VOLC_RTC_EN)
+if (CONFIG_VOLC_RTC_EN) 
 list(APPEND incs
             .
             include
-            hal/configs
+            # hal/configs
             hal/inc
-            hal/third_party/include/mbedtls
+            # hal/third_party/include
 )
 
 list(APPEND srcs
@@ -17,25 +17,33 @@ list(APPEND srcs
             hal/src/platform/bk7258/volc_atomic.c
             hal/src/platform/bk7258/volc_cond.c
             hal/src/platform/bk7258/volc_device.c
-            hal/src/platform/bk7258/volc_device_finger_print.c
+            # hal/src/platform/bk7258/volc_device_finger_print.c
             hal/src/platform/bk7258/volc_directory.c
             hal/src/platform/bk7258/volc_errno.c
             hal/src/platform/bk7258/volc_fileio.c
             hal/src/platform/bk7258/volc_log.c
             hal/src/platform/bk7258/volc_memory.c
             hal/src/platform/bk7258/volc_mutex.c
-            hal/src/platform/bk7258/volc_network.c
-            hal/src/platform/bk7258/volc_socket.c
+            # hal/src/platform/bk7258/volc_network.c
+            # hal/src/platform/bk7258/volc_socket.c
             hal/src/platform/bk7258/volc_thread.c
             hal/src/platform/bk7258/volc_time.c
             hal/src/platform/bk7258/volc_uuid.c
-            hal/src/platform/bk7258/volc_zlib.c
+            # hal/src/platform/bk7258/volc_zlib.c
 )
 endif()
 
-armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES bk_common lwip_intf_v2_1)
+armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES bk_common lwip_intf_v2_1 bk_vfs mbedtls)
 
-if (CONFIG_VOLC_RTC_EN)
+if (CONFIG_VOLC_RTC_EN) 
+    set(volc_define
+        -I${CMAKE_CURRENT_SOURCE_DIR}/hal/configs
+        -DMBEDTLS_USER_CONFIG_FILE=\<config_mbedtls.h\>
+        -fvisibility=hidden -Wno-error=attributes -Wno-attributes)
+    armino_build_set_property(COMPILE_OPTIONS "${volc_define}" APPEND)
+endif()
+
+if (0)
 get_filename_component(lib_name ${CMAKE_CURRENT_SOURCE_DIR}/libVolcEngineRTCLite_a.a NAME)
 add_prebuilt_library(${lib_name} "${CMAKE_CURRENT_SOURCE_DIR}/lib")
 target_link_libraries(${COMPONENT_LIB} INTERFACE ${lib_name})

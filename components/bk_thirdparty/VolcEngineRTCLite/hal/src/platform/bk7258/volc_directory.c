@@ -1,9 +1,11 @@
+#include <common/bk_include.h>
+#include "bk_posix.h"
+
 #include "volc_directory.h"
 
 #include <sys/stat.h>
-
-#include <dirent.h>
-#include <errno.h>
+// #include <dirent.h> // #error "<dirent.h> not supported"
+#include <sys/errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -39,7 +41,7 @@ err_out_label:
 static uint32_t _volc_get_file_dir_size(uint64_t data, volc_dir_entry_type_e type, char* path, char* name) {
     VOLC_UNUSED_PARAM(name);
     uint64_t size = 0;
-    uint64_t* p_size = (uint64_t*) data;
+    uint64_t* p_size = (uint64_t*)(uint32_t)data;
     uint32_t ret = VOLC_STATUS_SUCCESS;
 
     switch (type) {
@@ -194,12 +196,12 @@ uint32_t volc_create_directory(const char* path) {
 }
 
 uint32_t volc_get_directory_size(const char* path, uint64_t* p_size) {
-   uint32_t ret = VOLC_STATUS_SUCCESS;
+    uint32_t ret = VOLC_STATUS_SUCCESS;
     uint64_t size = 0;
 
     VOLC_CHK(p_size != NULL && path != NULL && path[0] != '\0', VOLC_STATUS_INVALID_ARG);
 
-    VOLC_CHK_STATUS(volc_traverse_directory(path, (uint64_t) &size, 1, _volc_get_file_dir_size));
+    VOLC_CHK_STATUS(volc_traverse_directory(path, (uint64_t)(uint32_t) &size, 1, _volc_get_file_dir_size));
 
     *p_size = size;
 

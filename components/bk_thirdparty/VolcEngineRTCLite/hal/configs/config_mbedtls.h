@@ -10,6 +10,9 @@ extern "C" {
 // enable DTLS-SRTP extension
 #define MBEDTLS_SSL_DTLS_SRTP
 
+#define MBEDTLS_X509_CREATE_C
+#define MBEDTLS_X509_CRT_WRITE_C
+
 // disable TLS 1.0 and 1.1 as they should be deprecated in major browser vendors
 #undef MBEDTLS_SSL_CBC_RECORD_SPLITTING
 #undef MBEDTLS_SSL_PROTO_TLS1

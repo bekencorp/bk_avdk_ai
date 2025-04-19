@@ -1,3 +1,5 @@
+#include <common/bk_include.h>
+#include "bk_posix.h"
 #include "volc_fileio.h"
 
 #include <sys/stat.h>
@@ -219,6 +221,6 @@ err_out_label:
 uint32_t volc_file_delete(const char* path) {
     uint32_t ret = VOLC_STATUS_SUCCESS;
     unlink(path);
-err_out_label:
+// err_out_label:
     return ret;
 }
