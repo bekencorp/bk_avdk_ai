@@ -296,6 +296,8 @@ menu "Media"
 		bool "Enable AUD sweep test"
 		default n
 
-
+	config AUD_INTF_SUPPORT_OPUS
+		bool "Enable Aud intf support OPUS data type"
+		default n
 
 endmenu

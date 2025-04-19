@@ -207,6 +207,10 @@ typedef struct {
 #endif
 #endif
 	RingBufferContext *aud_tx_rb;
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+	RingBufferContext *aud_tx_pkt_len_rb;           /**< audio send mic data length ring buffer */
+#endif
+
 
 	aud_intf_voc_data_type_t data_type;
 	aud_intf_voc_mic_ctrl_t mic_en;

@@ -850,6 +850,18 @@ static void aud_intf_voc_deconfig(void)
 		aud_intf_info.voc_info.rx_info.decoder_rb = NULL;
 	}
 
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+	if (aud_intf_info.voc_info.rx_info.decoder_len_ring_buff) {
+		audio_intf_free(aud_intf_info.voc_info.rx_info.decoder_len_ring_buff);
+		aud_intf_info.voc_info.rx_info.decoder_len_ring_buff = NULL;
+	}
+
+	if (aud_intf_info.voc_info.rx_info.decoder_len_rbc) {
+		audio_intf_free(aud_intf_info.voc_info.rx_info.decoder_len_rbc);
+		aud_intf_info.voc_info.rx_info.decoder_len_rbc = NULL;
+	}
+#endif
+
 	aud_intf_info.voc_info.rx_info.frame_num = 0;
 	aud_intf_info.voc_info.rx_info.frame_size = 0;
 	aud_intf_info.voc_info.rx_info.fifo_frame_num = 0;
@@ -964,8 +976,12 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 		case AUD_INTF_VOC_DATA_TYPE_G722:
 			aud_intf_info.voc_info.tx_info.buff_length = aud_intf_info.voc_info.aud_setup.mic_samp_rate_points / 2;
 			break;
-#endif
-
+#elif CONFIG_AUD_INTF_SUPPORT_OPUS
+		case AUD_INTF_VOC_DATA_TYPE_OPUS:
+			aud_intf_info.voc_info.tx_info.buff_length = (aud_intf_info.voc_info.aud_setup.mic_samp_rate_points << 1);
+			break;
+#else
+#endif             
 		default:
 			break;
 	}
@@ -1004,8 +1020,12 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 			aud_intf_info.voc_info.rx_info.frame_size = 160;		//apk receive one frame 40ms
 			//aud_intf_info.voc_info.rx_info.frame_size = aud_intf_info.voc_info.aud_setup.mic_samp_rate_points;
 			break;
-#endif
-
+#elif CONFIG_AUD_INTF_SUPPORT_OPUS
+		case AUD_INTF_VOC_DATA_TYPE_OPUS:
+			aud_intf_info.voc_info.rx_info.frame_size = 960;//bitrate 64000,frame 60ms,enable VBR rx frame max length:64000*0.06/8*2=960
+			break;
+#else
+#endif  
 		default:
 			break;
 	}
@@ -1030,7 +1050,29 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 
 	LOGI("%s, %d, decoder_rb:%p \n", __func__, __LINE__, aud_intf_info.voc_info.rx_info.decoder_rb);
 
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+	aud_intf_info.voc_info.rx_info.decoder_len_ring_buff = audio_intf_malloc(sizeof(uint16) * aud_intf_info.voc_info.rx_info.frame_num + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
+	if (aud_intf_info.voc_info.rx_info.decoder_len_ring_buff == NULL) {
+		LOGE("%s, %d, malloc decoder len ring buffer of rx fail \n", __func__, __LINE__);
+		err = BK_ERR_AUD_INTF_MEMY;
+		goto aud_intf_voc_init_exit;
+	}
+	LOGI("%s, %d, malloc decoder_len_ring_buff:%p, size:%d \r\n", __func__, __LINE__, aud_intf_info.voc_info.rx_info.decoder_len_ring_buff, sizeof(uint16) * aud_intf_info.voc_info.rx_info.frame_num);
+	aud_intf_info.voc_info.rx_info.decoder_len_rbc = audio_intf_malloc(sizeof(RingBufferContext));
+	if (aud_intf_info.voc_info.rx_info.decoder_len_rbc == NULL) {
+		LOGE("%s, %d, malloc decoder_rb fail \n", __func__, __LINE__);
+		err = BK_ERR_AUD_INTF_MEMY;
+		goto aud_intf_voc_init_exit;
+	}
+	ring_buffer_init(aud_intf_info.voc_info.rx_info.decoder_len_rbc, (uint8_t *)aud_intf_info.voc_info.rx_info.decoder_len_ring_buff, sizeof(uint16) * aud_intf_info.voc_info.rx_info.frame_num + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, DMA_ID_MAX, RB_DMA_TYPE_NULL);
+
+	LOGI("%s, %d, decoder_len_rbc:%p \n", __func__, __LINE__, aud_intf_info.voc_info.rx_info.decoder_len_rbc);
+#endif
+
 	aud_intf_info.voc_info.aud_tx_rb = aud_tras_get_tx_rb();
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+    aud_intf_info.voc_info.aud_tx_pkt_len_rb = aud_tras_get_tx_pkt_len_rb();
+#endif
 
 	/* callback config */
 //	aud_intf_info.voc_info.aud_tras_drv_voc_event_cb = aud_tras_drv_voc_event_cb_handle;
@@ -1087,6 +1129,18 @@ aud_intf_voc_init_exit:
 		audio_intf_free(aud_intf_info.voc_info.rx_info.decoder_rb);
 		aud_intf_info.voc_info.rx_info.decoder_rb = NULL;
 	}
+
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+	if (aud_intf_info.voc_info.rx_info.decoder_len_ring_buff != NULL) {
+		audio_intf_free(aud_intf_info.voc_info.rx_info.decoder_len_ring_buff);
+		aud_intf_info.voc_info.rx_info.decoder_len_ring_buff = NULL;
+	}
+    
+	if (aud_intf_info.voc_info.rx_info.decoder_len_rbc != NULL) {
+		audio_intf_free(aud_intf_info.voc_info.rx_info.decoder_len_rbc);
+		aud_intf_info.voc_info.rx_info.decoder_len_rbc = NULL;
+	}
+#endif
 
 	aud_intf_info.api_info.busy_status = false;
 	return err;
@@ -1174,13 +1228,20 @@ bk_err_t bk_aud_intf_voc_start(void)
                             }
                         }
 							break;
+#elif CONFIG_AUD_INTF_SUPPORT_OPUS 
+                        case AUD_INTF_VOC_DATA_TYPE_OPUS:
+                        {
+                            break;
+                        }
+#else
 #endif
-
 						default:
 							break;
 					}
-
+                    LOGE("bk_aud_intf_voc_start:status:%d,size:%d\n",aud_intf_info.voc_status,temp_size);
+                    #if !CONFIG_AUD_INTF_SUPPORT_OPUS 
 					aud_intf_voc_write_spk_data(temp_buff, temp_size);
+                    #endif
 					audio_intf_free(temp_buff);
 				}
 			}
@@ -1353,6 +1414,42 @@ bk_err_t bk_aud_intf_drv_deinit(void)
 /* write speaker data in voice work mode */
 static bk_err_t aud_intf_voc_write_spk_data(uint8_t *dac_buff, uint32_t size)
 {
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+	uint32_t write_size[2] = {0};
+	uint16_t pkt_len = size;
+
+	/* check aud_intf status */
+	if (aud_intf_info.voc_status == AUD_INTF_VOC_STA_NULL)
+		return BK_ERR_AUD_INTF_STA;
+
+#if (CONFIG_CACHE_ENABLE)
+	flush_all_dcache();
+#endif
+
+    if (ring_buffer_get_free_size(aud_intf_info.voc_info.rx_info.decoder_len_rbc) >= (sizeof(uint16_t)))
+    {
+        if (ring_buffer_get_free_size(aud_intf_info.voc_info.rx_info.decoder_rb) >= size)
+        {
+            write_size[0] = ring_buffer_write(aud_intf_info.voc_info.rx_info.decoder_rb, dac_buff, size);
+            write_size[1] = ring_buffer_write(aud_intf_info.voc_info.rx_info.decoder_len_rbc, (uint8_t *)&pkt_len, sizeof(uint16_t));
+            if ((write_size[0] != size) || (write_size[1] != sizeof(uint16_t))) 
+            {
+                LOGE("write decoder_ring_buff fail, size:%d \r\n", size);
+                return BK_FAIL;
+            }
+            aud_intf_info.voc_info.rx_info.rx_buff_seq_tail++;
+        }
+        else
+        {
+            LOGE("write decoder_ring_buff full!\r\n");
+        }
+    }
+    else
+    {
+        LOGE("write decoder_len_ring_buff full!\r\n");
+    }
+
+#else // non CONFIG_AUD_INTF_SUPPORT_OPUS
 	uint32_t write_size = 0;
 
 //	LOGI("enter: %s \r\n", __func__);
@@ -1374,6 +1471,7 @@ static bk_err_t aud_intf_voc_write_spk_data(uint8_t *dac_buff, uint32_t size)
 		}
 		aud_intf_info.voc_info.rx_info.rx_buff_seq_tail += size/(aud_intf_info.voc_info.rx_info.frame_size);
 	}
+#endif
 
 	return BK_OK;
 }

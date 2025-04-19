@@ -184,6 +184,10 @@ typedef struct {
 	//uint16_t rx_buff_seq_head;	//the rx data sequence in head of filled frames
 	uint16_t aud_trs_read_seq;		//save the sequence number of audio dac readed
 	uint16_t fifo_frame_num;
+	#if CONFIG_AUD_INTF_SUPPORT_OPUS
+	int32_t *decoder_len_ring_buff;  //save received data length 
+	RingBufferContext *decoder_len_rbc;  //decoder len ring buffer context, cpu0 malloc and init
+	#endif
 } rx_info_t;
 
 #if CONFIG_AUD_TRAS_AEC_DUMP_DEBUG
@@ -221,6 +225,10 @@ typedef struct {
 #endif
 #endif
 	RingBufferContext *aud_tx_rb;			/**< audio send mic data ring buffer */
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+	RingBufferContext *aud_tx_pkt_len_rb;			/**< audio send mic data length ring buffer */
+#endif
+
 //	void (*aud_tras_drv_voc_event_cb)(aud_tras_drv_voc_event_t event, bk_err_t result);
 } aud_intf_voc_config_t;
 

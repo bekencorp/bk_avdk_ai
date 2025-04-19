@@ -167,7 +167,9 @@ typedef enum {
 #if CONFIG_AUD_INTF_SUPPORT_G722
 	AUD_INTF_VOC_DATA_TYPE_G722,			/**< the data of voice transfer encoded by G722 */
 #endif
-
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+    AUD_INTF_VOC_DATA_TYPE_OPUS,            /**< the data of voice transfer encoded by G722 */
+#endif
 	AUD_INTF_VOC_DATA_TYPE_MAX,
 } aud_intf_voc_data_type_t;
 
