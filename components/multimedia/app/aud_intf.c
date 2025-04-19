@@ -948,6 +948,11 @@ void bk_aud_intf_aud_codec_init(aud_codec_setup_input_t *input, aud_codec_setup_
     output->dec_vbr_en = input->dec_vbr_en;
     aud_codec_buf_len_cal(input,output);
 }
+
+uint32_t bk_aud_get_dec_input_size_in_byte(void)
+{
+    return aud_intf_info.voc_info.aud_codec_setup.dec_input_size_in_byte;
+}
 #endif
 
 bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
