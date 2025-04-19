@@ -80,6 +80,8 @@ typedef struct
     beken_semaphore_t sem;
     bool running;
 
+    bool skip_idtag;
+
     audio_codec_sta_t state;                 /**< play state */
     audio_codec_cfg_t config;
     audio_frame_info_t cb_frame_info;
@@ -122,9 +124,9 @@ static bk_err_t mp3_data_read_send_msg(beken_queue_t queue, mp3_codec_op_t op, v
 }
 
 /* read mp3 data from pool */
-static int read_mp3_data(mp3_codec_priv_t *mp3_codec, char *buffer, uint32_t len)
+static int read_mp3_data(mp3_codec_priv_t *mp3_codec, char *buffer, uint32_t len, uint32_t time_to_wait)
 {
-    return rb_read(mp3_codec->rb, buffer, len, 5);//BEKEN_NEVER_TIMEOUT//10 / portTICK_RATE_MS
+    return rb_read(mp3_codec->rb, buffer, len, time_to_wait / portTICK_RATE_MS);
 }
 
 /* skip id3 tag */
@@ -133,14 +135,14 @@ static int codec_mp3_skip_idtag(mp3_codec_priv_t *mp3_codec)
     int  offset = 0;
     uint8_t *tag;
 
-    LOGI("%s\n", __func__);
+    LOGD("%s\n", __func__);
 
     /* set the read_ptr to the read buffer */
     mp3_codec->read_ptr = mp3_codec->read_buffer;
 
     tag = mp3_codec->read_ptr;
     /* read idtag v2 */
-    if (read_mp3_data(mp3_codec, (char *)mp3_codec->read_ptr, 3) != 3)
+    if (read_mp3_data(mp3_codec, (char *)mp3_codec->read_ptr, 3, 1000) != 3)
     {
         LOGE("%s, %d, read ID3 fail\n", __func__, __LINE__);
         goto __exit;
@@ -153,7 +155,7 @@ static int codec_mp3_skip_idtag(mp3_codec_priv_t *mp3_codec)
     {
         int  size;
 
-        if (read_mp3_data(mp3_codec, (char *)mp3_codec->read_ptr + 3, 7) != 7)
+        if (read_mp3_data(mp3_codec, (char *)mp3_codec->read_ptr + 3, 7, 5) != 7)
         {
             LOGE("%s, %d, read ID3 TAG fail\n", __func__, __LINE__);
             goto __exit;
@@ -180,7 +182,7 @@ static int codec_mp3_skip_idtag(mp3_codec_priv_t *mp3_codec)
                     chunk = rest_size;
                 }
 
-                length = read_mp3_data(mp3_codec, (char *)mp3_codec->read_buffer, chunk);
+                length = read_mp3_data(mp3_codec, (char *)mp3_codec->read_buffer, chunk, 5);
                 if (length > 0)
                 {
                     rest_size -= length;
@@ -199,7 +201,7 @@ static int codec_mp3_skip_idtag(mp3_codec_priv_t *mp3_codec)
 
 __exit:
 
-    return offset;
+    return -1;
 }
 
 static int check_mp3_sync_word(mp3_codec_priv_t *mp3_codec)
@@ -254,7 +256,7 @@ static int32_t codec_mp3_fill_buffer(mp3_codec_priv_t *mp3_codec)
     bytes_to_read = (MP3_AUDIO_BUF_SZ - mp3_codec->bytes_left) & ~(512 - 1);
 
 __retry:
-    bytes_read = read_mp3_data(mp3_codec, (char *)(mp3_codec->read_buffer + mp3_codec->bytes_left), bytes_to_read);
+    bytes_read = read_mp3_data(mp3_codec, (char *)(mp3_codec->read_buffer + mp3_codec->bytes_left), bytes_to_read, 5);
     if (bytes_read > 0)
     {
         mp3_codec->bytes_left = mp3_codec->bytes_left + bytes_read;
@@ -306,31 +308,18 @@ static int mp3_codec_process(mp3_codec_priv_t *mp3_codec, char *buffer, uint32_t
 {
     int err;
     int read_offset;
+    LOGD("%s\n", __func__);
 
-//retry:
     if ((mp3_codec->read_ptr == NULL) || mp3_codec->bytes_left < 2 * MAINBUF_SIZE)
     {
-        if (codec_mp3_fill_buffer(mp3_codec) != 0)
-        {
-            /* play complete */
-            //LOGE("%s, %d, play complete\nr", __func__, __LINE__);
-            //return 0;
-        }
+        codec_mp3_fill_buffer(mp3_codec);
     }
 
     if (mp3_codec->bytes_left == 0)
     {
+        LOGD("%s, %d, bytes_left = 0\n", __func__, __LINE__);
         return 0;
     }
-
-#if 0
-    /* Protect mp3 decoder to avoid decoding assert when data is insufficient. */
-    if (mp3_codec->bytes_left < MAINBUF_SIZE)
-    {
-        LOGE("%s, %d, connot read enough data, read: %d < %d\n", __func__, __LINE__, mp3_codec->bytes_left, MAINBUF_SIZE);
-//        goto retry;
-    }
-#endif
 
     read_offset = MP3FindSyncWord(mp3_codec->read_ptr, mp3_codec->bytes_left);
     if (read_offset < 0)
@@ -439,7 +428,6 @@ static void mp3_codec_task_main(beken_thread_arg_t param_data)
     bk_err_t ret = BK_OK;
     int pcm_size = 0;
     int out_size = 0;
-    bool skip_idtag = false;
 
     mp3_codec_priv_t *mp3_codec = (mp3_codec_priv_t *)param_data;
 
@@ -459,7 +447,7 @@ static void mp3_codec_task_main(beken_thread_arg_t param_data)
     LOGI("%s, %d, mp3_codec: %p\n", __func__, __LINE__, mp3_codec);
 
     mp3_codec->running = false;
-    uint32_t wait_time = 0;
+    uint32_t wait_time = BEKEN_WAIT_FOREVER;
 
     rtos_set_semaphore(&mp3_codec->sem);
 
@@ -474,6 +462,12 @@ static void mp3_codec_task_main(beken_thread_arg_t param_data)
                 case MP3_CODEC_IDLE:
                     mp3_codec->running = false;
                     wait_time = BEKEN_WAIT_FOREVER;
+                    mp3_codec->skip_idtag = false;
+                    /* clear ring buffer */
+                    mp3_codec->read_ptr = mp3_codec->read_buffer;
+                    mp3_codec->bytes_left = 0;
+                    rb_abort_write(mp3_codec->rb);
+                    rb_reset(mp3_codec->rb);
                     break;
 
                 case MP3_CODEC_EXIT:
@@ -490,23 +484,30 @@ static void mp3_codec_task_main(beken_thread_arg_t param_data)
             }
         }
 
-        if (skip_idtag == false)
-        {
-            codec_mp3_skip_idtag(mp3_codec);
-            skip_idtag = true;
-            LOGI("%s, %d, codec_mp3_skip_idtag complete\n", __func__, __LINE__);
-        }
 
-        /* read mp3 data and write to dac fifo */
-        pcm_size = mp3_codec_process(mp3_codec, mp3_codec->out_buffer, mp3_codec->out_buffer_size);
-        if (pcm_size > 0 && mp3_codec->config.data_handle)
+        if (mp3_codec->running)
         {
-            out_size = mp3_codec->config.data_handle(&mp3_codec->cb_frame_info, mp3_codec->out_buffer, pcm_size, mp3_codec->config.usr_data);
-            if (out_size != pcm_size)
+            if (mp3_codec->skip_idtag == false)
             {
-                LOGE("%s, %d, data_handle size: != %d\n", __func__, __LINE__, out_size, pcm_size);
+                ret = codec_mp3_skip_idtag(mp3_codec);
+                if (ret > 0)
+                {
+                    mp3_codec->skip_idtag = true;
+                    LOGI("%s, %d, codec_mp3_skip_idtag complete\n", __func__, __LINE__);
+                }
             }
-        }
+
+            /* read mp3 data and write to dac fifo */
+            pcm_size = mp3_codec_process(mp3_codec, mp3_codec->out_buffer, mp3_codec->out_buffer_size);
+            if (pcm_size > 0 && mp3_codec->config.data_handle)
+            {
+                out_size = mp3_codec->config.data_handle(&mp3_codec->cb_frame_info, mp3_codec->out_buffer, pcm_size, mp3_codec->config.usr_data);
+                if (out_size != pcm_size)
+                {
+                    LOGE("%s, %d, data_handle size: %d != %d\n", __func__, __LINE__, out_size, pcm_size);
+                }
+            }
+       }
     }
 
 mp3_codec_exit:
@@ -829,13 +830,15 @@ static int mp3_codec_ctrl(audio_codec_t *codec, audio_codec_ctrl_op_t op, void *
     switch (op)
     {
         case AUDIO_CODEC_CTRL_START:
+#if 0
             ret = mp3_data_read_send_msg(priv->mp3_codec_msg_que, MP3_CODEC_IDLE, NULL);
             if (ret != BK_OK)
             {
                 LOGE("%s, %d, send msg to stop mp3 decode fail\n", __func__, __LINE__);
                 break;
             }
-            ret = mp3_data_read_send_msg(priv->mp3_codec_msg_que, MP3_CODEC_START NULL);
+#endif
+            ret = mp3_data_read_send_msg(priv->mp3_codec_msg_que, MP3_CODEC_START, NULL);
             if (ret != BK_OK)
             {
                 LOGE("%s, %d, send msg to start mp3 decode fail\n", __func__, __LINE__);
@@ -862,10 +865,10 @@ static int mp3_codec_ctrl(audio_codec_t *codec, audio_codec_ctrl_op_t op, void *
 
 audio_codec_ops_t mp3_codec_ops =
 {
-    .open =           mp3_codec_open,
-    .write =          mp3_codec_write,
-    .close =          mp3_codec_close,
-    .ctrl =           mp3_codec_ctrl,
+    .open = mp3_codec_open,
+    .write = mp3_codec_write,
+    .close = mp3_codec_close,
+    .ctrl = mp3_codec_ctrl,
 };
 
 audio_codec_ops_t *get_mp3_codec_ops(void)

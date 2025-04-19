@@ -274,6 +274,7 @@ static char agent_offline_prompt_tone_path[] = "/agent_offline_16k_mono_16bit_en
 static char low_voltage_prompt_tone_path[] = "/low_voltage_16k_mono_16bit_en.mp3";
 static char ota_update_success_prompt_tone_path[] = "/ota_update_success_16k_mono_16bit_en.mp3";
 static char ota_update_fail_prompt_tone_path[] = "/ota_update_fail_16k_mono_16bit_en.mp3";
+static char agent_start_fail_prompt_tone_path[] = "/agent_start_fail_16k_mono_16bit_en.mp3";
 #endif
 
 #if CONFIG_PROMPT_TONE_CODEC_WAV
@@ -291,6 +292,7 @@ static char agent_offline_prompt_tone_path[] = "/agent_offline_16k_mono_16bit_en
 static char low_voltage_prompt_tone_path[] = "/low_voltage_16k_mono_16bit_en.wav";
 static char ota_update_success_prompt_tone_path[] = "/ota_update_success_16k_mono_16bit_en.wav";
 static char ota_update_fail_prompt_tone_path[] = "/ota_update_fail_16k_mono_16bit_en.wav";
+static char agent_start_fail_prompt_tone_path[] = "/agent_start_fail_16k_mono_16bit_en.wav";
 #endif
 
 #if CONFIG_PROMPT_TONE_CODEC_PCM
@@ -308,6 +310,7 @@ static char agent_offline_prompt_tone_path[] = "/agent_offline_16k_mono_16bit_en
 static char low_voltage_prompt_tone_path[] = "/low_voltage_16k_mono_16bit_en.pcm";
 static char ota_update_success_prompt_tone_path[] = "/ota_update_success_16k_mono_16bit_en.pcm";
 static char ota_update_fail_prompt_tone_path[] = "/ota_update_fail_16k_mono_16bit_en.pcm";
+static char agent_start_fail_prompt_tone_path[] = "/agent_start_fail_16k_mono_16bit_en.pcm";
 #endif
 #endif  //CONFIG_PROMPT_TONE_SOURCE_VFS
 #endif
@@ -3624,7 +3627,7 @@ static bk_err_t aud_tras_drv_prompt_tone_play_open(url_info_t *prompt_tone)
 
 #if CONFIG_PROMPT_TONE_SOURCE_VFS
 #if CONFIG_PROMPT_TONE_CODEC_MP3
-    //TODO
+    prompt_tone_play_cfg_t config = DEFAULT_VFS_MP3_PROMPT_TONE_PLAY_CONFIG();
 #endif
 #if CONFIG_PROMPT_TONE_CODEC_WAV
     prompt_tone_play_cfg_t config = DEFAULT_VFS_WAV_PROMPT_TONE_PLAY_CONFIG();
@@ -5321,6 +5324,17 @@ static bk_err_t aud_tras_drv_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_
 #if CONFIG_PROMPT_TONE_SOURCE_ARRAY
             prompt_tone_info.url = (char *)ota_update_fail_prompt_tone_array;
             prompt_tone_info.total_len = sizeof(ota_update_fail_prompt_tone_array);
+#endif
+            break;
+
+        case AUD_INTF_VOC_AGENT_START_FAIL:
+            LOGI("[prompt_tone] AGENT_START_FAIL\n");
+#if CONFIG_PROMPT_TONE_SOURCE_VFS
+            prompt_tone_info.url = agent_start_fail_prompt_tone_path;
+#endif
+#if CONFIG_PROMPT_TONE_SOURCE_ARRAY
+            prompt_tone_info.url = (char *)agent_start_fail_prompt_tone_array;
+            prompt_tone_info.total_len = sizeof(agent_start_fail_prompt_tone_array);
 #endif
             break;
 

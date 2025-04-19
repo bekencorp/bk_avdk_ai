@@ -45,6 +45,11 @@ struct prompt_tone_play
     prompt_tone_play_sta_t status;
 };
 
+#if CONFIG_PROMPT_TONE_CODEC_MP3
+#define CHUNK_SIZE      (4068)
+#else
+#define CHUNK_SIZE      (640)
+#endif
 
 static int source_out_data_handle_cb(char *buffer, uint32_t len, void *params)
 {
@@ -163,7 +168,8 @@ prompt_tone_play_handle_t prompt_tone_play_create(  prompt_tone_play_cfg_t *conf
     /* create codec */
     config->codec_cfg.data_handle = codec_out_data_handle_cb;
     config->codec_cfg.usr_data = handle;
-    config->codec_cfg.chunk_size = 640;
+
+    config->codec_cfg.chunk_size = CHUNK_SIZE;
     config->codec_cfg.pool_size = config->codec_cfg.chunk_size * 4;
     handle->codec = audio_codec_create(config->codec_type, &config->codec_cfg);
     if (!handle->codec)
@@ -403,6 +409,8 @@ bk_err_t prompt_tone_play_start(prompt_tone_play_handle_t handle)
     }
 
     handle->status = PROMPT_TONE_PLAY_STA_PLAYING;
+
+    return BK_OK;
 
 fail:
     audio_codec_ctrl(handle->codec, AUDIO_CODEC_CTRL_STOP, NULL);

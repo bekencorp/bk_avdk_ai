@@ -218,6 +218,7 @@ typedef enum {
 	AUD_INTF_VOC_LOW_VOLTAGE,
 	AUD_INTF_VOC_OTA_UPDATE_FAIL,
 	AUD_INTF_VOC_OTA_UPDATE_SUCCESS,
+	AUD_INTF_VOC_AGENT_START_FAIL,
 } aud_intf_voc_prompt_tone_t;
 #endif
 

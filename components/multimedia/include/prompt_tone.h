@@ -11525,6 +11525,11 @@ const char ota_update_fail_prompt_tone_array[] =
 {
     0x00,
 };
+
+const char agent_start_fail_prompt_tone_array[] =
+{
+    0x00,
+};
 #endif  //CONFIG_PROMPT_TONE_CODEC_PCM
 
 #if CONFIG_PROMPT_TONE_CODEC_MP3
@@ -11601,6 +11606,10 @@ const char ota_update_fail_prompt_tone_array[] =
     0x00,
 };
 
+const char agent_start_fail_prompt_tone_array[] =
+{
+    0x00,
+};
 #endif  //CONFIG_PROMPT_TONE_CODEC_MP3
 
 #if CONFIG_PROMPT_TONE_CODEC_WAV
@@ -11677,6 +11686,10 @@ const char ota_update_fail_prompt_tone_array[] =
     0x00,
 };
 
+const char agent_start_fail_prompt_tone_array[] =
+{
+    0x00,
+};
 #endif  //CONFIG_PROMPT_TONE_CODEC_WAV
 
 #ifdef __cplusplus
