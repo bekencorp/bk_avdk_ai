@@ -28,13 +28,15 @@ extern "C" {
 #endif
 
 #define AGORA_RTC_CHANNEL_NAME_MAX_LEN (64)
-#define AGORA_RTC_USER_ID_MAX_LEN (255)
 #define AGORA_RTC_PRODUCT_ID_MAX_LEN (63)
-#define AGORA_RTM_UID_MAX_LEN 64
+#define AGORA_RTC_USER_ACCOUNT_MAX_LEN (256)
+#define AGORA_RTC_DATA_STREAM_MAX_LEN (1024)
+#define AGORA_RTM_UID_MAX_LEN (64)
 #define AGORA_RTM_DATA_MAX_LEN (31 * 1024)
-#define AGORA_CREDENTIAL_MAX_LEN 256
-#define AGORA_CERTIFICATE_MAX_LEN 1024
-#define AGORA_LICENSE_VALUE_LEN 32
+#define AGORA_CREDENTIAL_MAX_LEN (256)
+#define AGORA_CERTIFICATE_MAX_LEN (1024)
+#define AGORA_LICENSE_VALUE_LEN (32)
+
 
 /** Error code. */
 typedef enum {
@@ -146,7 +148,6 @@ typedef enum {
   ERR_OPEN_CHANNEL_TRY_NEXT_VOS = 122,
   /** Client is banned by the server */
   ERR_CLIENT_IS_BANNED_BY_SERVER = 123,
-
 #endif // RTN End
 
 /******************************************************************************|
@@ -181,6 +182,7 @@ typedef enum {
   ERR_VIDEO_SEND_PACKETIZE_FAILED = 301,
 #endif // Video End
 
+
 /******************************************************************************|
 |                               RDT(600~620)                                   |
 *******************************************************************************/
@@ -191,6 +193,24 @@ typedef enum {
   ERR_RDT_CMD_EXCEED_LIMIT = 603,
   ERR_RDT_DATA_EXCEED_LIMIT = 604,
 #endif // RDT End
+
+/******************************************************************************|
+|                               DataStream(621~630)                            |
+*******************************************************************************/
+#if 1 // DataStream Start
+  /* too many data stream */
+  ERR_TOO_MANY_DATA_STREAMS = 621,
+  /* The data size is over 1024 */
+  ERR_DATA_STREAM_SIZE_TOO_LARGE = 622,
+  /* stream id not exist */
+  ERR_NOT_EXIST_STREAM_ID = 623,
+  /* The bitrate of the sent data exceeds the limit of 6 Kbps*/
+  ERR_DATA_STREAM_BITRATE_LIMIT = 624,
+  /* send data stream exceeds the limit of 60 PPS */
+  ERR_DATA_STREAM_SEND_TOO_OFTEN = 625,
+  /* peer data stream time out*/
+  ERR_DATA_STREAM_TIME_OUT = 626,
+#endif // DataStream End
 
 /******************************************************************************|
 |                               RTM(1000~1099)                                 |
@@ -420,6 +440,30 @@ typedef enum {
    */
   AUDIO_DATA_TYPE_HEAAC = 9,
   /**
+   * 10: HEAAC2, sample=48k
+   */
+  AUDIO_DATA_TYPE_HEAAC2 = 10,
+  /*
+   * 11: AACLC3 sample=8k 2CH
+   */
+  AUDIO_DATA_TYPE_AACLC_8K_2CH = 11,
+  /*
+   * 12: AACLC2 sample=16k 2CH
+   */
+  AUDIO_DATA_TYPE_AACLC_16K_2CH = 12,
+  /**
+   * 13: AACLC, sample=48k 2CH
+   */
+  AUDIO_DATA_TYPE_AACLC_2CH = 13,
+  /**
+   * 14: HEAAC, sample=48k 2CH
+   */
+  AUDIO_DATA_TYPE_HEAAC_2CH = 14,
+  /**
+   * 15: HEAAC2, sample=48k 2CH
+   */
+  AUDIO_DATA_TYPE_HEAAC2_2CH = 15,
+  /**
    * 100: PCM (audio codec should be enabled)
    */
   AUDIO_DATA_TYPE_PCM = 100,
@@ -535,6 +579,7 @@ typedef struct {
    * - `false`: (Default) connect to servers with no limit
    */
   bool domain_limit;
+
 } rtc_service_option_t;
 
 typedef struct {
@@ -546,11 +591,11 @@ typedef struct {
    */
   audio_codec_type_e audio_codec_type;
   /**
-   * Pcm sample rate. Ignored if audio coded is diabled
+   * Pcm sample rate.
    */
   int pcm_sample_rate;
   /**
-   * Pcm channel number. Ignored if audio coded is diabled
+   * Pcm channel number.
    */
   int pcm_channel_num;
   /**
@@ -579,6 +624,21 @@ typedef struct{
 
 
 /**
+ * @brief rtc packet type enum
+ * @technical preview
+ */
+typedef enum {
+  // 1: audio packet type.
+  RTC_PACKET_TYPE_AUDIO = 1,
+  // 2: video packet type.
+  RTC_PACKET_TYPE_VIDEO,
+  // 3. stream message type
+  RTC_PACKET_TYPE_STREAM_MESSAGE,
+  // 4: rdt packet type.
+  RTC_PACKET_TYPE_RDT,
+} rtc_packet_type_e;
+
+/**
  * The definition of the rtc_channel_options_t struct.
  */
 typedef struct {
@@ -594,6 +654,9 @@ typedef struct {
   audio_codec_option_t audio_codec_opt;
   // audio process options
   rtc_audio_process_options_t audio_process_opt;
+  // configure jitter buffer process pcm frame length; such as 20, 40, 60, etc .. only support 16K 16bit 1channel
+  int jitter_buffer_per_pcm_frame_ms;
+
 
 
 } rtc_channel_options_t;
@@ -601,6 +664,8 @@ typedef struct {
 
 /**
  * Network event type enum
+ *
+ * @technical preview
  */
 typedef enum {
   NETWORK_EVENT_DOWN = 0,
@@ -634,10 +699,31 @@ typedef struct {
   char channel_name[AGORA_RTC_CHANNEL_NAME_MAX_LEN + 1];
 } connection_info_t;
 
+
+/**
+ * rtc statistics
+ *
+ * @technical preview
+ */
+typedef struct rtc_stats_s {
+  bool lan_accelerate_state;
+} rtc_stats_t;
+
 /**
  * Agora RTC SDK event handler
  */
 typedef struct {
+  /**
+   * Report error message during runtime.
+   *
+   * In most cases, it means SDK can't fix the issue and application should take action.
+   *
+   * @param[in] conn_id Connection identification
+   * @param[in] code    Error code, see #agora_err_code_e
+   * @param[in] msg     Error message
+   */
+  void (*on_error)(connection_id_t conn_id, int code, const char *msg);
+
   /**
    * Occurs when local user joins channel successfully.
    *
@@ -678,20 +764,17 @@ typedef struct {
    *
    * You can know the reason accordding to error code
    * @param[in] conn_id Connection identification
-   * @param[in] error   Error code, see #license_err_code_e
+   * @param[in] error   Error code, see #license_err_reason_e
    */
   void (*on_license_validation_failure)(connection_id_t conn_id, int error);
 
   /**
-   * Report error message during runtime.
+   * Occurs when token will expired.
    *
-   * In most cases, it means SDK can't fix the issue and application should take action.
-   *
-   * @param[in] conn_id Connection identification
-   * @param[in] code    Error code, see #agora_err_code_e
-   * @param[in] msg     Error message
+   * @param[in] conn_id    Connection identification
+   * @param[in] token      The token will expire
    */
-  void (*on_error)(connection_id_t conn_id, int code, const char *msg);
+  void (*on_token_privilege_will_expire)(connection_id_t conn_id, const char *token);
 
   /**
    * Occurs when a remote user joins channel successfully.
@@ -710,6 +793,7 @@ typedef struct {
    * @param[in] reason  Reason, see #user_offline_reason_e
    */
   void (*on_user_offline)(connection_id_t conn_id, uint32_t uid, int reason);
+
 
   /**
    * Occurs when a remote user sends notification before enable/disable sending audio.
@@ -780,7 +864,6 @@ typedef struct {
 
   /**
    * Occurs when a remote user requests a keyframe.
-   *
    * This callback notifies the sender to generate a new keyframe.
    *
    * @param[in] conn_id      Connection identification
@@ -789,16 +872,68 @@ typedef struct {
    */
   void (*on_key_frame_gen_req)(connection_id_t conn_id, uint32_t uid, video_stream_type_e stream_type);
 
+  /**
+   * The SDK triggers this callback once every two seconds after join the channel.
+   *
+   * @param[in] conn_id      Connection identification
+   * @param[in] stats        The statistics of the connection
+   * @technical preview
+   */
+  void (*on_rtc_stats)(connection_id_t conn_id, rtc_stats_t stats);
+
+
 
   /**
-   * Occurs when token will expired.
+   * Occur when receive a stream message.
    *
-   * @param[in] conn_id    Connection identification
-   * @param[in] token      The token will expire
+   * @param[in] conn_id     Connection identification
+   * @param[in] uid         Remote user ID
+   * @param[in] stream_id   stream_id in stream message
+   * @param[in] data        data of message
+   * @param[in] length      length of message
+   * @param[in] sent_ts      time of message sent
    */
-  void (*on_token_privilege_will_expire)(connection_id_t conn_id, const char *token);
+  void (*on_stream_message)(connection_id_t conn_id, uint32_t uid, int stream_id, const char* data, size_t length, uint64_t sent_ts);
 
+  /**
+   * Occur when receiving incoming packet
+   *
+   * @technical preview
+   *
+   * @param[in] conn_id     : Connection identification
+   * @param[in] type        : Packet type
+   * @param[in] src         : Source data pointer
+   * @param[in] src_size    : Source data size
+   * @param[out] dst_buf    : Destination buffer
+   * @param[in] dst_buf_size: Destination buffer size
+   *
+   * @return
+   *  <0  : Error and will use src data to input sdk
+   *  =0  : No modify data, use src data to input sdk
+   *  >0  : Effective data size of destination buffer
+   */
+  int (*on_packet_input_hook)(connection_id_t conn_id, rtc_packet_type_e type,
+                              const void *src, uint16_t src_size, void *dst_buf, uint16_t dst_buf_size);
 
+  /**
+   * Occur when sending outgoing packet
+   *
+   * @technical preview
+   *
+   * @param[in] conn_id     : Connection identification
+   * @param[in] type        : Packet type
+   * @param[in] src         : Source data pointer
+   * @param[in] src_size    : Source data size
+   * @param[out] dst_buf    : Destination buffer
+   * @param[in] dst_buf_size: Destination buffer size
+   *
+   * @return
+   *  <0  : Error and will use src data to sending out
+   *  =0  : No modify data, use src data to sending out
+   *  >0  : Effective data size of destination buffer
+   */
+  int (*on_packet_output_hook)(connection_id_t conn_id, rtc_packet_type_e type,
+                               const void *src, uint16_t src_size, void *dst_buf, uint16_t dst_buf_size);
 
 } agora_rtc_event_handler_t;
 
@@ -889,37 +1024,37 @@ extern __agora_api__ int agora_rtc_destroy_connection(connection_id_t conn_id);
  */
 extern __agora_api__ int agora_rtc_get_connection_info(connection_id_t conn_id, connection_info_t *conn_info);
 
+
 /**
  * @brief Local user joins channel.
  * @note Users in the same channel with the same App ID can send data to each other.
- *       You can join more than one channel at the same time. All channels that
- *       you join will receive the audio/video data stream that you send unless
- *       you stop sending the audio/video data stream in a specific channel.
+ *   You can join more than one channel at the same time. All channels that
+ *   you join will receive the audio/video data stream that you send unless
+ *   you stop sending the audio/video data stream in a specific channel.
  * @param[in] conn_id      : Connection identification
  * @param[in] channel_name : Channel name
- *            Length=strlen(channel_name) should be less than 64 bytes
- *            Supported character scopes are:
- *            - The 26 lowercase English letters: a to z
- *            - The 26 uppercase English letters: A to Z
- *            - The 10 numbers: 0 to 9
- *            - The space
- *            - "!", "#", "$", "%", "&", "(", ")", "+", "-", ":", ";", "<",
- *              "=", ".", ">", "?", "@", "[", "]", "^", "_", " {", "}", "|", "~", ","
+ *   Length=strlen(channel_name) should be less than 64 bytes. Supported character scopes are:
+ *   - The 26 lowercase English letters: a to z
+ *   - The 26 uppercase English letters: A to Z
+ *   - The 10 numbers: 0 to 9
+ *   - The space
+ *   - "!", "#", "$", "%", "&", "(", ")", "+", "-", ":", ";", "<",
+ *     "=", ".", ">", "?", "@", "[", "]", "^", "_", " {", "}", "|", "~", ","
  * @param[in] uid   : User ID.
- *                   A 32-bit unsigned integer with a value ranging from 1 to 2^32-1. The uid must be unique.
- *                   If a uid is set to 0, the SDK assigns and returns a uid in the on_join_channel_success callback.
- *                     Your application must record and maintain the returned uid, because the SDK does not do so.
+ *   A 32-bit unsigned integer with a value ranging from 1 to 2^32-1. The uid must be unique.
+ *   If a uid is set to 0, the SDK assigns and returns a uid in the on_join_channel_success callback.
+ *     Your application must record and maintain the returned uid, because the SDK does not do so.
  * @param[in] token : Token string generated by the server, length=strlen(token) Range is [32, 512]
- *                      - if token authorization is enabled on developer website, it should be set correctly
- *                      - else token can be set as `NULL`
- * @param[in] options   channel options when create channel.
- *                      If do not set channel options, set NULL
+ *   - if token authorization is enabled on developer website, it should be set correctly
+ *   - else token can be set as `NULL`
+ * @param[in] options   channel options when create channel. If do not set channel options, set NULL
  * @return
  * - = 0: Success
  * - < 0: Failure
  */
 extern __agora_api__ int agora_rtc_join_channel(connection_id_t conn_id, const char *channel_name, uint32_t uid,
                                                 const char *token, rtc_channel_options_t *options);
+
 
 /**
  * @brief Allow Local user leaves channel.
@@ -944,9 +1079,11 @@ extern __agora_api__ int agora_rtc_renew_token(connection_id_t conn_id, const ch
 
 /**
  * Set network state
+ *
  * @note It should only be used on systems where the SDK is not aware of network events, such as Android11 and later.
  * @param event : network event, ref@network_event_e
  * @return =0: success; <0: failure
+ * @technical preview
  */
 extern __agora_api__ int agora_rtc_notify_network_event(network_event_e event);
 
@@ -1067,16 +1204,57 @@ extern __agora_api__ int agora_rtc_set_bwe_param(connection_id_t conn_id, uint32
 /**
  * Set config params
  *
+ * @param [in] connid : Connection identification, if set CONNECTION_ID_ALL(0) is for all connections
  * @param [in] params : config params described by json
- * @note  supported sets are shown below, they can be together in params json string
- *  - {"rtc.encryption": {"enable": true/false, "master_key": "xxx..."}}
- *  - {"rtc_network": { "type": INT_xx, "id": INT_xx, "update": true|false }}
  * @return:
  *  - = 0: Success
  *  - < 0: Failure
  */
-extern __agora_api__ int agora_rtc_set_params(const char *params);
+extern __agora_api__ int agora_rtc_set_params(connection_id_t conn_id, const char *params);
 
+
+
+/**
+* Creates a data stream.
+*
+* Each user can create up to five data streams during the lifecycle of a connection.
+* Call after join channel
+*
+* @note Set both the `reliable` and `ordered` parameters as `true` or `false`. Do not set one as `true` and the other as `false`.
+*
+* @param[in] conn_id : Connection identification
+* @param[out] stream_id : The pointer to the ID of the data stream.
+* @param[in] reliable : Whether to guarantee the receivers receive the data stream within five seconds:
+* - `true`: Guarantee that the receivers receive the data stream within five seconds.
+            If the receivers do not receive the data stream within five seconds, the SDK reports an error to the application.
+* - `false`: Do not guarantee that the receivers receive the data stream within five seconds
+             and the SDK does not report any error message for data stream delay or missing.
+* @param[in] ordered : Whether the receivers receive the data stream in the order of sending:
+* - `true`: The receivers receive the data stream in the order of sending.
+* - `false`: The receivers do not receive the data stream in the order of sending.
+*
+* @return
+* - 0: Success.
+* - < 0: Failure.
+*/
+extern __agora_api__ int agora_rtc_create_data_stream(connection_id_t conn_id, int* stream_id, bool reliable, bool ordered);
+
+/** Sends data stream messages to all users in a channel.
+*
+* @note This method has the following restrictions:
+* - Up to 60 packets can be sent per second in a channel with a maximum size of 1 kB for each packet.
+* - Each client can send up to 6 kB of data per second.
+* - Each user can have up to five data streams simultaneously.
+*
+* @param[in] stream_id : The ID of the sent data stream, returned in the "agora_rtc_create_data_stream" method.
+* @param[in] data : The pointer to the sent data.
+* @param[in] length : The length of the sent data.
+*
+* @return
+* - 0: Success.
+* - < 0: Failure.
+*/
+extern __agora_api__ int agora_rtc_send_stream_message(connection_id_t conn_id, int stream_id, const char* data, size_t length);
 
 
 
