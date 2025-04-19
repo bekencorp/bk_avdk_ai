@@ -72,6 +72,32 @@ static int source_out_data_handle_cb(char *buffer, uint32_t len, void *params)
     return w_len;
 }
 
+int source_notify_cb(void *play_ctx, void *params)
+{
+
+    audio_source_event_t event = (audio_source_event_t)params;
+
+    switch (event)
+    {
+        case AUDIO_SOURCE_EVENT_EMPTY:
+            break;
+
+        case AUDIO_SOURCE_EVENT_FAIL:
+            break;
+
+        case AUDIO_SOURCE_EVENT_LACK_RESOURCE:
+            LOGW("%s, %d, prompt tone file is not exist\n", __func__, __LINE__);
+            prompt_tone_play_stop(play_ctx);
+            break;
+
+        default:
+            break;
+    }
+
+    return BK_OK;
+}
+
+
 static int codec_out_data_handle_cb(audio_frame_info_t *frame_info, char *buffer, uint32_t len, void *params)
 {
     LOGD("channel_number: %d, sample_rate: %d, sample_bits: %d\n", frame_info->channel_number, frame_info->sample_rate, frame_info->sample_bits);
@@ -81,6 +107,15 @@ static int codec_out_data_handle_cb(audio_frame_info_t *frame_info, char *buffer
     int ret = 0;
     while (w_len < len)
     {
+        /* if prompt tone data pool has been write data, change speaker source type to prompt tone */
+        if (aud_tras_drv_get_prompt_tone_data_bytes_filled() >= 640)
+        {
+            if (SPK_SOURCE_TYPE_PROMPT_TONE != aud_tras_drv_get_spk_source_type())
+            {
+                aud_tras_drv_voc_set_spk_source_type(SPK_SOURCE_TYPE_PROMPT_TONE);
+            }
+        }
+
         /* write speaker data to ringbuffer, aud_tras_drv read prompt tone data from the ringbuffer */
         if ((len - w_len) >= 640)
         {
@@ -158,6 +193,7 @@ prompt_tone_play_handle_t prompt_tone_play_create(  prompt_tone_play_cfg_t *conf
     /* create source */
     config->source_cfg.data_handle = source_out_data_handle_cb;
     config->source_cfg.usr_data = handle;
+    config->source_cfg.notify = source_notify_cb;
     handle->source = audio_source_create(config->source_type, &config->source_cfg);
     if (!handle->source)
     {
@@ -443,6 +479,9 @@ bk_err_t prompt_tone_play_stop(prompt_tone_play_handle_t handle)
 
     LOGI("%s\n", __func__);
 
+    /* reset speaker source type to voice */
+    aud_tras_drv_voc_set_spk_source_type(SPK_SOURCE_TYPE_VOICE);
+
     if (handle->source)
     {
         ret = audio_source_ctrl(handle->source, AUDIO_SOURCE_CTRL_STOP, NULL);
@@ -459,6 +498,13 @@ bk_err_t prompt_tone_play_stop(prompt_tone_play_handle_t handle)
         if (ret != BK_OK)
         {
             LOGE("%s, %d, audio codec stop fail\n", __func__, __LINE__);
+            err = BK_FAIL;
+        }
+
+        ret = audio_codec_ctrl(handle->codec, AUDIO_CODEC_CTRL_CLEAR_POOL, NULL);
+        if (ret != BK_OK)
+        {
+            LOGE("%s, %d, audio codec clear rx pool fail\n", __func__, __LINE__);
             err = BK_FAIL;
         }
     }

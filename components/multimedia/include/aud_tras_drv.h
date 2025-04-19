@@ -559,6 +559,7 @@ typedef int (*prompt_tone_pool_empty_notify)(void *user_data);
 bk_err_t aud_tras_drv_register_prompt_tone_pool_empty_notify(prompt_tone_pool_empty_notify notify, void *user_data);
 int aud_tras_drv_read_prompt_tone_data(char *buffer, uint32_t len, uint32_t timeout);
 int aud_tras_drv_write_prompt_tone_data(char *buffer, uint32_t len, uint32_t timeout);
+int aud_tras_drv_get_prompt_tone_data_bytes_filled(void);
 #endif
 
 #if CONFIG_AI_ASR_MODE_CPU2

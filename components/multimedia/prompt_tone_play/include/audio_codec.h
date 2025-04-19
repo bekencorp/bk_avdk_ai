@@ -40,6 +40,7 @@ typedef enum
 {
     AUDIO_CODEC_CTRL_START = 0,
     AUDIO_CODEC_CTRL_STOP,
+    AUDIO_CODEC_CTRL_CLEAR_POOL,
     AUDIO_CODEC_CTRL_MAX,
 } audio_codec_ctrl_op_t;
 

@@ -132,8 +132,9 @@ static int read_mp3_data(mp3_codec_priv_t *mp3_codec, char *buffer, uint32_t len
 /* skip id3 tag */
 static int codec_mp3_skip_idtag(mp3_codec_priv_t *mp3_codec)
 {
-    int  offset = 0;
+    int offset = 0;
     uint8_t *tag;
+    int ret = 0;
 
     LOGD("%s\n", __func__);
 
@@ -142,9 +143,10 @@ static int codec_mp3_skip_idtag(mp3_codec_priv_t *mp3_codec)
 
     tag = mp3_codec->read_ptr;
     /* read idtag v2 */
-    if (read_mp3_data(mp3_codec, (char *)mp3_codec->read_ptr, 3, 1000) != 3)
+    ret = read_mp3_data(mp3_codec, (char *)mp3_codec->read_ptr, 3, 500);
+    if (ret != 3)
     {
-        LOGE("%s, %d, read ID3 fail\n", __func__, __LINE__);
+        LOGE("%s, %d, read ID3 fail, ret: %d\n", __func__, __LINE__, ret);
         goto __exit;
     }
 
@@ -466,8 +468,6 @@ static void mp3_codec_task_main(beken_thread_arg_t param_data)
                     /* clear ring buffer */
                     mp3_codec->read_ptr = mp3_codec->read_buffer;
                     mp3_codec->bytes_left = 0;
-                    rb_abort_write(mp3_codec->rb);
-                    rb_reset(mp3_codec->rb);
                     break;
 
                 case MP3_CODEC_EXIT:
@@ -852,6 +852,11 @@ static int mp3_codec_ctrl(audio_codec_t *codec, audio_codec_ctrl_op_t op, void *
                 LOGE("%s, %d, send msg to stop mp3 decode fail\n", __func__, __LINE__);
                 break;
             }
+            break;
+
+        case AUDIO_CODEC_CTRL_CLEAR_POOL:
+            rb_abort_write(priv->rb);
+            rb_reset(priv->rb);
             break;
 
         default:

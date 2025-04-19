@@ -165,6 +165,10 @@ static int pcm_codec_ctrl(audio_codec_t *codec, audio_codec_ctrl_op_t op, void *
             //nothing todo
             break;
 
+        case AUDIO_CODEC_CTRL_CLEAR_POOL:
+            //nothing todo
+            break;
+
         default:
             ret = BK_FAIL;
             break;

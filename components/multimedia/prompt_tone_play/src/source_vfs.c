@@ -267,6 +267,13 @@ static void vfs_data_read_task_main(beken_thread_arg_t param_data)
 #ifdef MOUNT_ENABLE
                             vfs_source_unmount(vfs_source_priv);
 #endif
+                            /* notify app prompt tone is not exist. */
+                            if (vfs_source_priv->config.notify)
+                            {
+                                vfs_source_priv->config.notify(vfs_source_priv->config.usr_data, (void *)AUDIO_SOURCE_EVENT_LACK_RESOURCE);
+                            }
+                            /* set vfs file read task to idle state */
+                            vfs_data_read_send_msg(vfs_source_priv->vfs_data_read_msg_que, VFS_DATA_READ_IDLE, NULL);
                         }
                         else
                         {
@@ -304,7 +311,7 @@ static void vfs_data_read_task_main(beken_thread_arg_t param_data)
                 /* notify app file is empty. */
                 if (vfs_source_priv->config.notify)
                 {
-                    vfs_source_priv->config.notify(vfs_source_priv, (void *)AUDIO_SOURCE_EVENT_EMPTY);
+                    vfs_source_priv->config.notify(vfs_source_priv->config.usr_data, (void *)AUDIO_SOURCE_EVENT_EMPTY);
                 }
 
                 /* set vfs file read task to idle state */
@@ -315,7 +322,7 @@ static void vfs_data_read_task_main(beken_thread_arg_t param_data)
                 /* notify app read file fail. */
                 if (vfs_source_priv->config.notify)
                 {
-                    vfs_source_priv->config.notify(vfs_source_priv, (void *)AUDIO_SOURCE_EVENT_FAIL);
+                    vfs_source_priv->config.notify(vfs_source_priv->config.usr_data, (void *)AUDIO_SOURCE_EVENT_FAIL);
                 }
 
                 /* set vfs file read task to idle state */

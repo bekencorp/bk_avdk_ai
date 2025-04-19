@@ -263,8 +263,8 @@ static url_info_t prompt_tone_info = {0};
 
 #if CONFIG_PROMPT_TONE_SOURCE_VFS
 #if CONFIG_PROMPT_TONE_CODEC_MP3
-static char asr_wakeup_prompt_tone_path[] = "/asr_wakeup_16k_mono_16bit.mp3";
-static char asr_standby_prompt_tone_path[] = "/asr_standby_16k_mono_16bit.mp3";
+static char asr_wakeup_prompt_tone_path[] = "/asr_wakeup_16k_mono_16bit_en.mp3";
+static char asr_standby_prompt_tone_path[] = "/asr_standby_16k_mono_16bit_en.mp3";
 static char network_provision_prompt_tone_path[] = "/network_provision_16k_mono_16bit_en.mp3";
 static char network_provision_success_prompt_tone_path[] = "/network_provision_success_16k_mono_16bit_en.mp3";
 static char network_provision_fail_prompt_tone_path[] = "/network_provision_fail_16k_mono_16bit_en.mp3";
@@ -299,8 +299,8 @@ static char agent_start_fail_prompt_tone_path[] = "/agent_start_fail_16k_mono_16
 #endif
 
 #if CONFIG_PROMPT_TONE_CODEC_PCM
-static char asr_wakeup_prompt_tone_path[] = "/asr_wakeup_16k_mono_16bit.pcm";
-static char asr_standby_prompt_tone_path[] = "/asr_standby_16k_mono_16bit.pcm";
+static char asr_wakeup_prompt_tone_path[] = "/asr_wakeup_16k_mono_16bit_en.pcm";
+static char asr_standby_prompt_tone_path[] = "/asr_standby_16k_mono_16bit_en.pcm";
 static char network_provision_prompt_tone_path[] = "/network_provision_16k_mono_16bit_en.pcm";
 static char network_provision_success_prompt_tone_path[] = "/network_provision_success_16k_mono_16bit_en.pcm";
 static char network_provision_fail_prompt_tone_path[] = "/network_provision_fail_16k_mono_16bit_en.pcm";
@@ -6050,6 +6050,15 @@ int aud_tras_drv_write_prompt_tone_data(char *buffer, uint32_t len, uint32_t tim
 {
     if (gl_prompt_tone_rb) {
         return rb_write(gl_prompt_tone_rb, buffer, len, timeout);
+    } else {
+        return BK_FAIL;
+    }
+}
+
+int aud_tras_drv_get_prompt_tone_data_bytes_filled(void)
+{
+    if (gl_prompt_tone_rb) {
+        return rb_bytes_filled(gl_prompt_tone_rb);
     } else {
         return BK_FAIL;
     }

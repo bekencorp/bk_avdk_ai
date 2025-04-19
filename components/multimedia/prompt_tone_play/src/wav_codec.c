@@ -209,12 +209,17 @@ static int wav_codec_ctrl(audio_codec_t *codec, audio_codec_ctrl_op_t op, void *
     switch (op)
     {
         case AUDIO_CODEC_CTRL_START:
+            //nothing todo
             break;
 
         case AUDIO_CODEC_CTRL_STOP:
             /* Notify codec wav decode complete. Need parse header when receive next file. */
             priv->head_parse = false;
             LOGD("%s, head_parse = false\n", __func__);
+            break;
+
+        case AUDIO_CODEC_CTRL_CLEAR_POOL:
+            //nothing todo
             break;
 
         default:
