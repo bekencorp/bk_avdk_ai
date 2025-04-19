@@ -123,6 +123,11 @@ typedef enum
 	EVENT_AUD_VOC_SET_SPK_GAIN_REQ,		/**< set audio dac gain */
 	EVENT_AUD_VOC_SET_AEC_PARA_REQ,		/**< set AEC parameters */
 	EVENT_AUD_VOC_GET_AEC_PARA_REQ,		/**< get AEC parameters */
+	EVENT_AUD_VOC_SET_VAD_PARA_REQ,		/**< set VAD parameters */
+	EVENT_AUD_VOC_GET_VAD_PARA_REQ,		/**< get VAD parameters */
+	EVENT_AUD_SET_AUD_PARA_REQ,		/**< set VAD parameters */
+	EVENT_AUD_GET_AUD_PARA_REQ,		/**< get VAD parameters */
+	
 	EVENT_AUD_VOC_TX_DEBUG_REQ,			/**< dump tx data */
 	EVENT_AUD_VOC_RX_DEBUG_REQ,			/**< dump rx data */
 	EVENT_AUD_VOC_AEC_DEBUG_REQ, 		/**< dump aec data */
@@ -248,6 +253,7 @@ typedef enum
 
 	/* notify op */
 	EVENT_AUD_MIC_DATA_NOTIFY = (MAILBOX_NOTIFY << MEDIA_EVT_BIT),
+	EVENT_AUD_VAD_FLAG_NOTIFY,
 	EVENT_AUD_SPK_DATA_NOTIFY,
 	EVENT_MEDIA_DATA_NOTIFY,
 	EVENT_USB_DATA_NOTIFY,

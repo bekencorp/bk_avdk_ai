@@ -78,13 +78,15 @@ typedef struct {
 	aud_intf_task_config_t task_config;
 	int (*aud_intf_tx_mic_data)(unsigned char *data, unsigned int size);		/**< the api is called when collecting a frame mic packet data is complete */
 	bk_err_t (*aud_intf_rx_spk_data)(unsigned int size);						/**< the api is called when playing a frame speaker packet data is complete */
-} aud_intf_drv_setup_t;
+	bk_err_t (*aud_intf_update_vad_flag)(unsigned char flag);						
+	} aud_intf_drv_setup_t;
 
 #define DEFAULT_AUD_INTF_DRV_SETUP_CONFIG() {          \
         .work_mode = AUD_INTF_WORK_MODE_NULL,          \
         .task_config = {.priority = 5},                \
         .aud_intf_tx_mic_data = NULL,                  \
         .aud_intf_rx_spk_data = NULL,                  \
+		.aud_intf_update_vad_flag = NULL,                  \
     }
 
 typedef bk_err_t (*aud_intf_dump_data_callback)(unsigned char *data, unsigned int size);
@@ -201,6 +203,24 @@ typedef enum {
 	AUD_INTF_VOC_AEC_MAX,
 } aud_intf_voc_aec_para_t;
 
+/* vad parameters */
+typedef struct {
+	int16_t vad_start_threshold;
+	int16_t vad_stop_threshold;
+	int16_t vad_silence_threshold;
+				
+} aud_intf_voc_vad_cfg_t;
+
+typedef enum {
+	AUD_INTF_VOC_VAD_NULL = 0,
+	AUD_INTF_VOC_VAD_START_THRESHOLD,			
+	AUD_INTF_VOC_VAD_STOP_THRESHOLD,			
+	AUD_INTF_VOC_VAD_SILENCE_THRESHOLD,				
+} aud_intf_voc_vad_para_t;
+
+
+
+
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
 /* prompt tone event */
 typedef enum {
@@ -245,6 +265,7 @@ typedef struct {
 	uint16_t spk_gain;						/**< spk gain: value range:0x0 ~ 0x3f, suggest:0x2d */
 	aud_dac_work_mode_t spk_mode;			/**< audio spk mode: signal_ended/differen */
 	aud_intf_voc_aec_cfg_t aec_cfg;
+	aud_intf_voc_vad_cfg_t vad_cfg;
 
 	aud_intf_voc_mic_ctrl_t mic_en;			/**< mic default status */
 	aud_intf_voc_spk_ctrl_t spk_en;			/**< spk default status */
@@ -270,6 +291,11 @@ typedef struct {
                        .ref_scale = 0,                 \
                        .ns_level = 2,                  \
                        .ns_para = 1,                   \
+                    },                                 \
+		.vad_cfg = {                                   \
+                       .vad_start_threshold = 20,      \
+                       .vad_stop_threshold = 50,       \
+                       .vad_silence_threshold = 160,     \
                     },                                 \
         .mic_en = AUD_INTF_VOC_MIC_OPEN,               \
         .spk_en = AUD_INTF_VOC_SPK_OPEN,               \

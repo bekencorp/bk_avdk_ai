@@ -34,6 +34,7 @@
 #else
 #include <modules/aec.h>
 #endif
+#include <modules/audio_process.h>
 #include <driver/audio_ring_buff.h>
 #include <modules/g711.h>
 #include "gpio_driver.h"
@@ -200,10 +201,12 @@ media_mailbox_msg_t uac_connect_state_msg = {0};
 
 media_mailbox_msg_t mic_to_media_app_msg = {0};
 media_mailbox_msg_t spk_to_media_app_msg = {0};
+media_mailbox_msg_t vad_to_media_app_msg = {0};
 #if AUD_MEDIA_SEM_ENABLE
 beken_semaphore_t mailbox_media_aud_mic_sem = NULL;
 #endif
 aud_tras_drv_mic_notify_t mic_nofity = {0, 0};
+aud_tras_drv_mic_notify_t vad_notify = {0, 0};
 
 static beken_semaphore_t aud_tras_drv_task_sem = NULL;
 
@@ -866,6 +869,38 @@ else
 	return BK_OK;
 }
 
+static bk_err_t aud_tras_drv_vad_cfg(void)
+{
+	#if CONFIG_AEC_VERSION_V3
+		vad_config_t *temp_vad_config = (vad_config_t *)&(aud_tras_drv_info.voc_info.vad_info.vad_config);
+		aec_info_t *temp_aec_info = aud_tras_drv_info.voc_info.aec_info;
+
+		int16_t vad_start_thr = 0;
+		int16_t vad_stop_thr = 0;
+		int16_t vad_silence_thr = 0;
+	
+		vad_start_thr = temp_vad_config->vad_start_threshold;
+		temp_aec_info->aec->SPthr[1] = (vad_start_thr/20)-4;
+
+		vad_stop_thr = temp_vad_config->vad_stop_threshold;
+		temp_aec_info->aec->SPthr[2] = (vad_stop_thr/20)+2;
+
+		vad_silence_thr = temp_vad_config->vad_silence_threshold;
+		temp_aec_info->aec->SPthr[6] = vad_silence_thr;
+		temp_aec_info->aec->SPthr[5] = 16 - vad_silence_thr/24;
+
+		if(temp_aec_info->aec->SPthr[5] < 0)    
+		{    temp_aec_info->aec->SPthr[5] = 0;    }
+		if(temp_aec_info->aec->SPthr[5] > 16)     
+		{    temp_aec_info->aec->SPthr[5] = 16;    }
+		
+		LOGI("vad_start_thr: %d, vad_stop_thr: %d, vad_silence_thr: %d \n", vad_start_thr, vad_stop_thr, vad_silence_thr);
+		#endif
+		return BK_ERR_AUD_INTF_OK;
+
+}
+
+
 static bk_err_t aud_tras_drv_aec_buff_cfg(aec_info_t *aec_info)
 {
 	uint16_t samp_rate_points = aec_info->samp_rate_points;
@@ -1107,21 +1142,23 @@ static bk_err_t aud_tras_dac_dma_config(dma_id_t dma_id, int32_t *ring_buff_addr
 
 	return BK_OK;
 }
+static void aud_tras_drv_vad_flag_send(uint32 flag)
+{
+	vad_notify.ptr_data = flag;
+	vad_notify.length = 1;
+	vad_to_media_app_msg.event = EVENT_AUD_VAD_FLAG_NOTIFY;
+	vad_to_media_app_msg.param = (uint32_t)&vad_notify;
+	msg_send_notify_to_media_major_mailbox(&vad_to_media_app_msg, APP_MODULE);
+}
 
 #if CONFIG_AEC_VERSION_V3
 static void aud_aec_vad_process(void)
 {
 #if CONFIG_SYS_CPU1
     aec_info_t *aec_info_pr = aud_tras_drv_info.voc_info.aec_info;
-    //extern int aec_vad_record_flag_get(void);
-    extern void aec_vad_status_send(int val);
-	
-    //if (!!aec_vad_record_flag_get())
-    //if(aec_info_pr->aec->test)
-    //if(!aud_get_production_mode())
-    {
+
+
         static int aec_vad_flag=0;
-        //static int aec_vad_flag_mem=0;
         static int aec_vad_mem=0;
 		       
         static int badframe = 0;
@@ -1178,16 +1215,8 @@ static void aud_aec_vad_process(void)
             }
             aec_vad_mem = aec_info_pr->aec->test;
         }
-        
-        //if(aec_vad_flag-aec_vad_flag_mem)
-        //{
-        //  bk_printf("a.v.flag:%d,%d\n",aec_vad_flag,aec_vad_flag_mem);
-        //}
-        //aec_vad_flag_mem = aec_vad_flag;
-        
-       // aec_vad_status_send(aec_vad_flag);
-	   __maybe_unused_var(aec_vad_flag);
-    }
+	aud_tras_drv_vad_flag_send(aec_vad_flag);
+
 #endif
 }
 #endif
@@ -2570,6 +2599,7 @@ static bk_err_t aud_tras_dec(void)
 	aud_production_data_generate(sweep, (int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points);			
 #endif
 
+voice_dl_process((int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data,aud_tras_drv_info.voc_info.speaker_samp_rate_points);
 #if CONFIG_AEC_ECHO_COLLECT_MODE_SOFTWARE
 	if (aud_tras_drv_info.voc_info.aec_enable) {
 		/* read mic fill data size */
@@ -4141,6 +4171,11 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 		}
 		LOGI("step2: init AEC and malloc two ring buffers complete \n");
 	}
+	aud_tras_drv_info.voc_info.vad_info.vad_config.vad_start_threshold = voc_cfg->vad_setup->vad_start_threshold;
+	aud_tras_drv_info.voc_info.vad_info.vad_config.vad_stop_threshold = voc_cfg->vad_setup->vad_stop_threshold;
+	aud_tras_drv_info.voc_info.vad_info.vad_config.vad_silence_threshold = voc_cfg->vad_setup->vad_silence_threshold;
+	aud_tras_drv_vad_cfg();
+	voice_dl_process_init();
 
 	/* -------------------step3: init and config DMA to carry mic and ref data ----------------------------- */
 #if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
@@ -4931,6 +4966,49 @@ static bk_err_t aud_tras_drv_get_aec_para(void)
 	return BK_ERR_AUD_INTF_OK;
 }
 
+static bk_err_t aud_tras_drv_set_vad_para(aud_intf_voc_vad_ctl_t *vad_ctl)
+{
+	#if CONFIG_AEC_VERSION_V3
+	int16_t vad_start_thr = 0;
+	int16_t vad_stop_thr = 0;
+	int16_t vad_silence_thr = 0;
+	
+	aec_info_t *temp_aec_info = aud_tras_drv_info.voc_info.aec_info;
+	switch (vad_ctl->op) {
+		case AUD_INTF_VOC_VAD_NULL:
+			break;
+		case AUD_INTF_VOC_VAD_START_THRESHOLD:
+			aud_tras_drv_info.voc_info.vad_info.vad_config.vad_start_threshold = vad_ctl->value;
+			vad_start_thr = vad_ctl->value;
+	    	temp_aec_info->aec->SPthr[1] = (vad_start_thr/20)-4;
+			LOGI("set vad_start_thr: %d \r\n", temp_aec_info->aec->SPthr[1]);
+			break;
+
+		case AUD_INTF_VOC_VAD_STOP_THRESHOLD:
+			aud_tras_drv_info.voc_info.vad_info.vad_config.vad_stop_threshold = vad_ctl->value;
+			vad_stop_thr = vad_ctl->value;
+			temp_aec_info->aec->SPthr[2] = (vad_stop_thr/20)+2;
+			LOGI("set vad_stop_thr: %d \r\n", temp_aec_info->aec->SPthr[2]);
+			break;
+
+		case AUD_INTF_VOC_VAD_SILENCE_THRESHOLD:
+			aud_tras_drv_info.voc_info.vad_info.vad_config.vad_silence_threshold = vad_ctl->value;
+			vad_silence_thr = vad_ctl->value;
+			temp_aec_info->aec->SPthr[6] = vad_silence_thr;
+			temp_aec_info->aec->SPthr[5] = 16 - vad_silence_thr/24;
+			LOGI("set vad_silence_thr: %d \r\n", temp_aec_info->aec->SPthr[6]);
+			break;
+	}
+
+		if(temp_aec_info->aec->SPthr[5] < 0)    
+		{    temp_aec_info->aec->SPthr[5] = 0;    }
+		if(temp_aec_info->aec->SPthr[5] > 16)     
+		{    temp_aec_info->aec->SPthr[5] = 16;    }
+
+	#endif	
+		return BK_ERR_AUD_INTF_OK;
+}
+
 static bk_err_t aud_tras_drv_voc_tx_debug(aud_intf_dump_data_callback callback)
 {
 	GLOBAL_INT_DECLARATION();
@@ -5576,11 +5654,22 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
 					ret = aud_tras_drv_get_aec_para();
 					msg_send_rsp_to_media_major_mailbox(mailbox_msg, ret, APP_MODULE);
 					break;
+				case AUD_TRAS_DRV_VOC_SET_VAD_PARA:
+					mailbox_msg = (media_mailbox_msg_t *)msg.param;
+					ret = aud_tras_drv_set_vad_para((aud_intf_voc_vad_ctl_t *)mailbox_msg->param);
+					msg_send_rsp_to_media_major_mailbox(mailbox_msg, ret, APP_MODULE);
+					break;
 
 				case AUD_TRAS_DRV_VOC_TX_DEBUG:
 					mailbox_msg = (media_mailbox_msg_t *)msg.param;
 					ret = aud_tras_drv_voc_tx_debug((aud_intf_dump_data_callback)mailbox_msg->param);
 					msg_send_rsp_to_media_major_mailbox(mailbox_msg, ret, APP_MODULE);
+					break;
+				case AUD_TRAS_DRV_SET_AUD_PARA:
+					mailbox_msg = (media_mailbox_msg_t *)msg.param;
+					ret = audio_para_init((app_aud_para_t *)mailbox_msg->param);
+					msg_send_rsp_to_media_major_mailbox(mailbox_msg, ret, APP_MODULE);
+					bk_printf("%s, %d, goto: AUD_TRAS_DRV_SET_AUD_PARA \n", __func__, __LINE__);
 					break;
 
 				case AUD_TRAS_DRV_VOC_RX_DEBUG:
@@ -6422,6 +6511,19 @@ bk_err_t audio_event_handle(media_mailbox_msg_t * msg)
 			aud_tras_drv_send_msg(AUD_TRAS_DRV_VOC_GET_AEC_PARA, (void *)msg);
 			break;
 
+		case EVENT_AUD_VOC_SET_VAD_PARA_REQ:
+			 aud_tras_drv_send_msg(AUD_TRAS_DRV_VOC_SET_VAD_PARA, (void *)msg);
+			 break;
+		case EVENT_AUD_VOC_GET_VAD_PARA_REQ:
+			 aud_tras_drv_send_msg(AUD_TRAS_DRV_VOC_GET_VAD_PARA, (void *)msg);
+			 break;
+
+		case EVENT_AUD_SET_AUD_PARA_REQ:
+			 aud_tras_drv_send_msg(AUD_TRAS_DRV_SET_AUD_PARA, (void *)msg);
+			 break;
+		case EVENT_AUD_GET_AUD_PARA_REQ:
+			 aud_tras_drv_send_msg(AUD_TRAS_DRV_GET_AUD_PARA, (void *)msg);
+			 break;
 		case EVENT_AUD_VOC_TX_DEBUG_REQ:
 			aud_tras_drv_send_msg(AUD_TRAS_DRV_VOC_TX_DEBUG, (void *)msg);
 			break;

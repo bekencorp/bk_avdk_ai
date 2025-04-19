@@ -26,6 +26,7 @@
 #include "cache.h"
 #endif
 #include "aud_tras.h"
+#include <modules/audio_process.h>
 
 
 #define AUD_INTF_TAG "aud_intf"
@@ -76,6 +77,11 @@ const char g722_silence_data[] =
 };
 #endif
 
+static uint32_t aud_intf_aec_vad_flag = 0;
+static uint32_t aud_intf_aec_silence_flag = 0;
+
+
+
 //aud_intf_all_setup_t aud_all_setup;
 aud_intf_info_t aud_intf_info = DEFAULT_AUD_INTF_CONFIG();
 
@@ -83,6 +89,7 @@ static beken_semaphore_t aud_intf_task_sem = NULL;
 
 /* extern api */
 static bk_err_t aud_intf_voc_write_spk_data(uint8_t *dac_buff, uint32_t size);
+static void aec_vad_status_set(int val);
 
 static void *audio_intf_malloc(uint32_t size)
 {
@@ -184,6 +191,12 @@ static void aud_intf_main(beken_thread_arg_t param_data)
 					if (aud_intf_info.drv_info.setup.aud_intf_tx_mic_data) {
 						aud_intf_info.drv_info.setup.aud_intf_tx_mic_data((unsigned char *)msg.data, msg.size);
 					}
+					break;
+				case AUD_INTF_EVENT_VAD_FLAG_UPDATE:
+					if (aud_intf_info.drv_info.setup.aud_intf_update_vad_flag) {
+						aud_intf_info.drv_info.setup.aud_intf_update_vad_flag(msg.data);
+					}
+					aec_vad_status_set(msg.data);
 					break;
 
 				case AUD_INTF_EVENT_SPK_RX:
@@ -961,6 +974,15 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 		aud_intf_info.voc_info.aec_setup = NULL;
 	}
 
+		aud_intf_info.voc_info.vad_setup = audio_intf_malloc(sizeof(vad_config_t));
+		if (aud_intf_info.voc_info.vad_setup == NULL) {
+			LOGE("%s, %d, malloc vad_setup fail \n", __func__, __LINE__);
+			err = BK_ERR_AUD_INTF_MEMY;
+			goto aud_intf_voc_init_exit;
+		}	
+		aud_intf_info.voc_info.vad_setup->vad_start_threshold = setup.vad_cfg.vad_start_threshold;
+		aud_intf_info.voc_info.vad_setup->vad_stop_threshold = setup.vad_cfg.vad_stop_threshold;
+		aud_intf_info.voc_info.vad_setup->vad_silence_threshold = setup.vad_cfg.vad_silence_threshold;
 	/* tx config */
 	switch (aud_intf_info.voc_info.data_type) {
 		case AUD_INTF_VOC_DATA_TYPE_G711A:
@@ -1109,7 +1131,10 @@ aud_intf_voc_init_exit:
 		audio_intf_free(aud_intf_info.voc_info.aec_setup);
 		aud_intf_info.voc_info.aec_setup = NULL;
 	}
-
+	if (aud_intf_info.voc_info.vad_setup != NULL) {
+		audio_intf_free(aud_intf_info.voc_info.vad_setup);
+		aud_intf_info.voc_info.vad_setup = NULL;
+	}
 	if (aud_intf_info.voc_info.tx_info.ping.buff_addr != NULL) {
 		audio_intf_free(aud_intf_info.voc_info.tx_info.ping.buff_addr);
 		aud_intf_info.voc_info.tx_info.ping.buff_addr = NULL;
@@ -1573,3 +1598,88 @@ bk_err_t bk_aud_intf_voc_stop_prompt_tone(void)
 }
 #endif
 
+static void aec_vad_status_set(int val)
+{    
+    if(val == 1)
+    {
+        //os_printf("------------vad start----------\r\n");
+        aud_intf_aec_vad_flag = 1;//FLAG_VAD_START;
+    }
+    else if(val == 2)
+    {
+        //os_printf("------------vad end:%d----------\r\n",rtos_get_time());
+        aud_intf_aec_vad_flag = 2;//FLAG_VAD_END;
+    }
+    else if(val == 3)
+    {
+        //os_printf("------------silence----------\r\n");
+        aud_intf_aec_silence_flag = 1;
+    }
+}
+
+uint8_t bk_aud_intf_get_aec_vad_flag(void)
+{
+	return aud_intf_aec_vad_flag;
+}
+
+void bk_aud_intf_clear_aec_vad_flag(void)
+{
+    aud_intf_aec_vad_flag = 0;
+}
+
+uint8_t bk_aud_intf_get_aec_slience_flag(void)
+{
+    return aud_intf_aec_silence_flag;
+}
+
+void bk_aud_intf_clear_aec_slience_flag(void)
+{
+    aud_intf_aec_silence_flag = 0;
+}
+bk_err_t bk_aud_intf_set_vad_para(aud_intf_voc_vad_para_t vad_para, uint32_t value)
+{
+	bk_err_t ret = BK_OK;
+	aud_intf_voc_vad_ctl_t *vad_ctl = NULL;
+
+	if (aud_intf_info.voc_status == AUD_INTF_VOC_STA_NULL)
+		return BK_ERR_AUD_INTF_STA;
+
+	CHECK_AUD_INTF_BUSY_STA();
+
+	vad_ctl = audio_intf_malloc(sizeof(aud_intf_voc_vad_ctl_t));
+	if (vad_ctl == NULL) {
+		aud_intf_info.api_info.busy_status = false;
+		return BK_ERR_AUD_INTF_MEMY;
+	}
+	vad_ctl->op = vad_para;
+	vad_ctl->value = value;
+
+
+	switch (vad_para) {
+		case AUD_INTF_VOC_VAD_START_THRESHOLD:
+			aud_intf_info.voc_info.vad_setup->vad_start_threshold = vad_para;
+			break;
+
+		case AUD_INTF_VOC_VAD_STOP_THRESHOLD:
+			aud_intf_info.voc_info.vad_setup->vad_stop_threshold = vad_para;
+			break;
+
+		case AUD_INTF_VOC_VAD_SILENCE_THRESHOLD:
+			aud_intf_info.voc_info.vad_setup->vad_silence_threshold = vad_para;
+			break;
+
+		default:
+			break;
+		}
+		ret = mailbox_media_aud_send_msg(EVENT_AUD_VOC_SET_VAD_PARA_REQ, vad_ctl);
+
+		audio_intf_free(vad_ctl);
+		return ret;
+}
+
+bk_err_t bk_aud_intf_audio_para_set(app_aud_para_t *aud_para_ptr)
+{
+		bk_err_t ret = BK_OK;
+		ret = mailbox_media_aud_send_msg(EVENT_AUD_SET_AUD_PARA_REQ, aud_para_ptr);
+		return ret;
+}

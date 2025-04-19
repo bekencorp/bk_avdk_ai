@@ -1,6 +1,7 @@
 #pragma once
 
 #include "aud_intf_types.h"
+#include <modules/audio_process.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -650,6 +651,13 @@ bk_err_t bk_aud_intf_voc_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_tone
 
 bk_err_t bk_aud_intf_voc_stop_prompt_tone(void);
 #endif
+
+uint8_t bk_aud_intf_get_aec_vad_flag(void);
+void bk_aud_intf_clear_aec_vad_flag(void);
+void bk_aud_intf_clear_aec_slience_flag(void);
+bk_err_t bk_aud_intf_set_vad_para(aud_intf_voc_vad_para_t vad_para, uint32_t value);
+bk_err_t bk_aud_intf_audio_para_set(app_aud_para_t *aud_para_ptr);
+
 
 /**
  * @}

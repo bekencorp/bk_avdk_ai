@@ -65,6 +65,11 @@ typedef enum {
 	AUD_TRAS_DRV_VOC_SET_SPK_GAIN,		/**< set audio dac gain */
 	AUD_TRAS_DRV_VOC_SET_AEC_PARA,		/**< set AEC parameters */
 	AUD_TRAS_DRV_VOC_GET_AEC_PARA,		/**< get AEC parameters */
+	AUD_TRAS_DRV_VOC_SET_VAD_PARA,		/**< set VAD parameters */
+	AUD_TRAS_DRV_VOC_GET_VAD_PARA,		/**< get VAD parameters */
+	AUD_TRAS_DRV_SET_AUD_PARA,		/**< set audio parameters */
+	AUD_TRAS_DRV_GET_AUD_PARA,		/**< get audio parameters */
+	
 	AUD_TRAS_DRV_VOC_TX_DEBUG,			/**< dump tx data */
 	AUD_TRAS_DRV_VOC_RX_DEBUG,			/**< dump rx data */
 	AUD_TRAS_DRV_VOC_AEC_DEBUG,			/**< dump aec data */
@@ -134,6 +139,10 @@ typedef struct {
 	RingBufferContext aec_rb;   //out data of AEC context
 } aec_info_t;
 
+typedef struct {
+	vad_config_t vad_config;
+} vad_info_t;
+
 typedef enum {
 	EVENT_AUD_TRAS_DRV_INIT_CMP,
 	EVENT_AUD_TRAS_DRV_START_CMP,
@@ -180,6 +189,7 @@ typedef struct {
 	aud_tras_voc_sta_t status;
 	bool aec_enable;
 	aec_info_t *aec_info;
+	vad_info_t vad_info;
 
 	dma_id_t adc_dma_id;				//audio transfer ADC DMA id
 	uint16_t mic_samp_rate_points;		//the number of points in mic frame

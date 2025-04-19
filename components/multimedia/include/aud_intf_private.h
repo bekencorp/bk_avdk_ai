@@ -147,6 +147,18 @@ typedef struct {
 	uint32_t value;
 } aud_intf_voc_aec_ctl_t;
 
+typedef struct {
+	int16_t vad_start_threshold;
+	int16_t vad_stop_threshold;
+	int16_t vad_silence_threshold;
+} vad_config_t;
+
+
+
+typedef struct {
+	aud_intf_voc_vad_para_t op;
+	uint32_t value;
+} aud_intf_voc_vad_ctl_t;
 /* audio config */
 typedef struct {
 	uint8_t adc_gain;
@@ -209,6 +221,8 @@ typedef struct {
 	aud_intf_aud_config_t aud_setup;
 	bool aec_enable;
 	aec_config_t *aec_setup;
+	vad_config_t *vad_setup;
+	
 	tx_info_t tx_info;
 	rx_info_t rx_info;
 
@@ -380,6 +394,7 @@ typedef struct {
 typedef enum {
 	AUD_INTF_EVENT_IDLE = 0,
 	AUD_INTF_EVENT_MIC_TX,
+	AUD_INTF_EVENT_VAD_FLAG_UPDATE,
 	AUD_INTF_EVENT_SPK_RX,
 	AUD_INTF_EVENT_UAC_STATE,
 	AUD_INTF_EVENT_EXIT,
