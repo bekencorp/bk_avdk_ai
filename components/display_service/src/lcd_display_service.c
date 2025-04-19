@@ -32,10 +32,6 @@
 #include "draw_blend.h"
 #include "lcd_draw_blend.h"
 
-#if CONFIG_LCD_SPI_DISPLAY
-#include <lcd_spi_display_service.h>
-#endif
-
 
 #define TAG "lcd_pip"
 
@@ -88,6 +84,8 @@ extern uint32_t  platform_is_in_interrupt_context(void);
 
 static lcd_disp_config_t *lcd_disp_config = NULL;
 static display_service_info_t *service_info = NULL;
+
+const lcd_device_t *g_lcd_device = NULL;
 
 typedef enum {
 	DISPLAY_FRAME_REQUEST,
@@ -474,10 +472,22 @@ bool check_lcd_task_is_open(void)
 	}
 }
 
+uint8_t lcd_display_get_type(void)
+{
+    if (lcd_disp_config == NULL)
+    {
+        LOGI("%s lcd_disp_config is null\r\n", __func__);
+        return 0;
+    }
+    else
+    {
+        return lcd_disp_config->lcd_type;
+    }
+}
+
 bk_err_t lcd_display_open(lcd_open_t *config)
 {
 	int ret = BK_OK;
-	const lcd_device_t *lcd_device = NULL;
 
 	if (lcd_disp_config && lcd_disp_config->disp_task_running)
 	{
@@ -510,35 +520,35 @@ bk_err_t lcd_display_open(lcd_open_t *config)
 	}
 
 	if (config->device_name != NULL)
-		lcd_device = get_lcd_device_by_name(config->device_name);
+		g_lcd_device = get_lcd_device_by_name(config->device_name);
 
-	if (lcd_device == NULL)
+	if (g_lcd_device == NULL)
 	{
-		lcd_device = get_lcd_device_by_ppi(config->device_ppi);
+		g_lcd_device = get_lcd_device_by_ppi(config->device_ppi);
 	}
 
-	if (lcd_device == NULL)
+	if (g_lcd_device == NULL)
 	{
 		LOGE("%s lcd device not found\n", __func__);
 		goto out;
 	}
 
-    lcd_disp_config->lcd_width = lcd_device->ppi >> 16;
-    lcd_disp_config->lcd_height = lcd_device->ppi & 0xFFFF;
-    lcd_disp_config->lcd_type = lcd_device->type;
+    lcd_disp_config->lcd_width = g_lcd_device->ppi >> 16;
+    lcd_disp_config->lcd_height = g_lcd_device->ppi & 0xFFFF;
+    lcd_disp_config->lcd_type = g_lcd_device->type;
 
 	// step 4: init frame buffer
 	LOGI("%s %d lcd ppi:%d %d\n", __func__, __LINE__, lcd_disp_config->lcd_width, lcd_disp_config->lcd_height);
 
 	// step 5: init lcd display
-	ret = lcd_driver_init(lcd_device);
+	ret = lcd_driver_init(g_lcd_device);
 	if (ret != BK_OK)
 	{
 		LOGE("%s, lcd_driver_init fail\r\n", __func__);
 		goto out;
 	}
 
-	if(lcd_device->type == LCD_TYPE_MCU8080)
+	if(g_lcd_device->type == LCD_TYPE_MCU8080)
 		bk_lcd_isr_register(I8080_OUTPUT_EOF, lcd_driver_display_mcu_isr);
 	else
 		bk_lcd_isr_register(RGB_OUTPUT_EOF, lcd_driver_display_rgb_isr);
@@ -560,20 +570,11 @@ bk_err_t lcd_display_open(lcd_open_t *config)
     }
 #endif
 
-    if (lcd_device->type == LCD_TYPE_SPI) {
-    #if CONFIG_LCD_SPI_DISPLAY
-        #if (LCD_SPI_DEVICE_NUM > 1)
-            lcd_spi_init(LCD_SPI_ID0, lcd_device);
-            lcd_spi_init(LCD_SPI_ID1, lcd_device);
-        #else
-            lcd_spi_init(LCD_SPI_ID, lcd_device);
+    if (g_lcd_device->type == LCD_TYPE_QSPI) {
+        #if (CONFIG_LCD_QSPI && CONFIG_LCD_QSPI_DEVICE_NUM == 1)
+            bk_lcd_qspi_disp_task_start(g_lcd_device);
+            lcd_disp_config->disp_task_running = true;
         #endif
-    #endif
-    } else if (lcd_device->type == LCD_TYPE_QSPI) {
-    #if CONFIG_LCD_QSPI
-        bk_lcd_qspi_disp_task_start(lcd_device);
-        lcd_disp_config->disp_task_running = true;
-    #endif
     } else {
         ret = lcd_display_task_start();
         if (ret != BK_OK)
@@ -609,14 +610,7 @@ bk_err_t lcd_display_close(void)
 
 	lcd_driver_backlight_close();
 
-#if CONFIG_LCD_SPI_DISPLAY
-    #if (LCD_SPI_DEVICE_NUM > 1)
-        lcd_spi_deinit(LCD_SPI_ID0);
-        lcd_spi_deinit(LCD_SPI_ID1);
-    #else
-        lcd_spi_deinit(LCD_SPI_ID);
-    #endif
-#elif CONFIG_LCD_QSPI
+#if (CONFIG_LCD_QSPI && CONFIG_LCD_QSPI_DEVICE_NUM == 1)
     bk_lcd_qspi_disp_task_stop();
     lcd_disp_config->disp_task_running = false;
 #else

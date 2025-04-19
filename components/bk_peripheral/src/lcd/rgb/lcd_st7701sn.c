@@ -15,7 +15,7 @@
 #include <driver/gpio.h>
 #include <driver/media_types.h>
 #include <driver/lcd_types.h>
-#include <driver/lcd_spi.h>
+#include <driver/lcd_spi_io.h>
 #include "bk_misc.h"
 #include "lcd_panel_devices.h"
 #include "gpio_driver.h"

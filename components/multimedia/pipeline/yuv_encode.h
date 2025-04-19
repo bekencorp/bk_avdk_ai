@@ -100,6 +100,8 @@ bk_err_t jpeg_decode_task_close();
 
 bool check_jpeg_decode_task_is_open(void);
 
+uint8_t lcd_display_get_type(void);
+
 bk_err_t lcd_display_open(lcd_open_t *config);
 
 bk_err_t lcd_display_close(void);

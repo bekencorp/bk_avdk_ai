@@ -20,12 +20,6 @@ if (CONFIG_LCD_QSPI)
 	)
 endif()
 
-if (CONFIG_LCD_SPI_DISPLAY)
-	list(APPEND srcs
-		src/lcd_spi_display_service.c
-	)
-endif()
-
 set(priv_req bk_common unity include )
 endif()
 

@@ -18,10 +18,13 @@
 #include "driver/media_types.h"
 #include "driver/dma2d.h"
 #if CONFIG_LCD_QSPI
+#include <driver/lcd_qspi.h>
+#include <driver/lcd_qspi_types.h>
 #include <lcd_qspi_display_service.h>
 #endif
-#if (CONFIG_LCD_SPI_DISPLAY)
-#include <lcd_spi_display_service.h>
+
+#if CONFIG_LCD_SPI
+#include <driver/lcd_spi.h>
 #endif
 
 #define TAG "LVGL_DISP"
@@ -69,7 +72,7 @@ static uint8_t lv_dma2d_use_flag = 0;
 frame_buffer_t *lvgl_frame_buffer = NULL;
 extern lv_vnd_config_t vendor_config;
 extern media_debug_t *media_debug;
-
+extern const lcd_device_t *g_lcd_device;
 
 int lv_port_disp_init(void)
 {
@@ -463,6 +466,7 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
 {
 #if (!LVGL_USE_PSRAM)
     if (disp_flush_enabled) {
+        uint8_t lcd_type = lcd_display_get_type();
         static uint8_t disp_buff_index = DISPLAY_BUFFER_1;
         lv_color_t *color_ptr = color_p;
         lv_color_t *disp_buf = NULL;
@@ -560,16 +564,25 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
 
         if (lv_disp_flush_is_last(disp_drv)) {
             media_debug->lvgl_draw++;
-            #if (CONFIG_LCD_QSPI)
-                bk_lcd_qspi_display((uint32_t)disp_buf);
-            #elif (CONFIG_LCD_SPI_DISPLAY)
-                #if (LCD_SPI_DEVICE_NUM > 1)
-                    lcd_spi_display_frame(LCD_SPI_ID0, (uint8_t *)disp_buf, lv_hor, lv_ver >> 1);
-                    lcd_spi_display_frame(LCD_SPI_ID1, (uint8_t *)(disp_buf + lv_hor * (lv_ver >> 1)), lv_hor, lv_ver >> 1);
-                #else
-                    lcd_spi_display_frame(LCD_SPI_ID, (uint8_t *)disp_buf, lv_hor, lv_ver);
+            if (lcd_type == LCD_TYPE_QSPI) {
+                #if (CONFIG_LCD_QSPI)
+                    #if (CONFIG_LCD_QSPI_DEVICE_NUM > 1)
+                        bk_lcd_qspi_send_data(LCD_QSPI_ID0, g_lcd_device, (uint32_t *)disp_buf, g_lcd_device->qspi->frame_len);
+                        bk_lcd_qspi_send_data(LCD_QSPI_ID1, g_lcd_device, (uint32_t *)(disp_buf + lv_hor * (lv_ver >> 1)), g_lcd_device->qspi->frame_len);
+                    #else
+                        bk_lcd_qspi_display((uint32_t)disp_buf);
+                    #endif
                 #endif
-            #else
+            } else if (lcd_type == LCD_TYPE_SPI) {
+                #if (CONFIG_LCD_SPI)
+                    #if (CONFIG_LCD_SPI_DEVICE_NUM > 1)
+                        lcd_spi_display_frame(LCD_SPI_ID0, (uint8_t *)disp_buf, lv_hor, lv_ver >> 1);
+                        lcd_spi_display_frame(LCD_SPI_ID1, (uint8_t *)(disp_buf + lv_hor * (lv_ver >> 1)), lv_hor, lv_ver >> 1);
+                    #else
+                        lcd_spi_display_frame(LCD_SPI_ID, (uint8_t *)disp_buf, lv_hor, lv_ver);
+                    #endif
+                #endif
+            } else {
                 lvgl_frame_buffer->frame = (uint8_t *)disp_buf;
                 #if (!CONFIG_LV_USE_DEMO_BENCHMARK)
                     if (lv_vendor_draw_buffer_cnt() == 2) {
@@ -577,7 +590,7 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
                     }
                 #endif
                 lcd_display_frame_request(lvgl_frame_buffer);
-            #endif
+            }
 
             if(disp_buf2) {
                 lv_dma2d_memcpy_last_frame(disp_buf, copy_buf, lv_hor, lv_ver, 0, 0);

@@ -1511,8 +1511,8 @@ bk_err_t lcd_open_handle(media_mailbox_msg_t *msg)
 
 	lcd_decoder_task_start(lcd_info.rotate);
 
-#if CONFIG_LCD_QSPI
-    bk_lcd_qspi_disp_task_start(lcd_info.lcd_device);
+#if (CONFIG_LCD_QSPI && CONFIG_LCD_QSPI_DEVICE_NUM == 1)
+	bk_lcd_qspi_disp_task_start(lcd_info.lcd_device);
 #else
 #ifdef DISPLAY_PIPELINE_TASK
 	lcd_display_task_start(lcd_info.rotate);
@@ -1605,7 +1605,7 @@ bk_err_t lcd_close_handle(media_mailbox_msg_t *msg)
 
 	jpeg_decoder_task_stop();
 
-#if CONFIG_LCD_QSPI
+#if (CONFIG_LCD_QSPI_DISPLAY && CONFIG_LCD_QSPI_DEVICE_NUM == 1)
     bk_lcd_qspi_disp_task_stop();
 #else
 #ifdef DISPLAY_PIPELINE_TASK

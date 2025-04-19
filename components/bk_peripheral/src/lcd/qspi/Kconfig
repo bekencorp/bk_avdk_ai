@@ -34,4 +34,9 @@ menu "QSPI LCD"
 		depends on LCD_QSPI
 		bool "Enable LCD_QSPI_GC9C01 API"
 		default n
+
+	config LCD_QSPI_JD9855
+		depends on LCD_QSPI
+		bool "Enable LCD_QSPI_JD9855 API"
+		default n
 endmenu

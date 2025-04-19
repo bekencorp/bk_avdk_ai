@@ -107,6 +107,10 @@ extern const lcd_device_t lcd_device_spd2010;
 extern const lcd_device_t lcd_device_gc9c01;
 #endif
 
+#if CONFIG_LCD_QSPI_JD9855
+extern const lcd_device_t lcd_device_jd9855;
+#endif
+
 #if CONFIG_LCD_SPI_ST7796U
 extern const lcd_device_t lcd_device_st7796u;
 #endif

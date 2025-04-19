@@ -30,6 +30,7 @@
 #define QSPI_DISP_LOGD(...) BK_LOGD(TAG, ##__VA_ARGS__)
 
 
+#if (CONFIG_LCD_QSPI_DEVICE_NUM == 1)
 static beken_thread_t lcd_qspi_disp_thread_hdl = NULL;
 static beken_semaphore_t g_lcd_qspi_task_sem;
 static beken_semaphore_t g_lcd_qspi_disp_sem;
@@ -139,4 +140,5 @@ void bk_lcd_qspi_display(uint32_t frame)
         QSPI_DISP_LOGI("[%s] close success\r\n", __FUNCTION__);
     }
 }
+#endif
 
