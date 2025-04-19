@@ -1,11 +1,10 @@
+#include <common/bk_include.h>
+#include "volc_memory.h"
 #include "zlib.h"
 
 void * _zcalloc(voidpf opaque, unsigned items, unsigned size) {
     (void)opaque;
-   return malloc((items * size));
-
-//    return malloc((size_t)(items * size));
-//    return ret;
+    return volc_calloc(items, size);
 }
 
 void  _zcfree(voidpf opaque, voidpf ptr) {
@@ -32,7 +31,7 @@ int volc_unzip(const char * src, int src_size, char * dst, int dst_size) {
     strm.next_in = (Bytef*)src;
 
     strm.avail_out = dst_size;
-    strm.next_out = dst;
+    strm.next_out = (Bytef*)dst;
     ret = inflate(&strm, Z_FINISH);
     if (ret != Z_STREAM_END) {
         inflateEnd(&strm);
@@ -65,7 +64,7 @@ int volc_zip(const char * src, int src_size, char * dst, int dst_size) {
     strm.next_in = (Bytef*)src;
 
     strm.avail_out = dst_size;
-    strm.next_out = dst;
+    strm.next_out = (Bytef*)dst;
 
     ret = deflate(&strm, Z_FINISH);    /* no bad return value */
     if (ret != Z_STREAM_END) {
