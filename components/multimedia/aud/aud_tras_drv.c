@@ -2525,7 +2525,7 @@ static bk_err_t aud_tras_dec(void)
                                                        (int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 
                                                        aud_tras_drv_info.voc_info.speaker_samp_rate_points*2, 
                                                        0);
-                            LOGI("%s, %d, len: %d, dec_size: %d \n", __func__, __LINE__, pkt_len, dec_size * 2);
+                            LOGD("%s, %d, len: %d, dec_size: %d \n", __func__, __LINE__, pkt_len, dec_size * 2);
                         }
                         #endif
                         break;
