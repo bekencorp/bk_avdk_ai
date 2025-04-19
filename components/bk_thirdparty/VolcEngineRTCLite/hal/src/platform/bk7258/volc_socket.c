@@ -1,23 +1,10 @@
 #include "volc_socket.h"
-
-#include <errno.h>
-#include <fcntl.h>
-#include <stdio.h>
 #include <unistd.h>
-
-#include <net/if.h>
-#include <netinet/tcp.h>
-#include <sys/socket.h>
 #include <netdb.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <netdb.h>
-#include <unistd.h>
-
+#include <lwip/sockets.h>
 #include "volc_type.h"
 #include "volc_errno.h"
 #include "volc_memory.h"
-#include <assert.h>
 
 
 static uint32_t _volc_ip_addr_to_socket_addr(const volc_ip_addr_t* p_ip_address, struct sockaddr_in* p_addr) {
@@ -111,7 +98,13 @@ ssize_t volc_recv_msg (int __fd, void* data, size_t size, volc_ip_addr_t* p_addr
     struct iovec iov ={.iov_base = data,.iov_len = size};
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;
+
+    #if LWIP_IPV6
     struct sockaddr_storage peer;
+    #else
+    struct sockaddr_in peer;
+    #endif
+
     if(p_addr != NULL){
         msg.msg_name = (struct sockaddr *)&peer;
         msg.msg_namelen = sizeof(peer);
@@ -139,11 +132,11 @@ ssize_t volc_recv_msg (int __fd, void* data, size_t size, volc_ip_addr_t* p_addr
 
 
 ssize_t volc_send_msg (int __fd, void* data, size_t size , volc_ip_addr_t* __addr, uint32_t *p_status){
-    struct msghdr msg = {0};
-    msg.msg_flags = 0;
-    struct iovec iov ={.iov_base = data,.iov_len = size};
-    msg.msg_iov = &iov;
-    msg.msg_iovlen = 1;
+    // msghdr msg = {0};
+    // msg.msg_flags = 0;
+    // struct iovec iov ={.iov_base = data,.iov_len = size};
+    // msg.msg_iov = &iov;
+    // msg.msg_iovlen = 1;
     struct sockaddr_in addr;
     _volc_ip_addr_to_socket_addr(__addr, &addr);
     int r = 0;
@@ -184,7 +177,7 @@ int volc_make_pipe(int fds[2]) {
     uint32_t ret = VOLC_STATUS_SUCCESS;
     fds[0] = -1;
     fds[1] = -1;
-    int err = 0,opt = 0,write_fd = -1,read_fd = -1;
+    __maybe_unused int err = 0,opt = 0,write_fd = -1,read_fd = -1;
     read_fd =  socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
     VOLC_CHK(read_fd > 0,VOLC_STATUS_INVALID_ARG);
 
@@ -322,7 +315,7 @@ int volc_sockopt_set_buffer_size(int __fd, bool _is_send_buffer,int buffer_size)
         opt_name = SO_RCVBUF;
     } 
     int buffer_size = 0;
-    int len = sizeof(buffer_size);
+    socklen_t len = sizeof(buffer_size);
     return getsockopt(__fd,SOL_SOCKET,opt_name,&buffer_size,&len);
  } ;
 
