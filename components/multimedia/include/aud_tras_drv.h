@@ -166,11 +166,17 @@ typedef struct {
 typedef struct {
 	int16_t *pcm_data;
 	uint8_t *law_data;
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+	uint32_t frame_20ms_cnt;
+#endif
 } aud_tras_drv_encode_temp_t;
 
 typedef struct {
 	int16_t *pcm_data;
 	uint8_t *law_data;
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+	uint32_t frame_20ms_cnt;
+#endif
 } aud_tras_drv_decode_temp_t;
 
 /* voice transfer status */
@@ -219,6 +225,7 @@ typedef struct {
 	RingBufferContext *aud_tx_rb;
 #if CONFIG_AUD_INTF_SUPPORT_OPUS
 	RingBufferContext *aud_tx_pkt_len_rb;           /**< audio send mic data length ring buffer */
+	aud_codec_setup_t aud_codec_setup;
 #endif
 
 

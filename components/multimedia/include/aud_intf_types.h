@@ -256,6 +256,25 @@ typedef enum {
 	AUD_INTF_VOC_SPK_MAX,
 } aud_intf_voc_spk_ctrl_t;
 
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+typedef struct {
+    uint32_t adc_samp_rate;
+    uint32_t enc_bitrate;
+    uint8_t enc_frame_len_in_ms;
+    uint8_t enc_data_depth_in_byte;
+    uint8_t enc_vbr_en;
+    uint8_t reserved;
+
+    uint32_t dac_samp_rate;
+    uint32_t dec_bitrate;
+    uint8_t dec_frame_len_in_ms;
+    uint8_t dec_data_depth_in_byte;
+    uint8_t dec_vbr_en;
+    uint8_t reserved1;
+} aud_codec_setup_input_t;
+#endif
+
+
 /* audio interface voice setup configuration */
 typedef struct {
 	bool aec_enable;						/**< true: enable aec, false: disable aec */
@@ -275,37 +294,84 @@ typedef struct {
 	uint8_t frame_num;						/**< the max number of frames in rx buffer to save rx data, the time of one frame is 20ms */
 	uint8_t fifo_frame_num;					/**< the number of frames in rx buffer before start voice transfer, the time of one frame is 20ms */
 	RingBufferContext *aud_tx_rb;
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+	aud_codec_setup_input_t aud_codec_setup_input;
+#endif
 } aud_intf_voc_setup_t;
 
-#define DEFAULT_AUD_INTF_VOC_SETUP_CONFIG() {          \
-        .aec_enable = true,                            \
-        .samp_rate = 8000,        \
-        .data_type = AUD_INTF_VOC_DATA_TYPE_G711A,     \
-        .mic_gain = 0x2d,                              \
-        .spk_gain = 0x2d,                              \
-        .spk_mode = AUD_DAC_WORK_MODE_DIFFEN,          \
-        .aec_cfg = {                                   \
-                       .ec_depth = 20,                 \
-                       .TxRxThr = 30,                  \
-                       .TxRxFlr = 6,                   \
-                       .ref_scale = 0,                 \
-                       .ns_level = 2,                  \
-                       .ns_para = 1,                   \
-                    },                                 \
-		.vad_cfg = {                                   \
-                       .vad_start_threshold = 20,      \
-                       .vad_stop_threshold = 50,       \
-                       .vad_silence_threshold = 160,     \
-                    },                                 \
-        .mic_en = AUD_INTF_VOC_MIC_OPEN,               \
-        .spk_en = AUD_INTF_VOC_SPK_OPEN,               \
-        .mic_type = AUD_INTF_MIC_TYPE_BOARD,           \
-        .spk_type = AUD_INTF_SPK_TYPE_BOARD,           \
-        .mic_mode = AUD_ADC_MODE_DIFFEN,          \
-        .frame_num = 15,                               \
-        .fifo_frame_num = 10,                          \
-        .aud_tx_rb = NULL,                             \
-    }
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+#define DEFAULT_AUD_INTF_VOC_SETUP_CONFIG() {                          \
+            .aec_enable = true,                                        \
+            .samp_rate = 8000,                                         \
+            .data_type = AUD_INTF_VOC_DATA_TYPE_G711A,                 \
+            .mic_gain = 0x2d,                                          \
+            .spk_gain = 0x2d,                                          \
+            .spk_mode = AUD_DAC_WORK_MODE_DIFFEN,                      \
+            .aec_cfg = {                                               \
+                           .ec_depth = 20,                             \
+                           .TxRxThr = 30,                              \
+                           .TxRxFlr = 6,                               \
+                           .ref_scale = 0,                             \
+                           .ns_level = 2,                              \
+                           .ns_para = 1,                               \
+                        },                                             \
+            .vad_cfg = {                                               \
+                           .vad_start_threshold = 20,                  \
+                           .vad_stop_threshold = 50,                   \
+                           .vad_silence_threshold = 160,               \
+                        },                                             \
+            .mic_en = AUD_INTF_VOC_MIC_OPEN,                           \
+            .spk_en = AUD_INTF_VOC_SPK_OPEN,                           \
+            .mic_type = AUD_INTF_MIC_TYPE_BOARD,                       \
+            .spk_type = AUD_INTF_SPK_TYPE_BOARD,                       \
+            .mic_mode = AUD_ADC_MODE_DIFFEN,                           \
+            .frame_num = 15,                                           \
+            .fifo_frame_num = 10,                                      \
+            .aud_tx_rb = NULL,                                         \
+            .aud_codec_setup_input = {                                 \
+                                       .adc_samp_rate = 16000,         \
+                                       .enc_bitrate = 16000,           \
+                                       .enc_frame_len_in_ms = 20,      \
+                                       .enc_data_depth_in_byte = 2,    \
+                                       .enc_vbr_en = 1,                \
+                                       .dac_samp_rate = 16000,         \
+                                       .dec_bitrate = 64000,           \
+                                       .dec_frame_len_in_ms = 20,      \
+                                       .dec_data_depth_in_byte = 2,    \
+                                       .dec_vbr_en = 1,                \
+                                     },                                \
+        }
+#else
+#define DEFAULT_AUD_INTF_VOC_SETUP_CONFIG() {                          \
+            .aec_enable = true,                                        \
+            .samp_rate = 8000,                                         \
+            .data_type = AUD_INTF_VOC_DATA_TYPE_G711A,                 \
+            .mic_gain = 0x2d,                                          \
+            .spk_gain = 0x2d,                                          \
+            .spk_mode = AUD_DAC_WORK_MODE_DIFFEN,                      \
+            .aec_cfg = {                                               \
+                           .ec_depth = 20,                             \
+                           .TxRxThr = 30,                              \
+                           .TxRxFlr = 6,                               \
+                           .ref_scale = 0,                             \
+                           .ns_level = 2,                              \
+                           .ns_para = 1,                               \
+                        },                                             \
+            .vad_cfg = {                                               \
+                           .vad_start_threshold = 20,                  \
+                           .vad_stop_threshold = 50,                   \
+                           .vad_silence_threshold = 160,               \
+                        },                                             \
+            .mic_en = AUD_INTF_VOC_MIC_OPEN,                           \
+            .spk_en = AUD_INTF_VOC_SPK_OPEN,                           \
+            .mic_type = AUD_INTF_MIC_TYPE_BOARD,                       \
+            .spk_type = AUD_INTF_SPK_TYPE_BOARD,                       \
+            .mic_mode = AUD_ADC_MODE_DIFFEN,                           \
+            .frame_num = 15,                                           \
+            .fifo_frame_num = 10,                                      \
+            .aud_tx_rb = NULL,                                         \
+        }
+#endif
 
 #ifdef __cplusplus
 }

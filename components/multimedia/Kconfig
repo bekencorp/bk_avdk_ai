@@ -299,5 +299,8 @@ menu "Media"
 	config AUD_INTF_SUPPORT_OPUS
 		bool "Enable Aud intf support OPUS data type"
 		default n
-
+	config AUD_INTF_SUPPORT_OPUS_60MS_FRAME_AND_AUD_DAC_24k_SAMPLE_RATE
+	        depends on AUD_INTF_SUPPORT_OPUS
+		bool "Support OPUS 60ms frame and aud dac 240000 sample rate"
+		default n
 endmenu

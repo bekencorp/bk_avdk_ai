@@ -873,6 +873,8 @@ static void aud_intf_voc_deconfig(void)
 		audio_intf_free(aud_intf_info.voc_info.rx_info.decoder_len_rbc);
 		aud_intf_info.voc_info.rx_info.decoder_len_rbc = NULL;
 	}
+
+	os_memset(&aud_intf_info.voc_info.aud_codec_setup,0,sizeof(aud_intf_info.voc_info.aud_codec_setup));
 #endif
 
 	aud_intf_info.voc_info.rx_info.frame_num = 0;
@@ -889,6 +891,62 @@ static void aud_rx_lost_count_dump(void *param)
 
 	LOGI("[AUD Rx] %uKB/s \r\n", aud_rx_count.rx_size);
 	aud_rx_count.rx_size = 0;
+}
+#endif
+
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+void aud_codec_buf_len_cal(aud_codec_setup_input_t *para, aud_codec_setup_t *output)
+{
+    output->enc_input_size_in_byte = para->adc_samp_rate*para->enc_frame_len_in_ms/1000*para->enc_data_depth_in_byte;
+    output->enc_output_size_in_byte =  para->enc_bitrate*para->enc_frame_len_in_ms/1000/8;
+
+    if(para->enc_vbr_en)
+    {
+        output->enc_output_size_in_byte = output->enc_output_size_in_byte*2;
+    }
+
+    output->dec_input_size_in_byte = para->dec_bitrate*para->dec_frame_len_in_ms/1000/8;
+    output->dec_output_size_in_byte = para->dac_samp_rate*para->dec_frame_len_in_ms/1000*para->dec_data_depth_in_byte;
+
+    if(para->dec_vbr_en)
+    {
+        output->dec_input_size_in_byte = output->dec_input_size_in_byte*2;
+    }
+
+    LOGI("%s, %d, adc samp:%d,enc bitrate:%d,frame (ms):%d,data depth:%d,vbr:%d\n", __func__, __LINE__,
+        para->adc_samp_rate,
+        para->enc_bitrate,
+        para->enc_frame_len_in_ms,
+        para->enc_data_depth_in_byte,
+        para->enc_vbr_en);
+
+    LOGI("dac samp:%d,dec bitrate:%d,frame (ms):%d,data depth:%d,vbr:%d\n",
+        para->dac_samp_rate,
+        para->dec_bitrate,
+        para->dec_frame_len_in_ms,
+        para->dec_data_depth_in_byte,
+        para->enc_vbr_en);
+
+    LOGI("enc in s:%d,out s:%d,dec in s:%d,out s:%d\n",
+        output->enc_input_size_in_byte,
+        output->enc_output_size_in_byte,
+        output->dec_input_size_in_byte,
+        output->dec_output_size_in_byte);
+}
+
+void bk_aud_intf_aud_codec_init(aud_codec_setup_input_t *input, aud_codec_setup_t *output)
+{
+    output->adc_samp_rate = input->adc_samp_rate;
+    output->enc_bitrate = input->enc_bitrate;
+    output->enc_frame_len_in_ms = input->enc_frame_len_in_ms;
+    output->enc_data_depth_in_byte = input->enc_data_depth_in_byte;
+    output->enc_vbr_en = input->enc_vbr_en;
+    output->dac_samp_rate = input->dac_samp_rate;
+    output->dec_bitrate = input->dec_bitrate;
+    output->dec_frame_len_in_ms = input->dec_frame_len_in_ms;
+    output->dec_data_depth_in_byte = input->dec_data_depth_in_byte;
+    output->dec_vbr_en = input->dec_vbr_en;
+    aud_codec_buf_len_cal(input,output);
 }
 #endif
 
@@ -933,6 +991,9 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 	/* audio config */
 	aud_intf_info.voc_info.aud_setup.adc_gain = setup.mic_gain;	//default: 0x2d
 	aud_intf_info.voc_info.aud_setup.dac_gain = setup.spk_gain;	//default: 0x2d
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+	bk_aud_intf_aud_codec_init(&setup.aud_codec_setup_input,&aud_intf_info.voc_info.aud_codec_setup);
+#else
 	if (aud_intf_info.voc_info.samp_rate == 16000) {
 		aud_intf_info.voc_info.aud_setup.mic_samp_rate_points = 320;	//if AEC enable , the value is equal to aec_samp_rate_points, and the value not need to set
 		aud_intf_info.voc_info.aud_setup.speaker_samp_rate_points = 320;	//if AEC enable , the value is equal to aec_samp_rate_points, and the value not need to set
@@ -940,6 +1001,7 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 		aud_intf_info.voc_info.aud_setup.mic_samp_rate_points = 160;	//if AEC enable , the value is equal to aec_samp_rate_points, and the value not need to set
 		aud_intf_info.voc_info.aud_setup.speaker_samp_rate_points = 160;	//if AEC enable , the value is equal to aec_samp_rate_points, and the value not need to set
 	}
+#endif
 #if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
 	aud_intf_info.voc_info.aud_setup.mic_frame_number = 4;
 #else
@@ -1000,7 +1062,7 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 			break;
 #elif CONFIG_AUD_INTF_SUPPORT_OPUS
 		case AUD_INTF_VOC_DATA_TYPE_OPUS:
-			aud_intf_info.voc_info.tx_info.buff_length = (aud_intf_info.voc_info.aud_setup.mic_samp_rate_points << 1);
+			aud_intf_info.voc_info.tx_info.buff_length = (aud_intf_info.voc_info.aud_codec_setup.enc_output_size_in_byte);
 			break;
 #else
 #endif             
@@ -1044,7 +1106,7 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 			break;
 #elif CONFIG_AUD_INTF_SUPPORT_OPUS
 		case AUD_INTF_VOC_DATA_TYPE_OPUS:
-			aud_intf_info.voc_info.rx_info.frame_size = 960;//bitrate 64000,frame 60ms,enable VBR rx frame max length:64000*0.06/8*2=960
+			aud_intf_info.voc_info.rx_info.frame_size = aud_intf_info.voc_info.aud_codec_setup.dec_input_size_in_byte;
 			break;
 #else
 #endif  

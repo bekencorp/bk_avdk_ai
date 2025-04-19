@@ -214,6 +214,30 @@ typedef struct {
 #endif
 #endif
 
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
+typedef struct {
+    uint32_t adc_samp_rate;
+    uint32_t enc_bitrate;
+    uint8_t enc_frame_len_in_ms;
+    uint8_t enc_data_depth_in_byte;
+    uint8_t enc_vbr_en;
+    uint8_t reserved;
+
+    uint32_t dac_samp_rate;
+    uint32_t dec_bitrate;
+    uint8_t dec_frame_len_in_ms;
+    uint8_t dec_data_depth_in_byte;
+    uint8_t dec_vbr_en;
+    uint8_t reserved1;
+    
+    uint32_t enc_input_size_in_byte;
+    uint32_t enc_output_size_in_byte;
+    uint32_t dec_input_size_in_byte;
+    uint32_t dec_output_size_in_byte;
+} aud_codec_setup_t;
+#endif
+
+
 /* audio transfer driver setup config */
 typedef struct {
 	//audio_tras_drv_mode_t aud_trs_mode;
@@ -241,6 +265,7 @@ typedef struct {
 	RingBufferContext *aud_tx_rb;			/**< audio send mic data ring buffer */
 #if CONFIG_AUD_INTF_SUPPORT_OPUS
 	RingBufferContext *aud_tx_pkt_len_rb;			/**< audio send mic data length ring buffer */
+	aud_codec_setup_t aud_codec_setup;
 #endif
 
 //	void (*aud_tras_drv_voc_event_cb)(aud_tras_drv_voc_event_t event, bk_err_t result);
