@@ -40,6 +40,14 @@ int main(void)
 #endif
         bk_init();
 
+#if (CONFIG_SYS_CPU0)   
+        bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_AUDP_AUDIO, PM_POWER_MODULE_STATE_ON);
+#endif
+
+#if (CONFIG_SYS_CPU1) 
+        bk_pm_module_vote_cpu_freq(PM_DEV_ID_AUDIO, PM_CPU_FRQ_480M);
+#endif
+
         //media_service_init();
         bk_audio_osi_funcs_init();
     }

@@ -24,6 +24,8 @@
 
 #define RUNTIME_MEAS 1
 #define DEC_OUTPUT_DUMP 0
+#define MEM_USAGE 1
+#define TASK_SRAM 0
 
 uint16 enc_len[50] = {0}; //1s,50 frames,20ms frame length
 uint16 enc_cnt = 0;
@@ -302,6 +304,26 @@ void print_opus_codec_config(opus_codec_para_t * opus_codec_para, uint8_t encode
     #endif
 }
 
+void print_mem_usage(void)
+{
+    #if CONFIG_FREERTOS
+    GLOBAL_INT_DECLARATION();
+    GLOBAL_INT_DISABLE();
+    void rtos_dump_stack_memory_usage(void);
+    rtos_dump_stack_memory_usage();
+    GLOBAL_INT_RESTORE();
+    #endif
+
+    #if CONFIG_FREERTOS && CONFIG_MEM_DEBUG
+    os_dump_memory_stats(0, 0, NULL);
+    #endif
+
+    #if CONFIG_FREERTOS_V10
+    extern void port_check_isr_stack(void);
+    port_check_isr_stack();
+    #endif
+}
+
 void opus_encoder_main(beken_thread_arg_t *thread_param)
 {
     uint32 i;
@@ -395,6 +417,10 @@ void opus_encoder_main(beken_thread_arg_t *thread_param)
 
     os_printf("opus enc input_s:%d,output_s:%d \r\n", opus_codec_para->enc_input_size_in_byte*i,encoder_total_len);
 
+    #if MEM_USAGE
+    print_mem_usage();
+    #endif
+
     opus_encoder_destroy(enc);
 
     os_free(pcm_addr);
@@ -434,6 +460,7 @@ void opus_decoder_main(beken_thread_arg_t *thread_param)
 
     #if OPUS_LOOPBACK_TEST
     opus_codec_para->dac_samp_rate = opus_codec_para->adc_samp_rate;
+    opus_codec_para->dec_bitrate = opus_codec_para->enc_bitrate;
     opus_codec_para->dec_frame_size = opus_codec_para->enc_frame_size;
     opus_codec_para->dec_ch_num = opus_codec_para->enc_ch_num;
     opus_codec_para->dec_vbr_en = opus_codec_para->enc_vbr_en;
@@ -520,6 +547,10 @@ void opus_decoder_main(beken_thread_arg_t *thread_param)
     os_printf("dec output dump start!\r\n");
     BK_DUMP_RAW_OUT((char *)p_dec_out_start,(decoder_total_len<<1));
     os_printf("dec output dump end!\r\n");
+    #endif
+
+    #if MEM_USAGE
+    print_mem_usage();
     #endif
 
     opus_decoder_destroy(dec);
@@ -669,12 +700,22 @@ void cli_opus_encoder_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int arg
         }
     }
 
+    #if TASK_SRAM
+    ret = rtos_create_sram_thread(&opus_enc_thread_handle,
+                                   BEKEN_DEFAULT_WORKER_PRIORITY,
+                                   "opus_enc",
+                                   (beken_thread_function_t)opus_encoder_main,
+                                   1024*30,
+                                   &opus_codec_setup);
+    #else
     ret = rtos_create_psram_thread(&opus_enc_thread_handle,
                                    BEKEN_DEFAULT_WORKER_PRIORITY,
                                    "opus_enc",
                                    (beken_thread_function_t)opus_encoder_main,
                                    1024*30,
                                    &opus_codec_setup);
+    #endif
+    
     if (ret != kNoErr) {
         os_printf("Error: Failed to create opus encoder thread: %d\r\n",
                   ret);
@@ -749,14 +790,23 @@ void cli_opus_decoder_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int arg
         }
     }
 
+    #if TASK_SRAM
+    ret = rtos_create_sram_thread(&opus_dec_thread_handle,
+                                   BEKEN_DEFAULT_WORKER_PRIORITY,
+                                   "opus_dec",
+                                   (beken_thread_function_t)opus_decoder_main,
+                                   1024*10,
+                                   &opus_codec_setup);
+    #else
     ret = rtos_create_psram_thread(&opus_dec_thread_handle,
                                    BEKEN_DEFAULT_WORKER_PRIORITY,
                                    "opus_dec",
                                    (beken_thread_function_t)opus_decoder_main,
                                    1024*10,
                                    &opus_codec_setup);
+    #endif
     if (ret != kNoErr) {
-        os_printf("Error: Failed to create opus encoder thread: %d\r\n",
+        os_printf("Error: Failed to create opus decoder thread: %d\r\n",
                   ret);
     }
 
