@@ -121,7 +121,8 @@ static int pcm_codec_write(audio_codec_t *codec, char *buffer, uint32_t len)
     pcm_codec_priv_t *priv = (pcm_codec_priv_t *)codec->codec_ctx;
     PCM_CODEC_CHECK_NULL(priv);
 
-    uint32_t need_w_len = len;
+    //uint32_t need_w_len = len;
+    int need_w_len = (int)len;
 
     while (need_w_len > 0 && priv->config.data_handle)
     {

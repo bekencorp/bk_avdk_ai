@@ -27,24 +27,6 @@
 #define LOGE(...) BK_LOGE(PROMPT_TONE_PLAY_TAG, ##__VA_ARGS__)
 #define LOGD(...) BK_LOGD(PROMPT_TONE_PLAY_TAG, ##__VA_ARGS__)
 
-
-typedef enum
-{
-    PROMPT_TONE_PLAY_STA_NULL = 0,
-    PROMPT_TONE_PLAY_STA_IDLE,
-    PROMPT_TONE_PLAY_STA_PLAYING,
-    PROMPT_TONE_PLAY_STA_MAX,
-} prompt_tone_play_sta_t;
-
-struct prompt_tone_play
-{
-    audio_source_t *source;
-    audio_codec_t *codec;
-    prompt_tone_play_cfg_t config;
-    beken_semaphore_t play_finish_sem;
-    prompt_tone_play_sta_t status;
-};
-
 #if CONFIG_PROMPT_TONE_CODEC_MP3
 #define CHUNK_SIZE      (4068)
 #else
@@ -57,6 +39,7 @@ static int source_out_data_handle_cb(char *buffer, uint32_t len, void *params)
 
     uint32_t w_len = 0;
     int ret = 0;
+    LOGD("%s, %d, len: %d\n", __func__, __LINE__, len);
     while (handle && handle->codec && w_len < len)
     {
         ret = audio_codec_write_data(handle->codec, buffer + w_len, len - w_len);
@@ -96,8 +79,7 @@ int source_notify_cb(void *play_ctx, void *params)
 
     return BK_OK;
 }
-
-
+      
 static int codec_out_data_handle_cb(audio_frame_info_t *frame_info, char *buffer, uint32_t len, void *params)
 {
     LOGD("channel_number: %d, sample_rate: %d, sample_bits: %d\n", frame_info->channel_number, frame_info->sample_rate, frame_info->sample_bits);
@@ -105,10 +87,15 @@ static int codec_out_data_handle_cb(audio_frame_info_t *frame_info, char *buffer
     uint32_t temp_w_len = 0;
     uint32_t w_len = 0;
     int ret = 0;
+    #if CONFIG_AUD_INTF_SUPPORT_OPUS_PROMPT_TONE_RESAMPLE
+    uint32_t rsp_out_len,rsp_in_len;
+    uint8_t *rsp_out_addr = aud_tras_drv_get_rsp_output_buff();
+    #endif
+    
     while (w_len < len)
     {
         /* if prompt tone data pool has been write data, change speaker source type to prompt tone */
-        if (aud_tras_drv_get_prompt_tone_data_bytes_filled() >= 640)
+        if (aud_tras_drv_get_prompt_tone_data_bytes_filled() >= SAMP_CNT_20MS)
         {
             if (SPK_SOURCE_TYPE_PROMPT_TONE != aud_tras_drv_get_spk_source_type())
             {
@@ -117,15 +104,43 @@ static int codec_out_data_handle_cb(audio_frame_info_t *frame_info, char *buffer
         }
 
         /* write speaker data to ringbuffer, aud_tras_drv read prompt tone data from the ringbuffer */
-        if ((len - w_len) >= 640)
+        if ((len - w_len) >= SAMP_CNT_20MS)
         {
-            temp_w_len  = 640;
+            temp_w_len = SAMP_CNT_20MS;
         }
         else
         {
             temp_w_len = len - w_len;
         }
+
+        #if CONFIG_AUD_INTF_SUPPORT_OPUS_PROMPT_TONE_RESAMPLE
+        if(PROMPT_TONE_SRC_SAMP_RATE != aud_tras_drv_get_dac_samp_rate())
+        {
+            rsp_in_len = (temp_w_len/2);
+            rsp_out_len = MAX_SAMP_CNT_20MS/2;
+            ret = bk_aud_rsp_process((int16_t *)(buffer + w_len), &rsp_in_len, (int16_t *)rsp_out_addr, &rsp_out_len);
+            if (BK_OK != ret)
+            {
+                LOGE("%s:%d bk_aud_rsp_process fail\n", __func__, __LINE__);
+                break;
+            }
+            
+            ret = aud_tras_drv_write_prompt_tone_data((char *)rsp_out_addr, rsp_out_len*2, 40);
+            LOGD("rsp len:%d, w_len:%d,in len:%d,%d,out len:%d,in addr:0x%x,out_addr:0x%x,ret:%d\n",len,w_len,temp_w_len,rsp_in_len,rsp_out_len,(buffer + w_len),rsp_out_addr,ret);
+
+            if(ret > temp_w_len)
+            {
+                ret = temp_w_len;//write size may larger than input length after resample
+            }
+        }
+        else
+        {
+            ret = aud_tras_drv_write_prompt_tone_data(buffer + w_len, temp_w_len, 40);
+        }
+        #else
         ret = aud_tras_drv_write_prompt_tone_data(buffer + w_len, temp_w_len, 40);
+        #endif
+        
         if (ret <= 0)
         {
             LOGE("%s, %d, aud_tras_drv_write_prompt_tone_data fail, ret: %d\n", __func__, __LINE__, ret);
@@ -216,6 +231,43 @@ prompt_tone_play_handle_t prompt_tone_play_create(  prompt_tone_play_cfg_t *conf
 
     os_memcpy(&handle->config, config, sizeof(prompt_tone_play_cfg_t));
 
+    
+    #if CONFIG_AUD_INTF_SUPPORT_OPUS_PROMPT_TONE_RESAMPLE
+    int ret;
+    
+    handle->config.rsp_cfg.dest_rate = aud_tras_drv_get_dac_samp_rate();
+    if(PROMPT_TONE_SRC_SAMP_RATE != handle->config.rsp_cfg.dest_rate)
+    {
+        handle->config.rsp_cfg.complexity = 6;
+        handle->config.rsp_cfg.src_ch = 1;//only enable SPK left channel
+        handle->config.rsp_cfg.dest_ch = 1;//only enable SPK left channel
+        handle->config.rsp_cfg.src_bits = 16;
+        handle->config.rsp_cfg.dest_bits = 16;
+        handle->config.rsp_cfg.src_rate = PROMPT_TONE_SRC_SAMP_RATE;
+        handle->config.rsp_cfg.down_ch_idx = 0;
+        
+        ret = bk_aud_rsp_init(handle->config.rsp_cfg);
+        if (ret != BK_OK)
+        {
+            LOGE("%s, %d, audio resampler init fail\n", __func__, __LINE__);
+            goto fail;
+        }
+
+        handle->config.rsp_out_buff = (uint8_t *)psram_malloc(MAX_SAMP_CNT_20MS);
+        if (!handle->config.rsp_out_buff)
+        {
+            LOGE("%s, %d, malloc rsp output buffer fail\n", __func__, __LINE__);
+            goto fail;
+        }
+        LOGI("%s:%d rsp_init done!src sr:%d,dest sr:%d,cplx:%d,out buf:0x%x\n",
+            __func__, __LINE__,
+            handle->config.rsp_cfg.src_rate,
+            handle->config.rsp_cfg.dest_rate,
+            handle->config.rsp_cfg.complexity,
+            handle->config.rsp_out_buff);
+    }
+    #endif
+
     return handle;
 
 fail:
@@ -269,6 +321,14 @@ bk_err_t prompt_tone_play_destroy(prompt_tone_play_handle_t handle)
         audio_source_destroy(handle->source);
         handle->source = NULL;
     }
+
+    #if CONFIG_AUD_INTF_SUPPORT_OPUS_PROMPT_TONE_RESAMPLE
+    if(PROMPT_TONE_SRC_SAMP_RATE != handle->config.rsp_cfg.dest_rate)
+    {        
+        bk_aud_rsp_deinit();
+        psram_free(handle->config.rsp_out_buff);
+    }
+    #endif
 
     psram_free(handle);
 

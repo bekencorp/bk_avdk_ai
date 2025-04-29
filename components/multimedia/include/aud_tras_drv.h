@@ -573,6 +573,11 @@ int aud_tras_drv_get_prompt_tone_data_bytes_filled(void);
 void aud_cp2_ready_notify(void);
 #endif
 
+#if CONFIG_AUD_INTF_SUPPORT_OPUS_PROMPT_TONE_RESAMPLE
+uint8_t * aud_tras_drv_get_rsp_output_buff(void);
+uint32_t aud_tras_drv_get_dac_samp_rate(void);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

@@ -298,7 +298,7 @@ static void vfs_data_read_task_main(beken_thread_arg_t param_data)
         if (vfs_source_priv->running)
         {
             int r_len = read(vfs_source_priv->fd, vfs_source_priv->read_buff, vfs_source_priv->read_buff_size);
-            LOGD("%s, %d, fd: %d, read_buff_size: %d, r_len: %d\n", __func__, __LINE__, vfs_source_priv->read_buff_size, r_len);
+            LOGD("%s %d read_buff_size:%d,r_len:%d\n", __func__, __LINE__, vfs_source_priv->read_buff_size, r_len);
             if (r_len > 0)
             {
                 if (vfs_source_priv->config.data_handle)

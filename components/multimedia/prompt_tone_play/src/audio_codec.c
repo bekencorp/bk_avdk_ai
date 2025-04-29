@@ -162,7 +162,7 @@ bk_err_t audio_codec_write_data(audio_codec_t *codec, char *buffer, uint32_t len
         LOGE("%s, %d, params error, codec: %p, buffer: %p, len: %d\n", __func__, __LINE__, codec, buffer, len);
         return BK_FAIL;
     }
-
+    LOGD("%s, %d, len: %d\n", __func__, __LINE__, len);
     return codec->ops->write(codec, buffer, len);
 }
 

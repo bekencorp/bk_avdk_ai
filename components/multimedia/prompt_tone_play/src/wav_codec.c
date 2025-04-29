@@ -160,7 +160,8 @@ static int wav_codec_write(audio_codec_t *codec, char *buffer, uint32_t len)
     wav_codec_priv_t *priv = (wav_codec_priv_t *)codec->codec_ctx;
     WAV_CODEC_CHECK_NULL(priv);
 
-    uint32_t need_w_len = len;
+    //uint32_t need_w_len = len;
+    int need_w_len = (int)len;
 
     if (!priv->head_parse)
     {
@@ -173,6 +174,8 @@ static int wav_codec_write(audio_codec_t *codec, char *buffer, uint32_t len)
         /* skip header */
         need_w_len -= 44;
     }
+
+    LOGD("%s, %d, need_w_len:%d,len:%d\n", __func__, __LINE__, need_w_len,len);
 
     while (need_w_len > 0 && priv->config.data_handle)
     {

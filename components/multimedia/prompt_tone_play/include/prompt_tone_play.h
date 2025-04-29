@@ -22,7 +22,14 @@ extern "C" {
 
 #include "audio_source.h"
 #include "audio_codec.h"
+#if CONFIG_AUD_INTF_SUPPORT_OPUS_PROMPT_TONE_RESAMPLE
+#include <modules/audio_rsp_types.h>
+#include <modules/audio_rsp.h>
+#endif
 
+#define PROMPT_TONE_SRC_SAMP_RATE (16000)
+#define SAMP_CNT_20MS (PROMPT_TONE_SRC_SAMP_RATE*20/1000*2) //16bits
+#define MAX_SAMP_CNT_20MS (48000*20/1000*2) //16bits
 
 typedef struct
 {
@@ -30,7 +37,28 @@ typedef struct
     audio_source_cfg_t source_cfg;
     audio_codec_type_t codec_type;
     audio_codec_cfg_t codec_cfg;
+#if CONFIG_AUD_INTF_SUPPORT_OPUS_PROMPT_TONE_RESAMPLE
+    aud_rsp_cfg_t rsp_cfg;
+    uint8_t *rsp_out_buff;
+#endif
 } prompt_tone_play_cfg_t;
+
+typedef enum
+{
+    PROMPT_TONE_PLAY_STA_NULL = 0,
+    PROMPT_TONE_PLAY_STA_IDLE,
+    PROMPT_TONE_PLAY_STA_PLAYING,
+    PROMPT_TONE_PLAY_STA_MAX,
+} prompt_tone_play_sta_t;
+
+struct prompt_tone_play
+{
+    audio_source_t *source;
+    audio_codec_t *codec;
+    prompt_tone_play_cfg_t config;
+    beken_semaphore_t play_finish_sem;
+    prompt_tone_play_sta_t status;
+};
 
 typedef struct prompt_tone_play *prompt_tone_play_handle_t;
 

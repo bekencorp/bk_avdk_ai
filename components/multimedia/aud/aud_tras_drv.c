@@ -3722,6 +3722,14 @@ static bk_err_t aud_tras_drv_prompt_tone_play_close(void)
 
     return BK_OK;
 }
+
+#if CONFIG_AUD_INTF_SUPPORT_OPUS_PROMPT_TONE_RESAMPLE
+uint8_t * aud_tras_drv_get_rsp_output_buff(void)
+{
+    return gl_prompt_tone_play_handle->config.rsp_out_buff;
+}
+#endif
+
 #endif
 
 #if CONFIG_AUD_INTF_SUPPORT_OPUS
@@ -6666,5 +6674,10 @@ bk_err_t audio_event_handle(media_mailbox_msg_t * msg)
 	return ret;
 }
 
-
+#if CONFIG_AUD_INTF_SUPPORT_OPUS_PROMPT_TONE_RESAMPLE
+uint32_t aud_tras_drv_get_dac_samp_rate(void)
+{
+    return aud_tras_drv_info.voc_info.aud_codec_setup.dac_samp_rate;
+}
+#endif
 
