@@ -5,7 +5,6 @@ cmake_minimum_required(VERSION 3.5)
 set(EXTRA_COMPONENTS_DIRS 
     $ENV{ARMINO_PATH}/../components
     $ENV{ARMINO_PATH}/../components/audio_algorithms
-    $ENV{ARMINO_PATH}/../components/audio_codec
     $ENV{ARMINO_PATH}/../components/audio_codec/opus_demo
     $ENV{ARMINO_PATH}/../components/codec/
     $ENV{ARMINO_PATH}/../components/codec/legacy 
