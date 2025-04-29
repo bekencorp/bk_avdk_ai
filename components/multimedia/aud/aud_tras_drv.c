@@ -3785,7 +3785,7 @@ int opus_init(void)
     opus_encoder_ctl(opus_encoder, OPUS_SET_EXPERT_FRAME_DURATION(frame_len));
 
     opus_decoder = opus_decoder_create(aud_tras_drv_info.voc_info.aud_codec_setup.dac_samp_rate, 1, &error);
-    if(NULL == opus_encoder)
+    if(NULL == opus_decoder)
     {
         LOGE("opus_decoder create failure! err:%d\n",error);
         goto opus_init_exit;
@@ -3804,7 +3804,7 @@ void opus_deinit(void)
         opus_encoder = NULL;
     }
 
-    if(NULL != opus_encoder)
+    if(NULL != opus_decoder)
     {
         opus_decoder_destroy(opus_decoder);
         opus_decoder = NULL;
