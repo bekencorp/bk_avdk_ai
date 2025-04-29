@@ -12,17 +12,16 @@
 uint32_t volc_file_read(const char* path, bool bin_mode, uint8_t* buffer, uint64_t* size) {
     uint64_t file_len = 0;
     uint32_t ret = VOLC_STATUS_SUCCESS;
-    FILE* fp = NULL;
+    int fd = -1;
+    struct stat statbuf = {0};
 
     VOLC_CHK(path != NULL && size != NULL, VOLC_STATUS_NULL_ARG);
 
-    fp = fopen(path, bin_mode ? "rb" : "r");
-
-    VOLC_CHK(fp != NULL, VOLC_STATUS_OPEN_FILE_FAILED);
-
     // Get the size of the file
-    fseek(fp, 0, SEEK_END);
-    file_len = ftell(fp);
+    ret = stat(path, &statbuf);
+    VOLC_CHK(ret == 0, VOLC_STATUS_NOT_FOUND);
+    
+    file_len = statbuf.st_size; 
 
     if (buffer == NULL) {
         // requested the length - set and early return
@@ -30,49 +29,55 @@ uint32_t volc_file_read(const char* path, bool bin_mode, uint8_t* buffer, uint64
         VOLC_CHK(0, VOLC_STATUS_SUCCESS);
     }
 
+    fd = open(path, O_RDONLY);
+
+    VOLC_CHK(fd != -1, VOLC_STATUS_OPEN_FILE_FAILED);
+
     // Validate the buffer size
     VOLC_CHK(file_len <= *size, VOLC_STATUS_BUFFER_TOO_SMALL);
 
     // Read the file into memory buffer
-    fseek(fp, 0, SEEK_SET);
-    VOLC_CHK((fread(buffer, (size_t) file_len, 1, fp) == 1), VOLC_STATUS_READ_FILE_FAILED);
+    VOLC_CHK((read(fd, buffer, (size_t) file_len) == file_len), VOLC_STATUS_READ_FILE_FAILED);
 
 err_out_label:
-    if (fp != NULL) {
-        fclose(fp);
-        fp = NULL;
+    if (fd != -1) {
+        close(fd);
+        fd = -1;
     }
     return ret;
 }
 
 uint32_t volc_file_read_segment(const char* path, bool bin_mode, uint8_t* buffer, uint64_t offset, uint64_t size) {
-    uint64_t file_len;
+    uint64_t file_len = 0;
     uint32_t ret = VOLC_STATUS_SUCCESS;
-    FILE* fp = NULL;
+    int fd = -1;
+    struct stat statbuf = {0};
     int32_t result = 0;
 
     VOLC_CHK(path != NULL && buffer != NULL && size != 0, VOLC_STATUS_NULL_ARG);
 
-    fp = fopen(path, bin_mode ? "rb" : "r");
-
-    VOLC_CHK(fp != NULL, VOLC_STATUS_OPEN_FILE_FAILED);
-
     // Get the size of the file
-    fseek(fp, 0, SEEK_END);
-    file_len = ftell(fp);
+    ret = stat(path, &statbuf);
+    VOLC_CHK(ret == 0, VOLC_STATUS_NOT_FOUND);
+    
+    file_len = statbuf.st_size; 
+
+    fd = open(path, O_RDONLY);
+
+    VOLC_CHK(fd != -1, VOLC_STATUS_OPEN_FILE_FAILED);
 
     // Check if we are trying to read past the end of the file
     VOLC_CHK(offset + size <= file_len, VOLC_STATUS_READ_FILE_FAILED);
 
     // Set the offset and read the file content
-    result = fseek(fp, (uint32_t) offset, SEEK_SET);
-    VOLC_CHK(result == 0 && (fread(buffer, (size_t) size, 1, fp) == 1), VOLC_STATUS_READ_FILE_FAILED);
+    result = lseek(fd, (uint32_t) offset, SEEK_SET);
+    VOLC_CHK(result == offset && (read(fd, buffer, (size_t) size) == size), VOLC_STATUS_READ_FILE_FAILED);
 
 err_out_label:
 
-    if (fp != NULL) {
-        fclose(fp);
-        fp = NULL;
+    if (fd != -1) {
+        close(fd);
+        fd = -1;
     }
 
     return ret;
@@ -80,22 +85,21 @@ err_out_label:
 
 uint32_t volc_file_write(const char* path, bool bin_mode, bool append, uint8_t* buffer, uint64_t size) {
     uint32_t ret = VOLC_STATUS_SUCCESS;
-    FILE* fp = NULL;
+    int fd = -1;
 
     VOLC_CHK(path != NULL && buffer != NULL, VOLC_STATUS_NULL_ARG);
 
-    fp = fopen(path, bin_mode ? (append ? "ab" : "wb") : (append ? "a" : "w"));
+    fd = open(path, append ? O_APPEND : O_WRONLY);
 
-    VOLC_CHK(fp != NULL, VOLC_STATUS_OPEN_FILE_FAILED);
+    VOLC_CHK(fd != -1, VOLC_STATUS_OPEN_FILE_FAILED);
 
     // Write the buffer to the file
-    VOLC_CHK(fwrite(buffer, (size_t) size, 1, fp) == 1, VOLC_STATUS_WRITE_TO_FILE_FAILED);
+    VOLC_CHK(write(fd, buffer, (size_t) size) == size, VOLC_STATUS_WRITE_TO_FILE_FAILED);
 
 err_out_label:
-
-    if (fp != NULL) {
-        fclose(fp);
-        fp = NULL;
+    if (fd != -1) {
+        close(fd);
+        fd = -1;
     }
 
     return ret;
@@ -103,27 +107,24 @@ err_out_label:
 
 uint32_t volc_file_update(const char* path, bool bin_mode, uint8_t* buffer, uint64_t offset, uint64_t size) {
     uint32_t ret = VOLC_STATUS_SUCCESS;
-    FILE* fp = NULL;
-    uint32_t i;
-    uint8_t* p_cur_ptr;
+    int fd = -1;
 
     VOLC_CHK(path != NULL && buffer != NULL, VOLC_STATUS_NULL_ARG);
 
-    fp = fopen(path, bin_mode ? "rb+" : "r+");
+    fd = open(path, O_RDWR);
 
-    VOLC_CHK(fp != NULL, VOLC_STATUS_OPEN_FILE_FAILED);
+    VOLC_CHK(fd != -1, VOLC_STATUS_OPEN_FILE_FAILED);
 
-    VOLC_CHK(0 == fseek(fp, (uint32_t) offset, SEEK_SET), VOLC_STATUS_INVALID_OPERATION);
+    VOLC_CHK(offset == lseek(fd, (uint32_t) offset, SEEK_SET), VOLC_STATUS_INVALID_OPERATION);
 
-    for (i = 0, p_cur_ptr = buffer + offset; i < size; i++, p_cur_ptr++) {
-        VOLC_CHK(EOF != fputc(*p_cur_ptr, fp), VOLC_STATUS_WRITE_TO_FILE_FAILED);
-    }
+    // Write the buffer to the file
+    VOLC_CHK(write(fd, buffer + offset, (size_t) size) == size, VOLC_STATUS_WRITE_TO_FILE_FAILED);
 
 err_out_label:
 
-    if (fp != NULL) {
-        fclose(fp);
-        fp = NULL;
+    if (fd != -1) {
+        close(fd);
+        fd = -1;
     }
 
     return ret;
@@ -139,13 +140,15 @@ err_out_label:
 
 uint32_t volc_file_set_length(const char* path, uint64_t length) {
     uint32_t ret = VOLC_STATUS_SUCCESS;
-    int32_t ret_val, err_code, file_desc;
+    int fd = -1;
+    int32_t ret_val = -1, err_code = 0;
 
     VOLC_CHK(path != NULL, VOLC_STATUS_NULL_ARG);
 
-    VOLC_UNUSED_PARAM(file_desc);
+    fd = open(path, O_RDWR);
+    VOLC_CHK(fd != -1, VOLC_STATUS_OPEN_FILE_FAILED);
 
-    ret_val = truncate(path, length);
+    ret_val == ftruncate(fd, (uint32_t)(length));
 
     err_code = errno;
 
@@ -179,6 +182,10 @@ uint32_t volc_file_set_length(const char* path, uint64_t length) {
 
 err_out_label:
 
+    if (fd != -1) {
+        close(fd);
+        fd = -1;
+    }
     return ret;
 }
 
@@ -196,23 +203,22 @@ uint32_t volc_file_exists(const char* path, bool* p_exists) {
 
 uint32_t volc_file_create(const char* path, uint64_t size) {
     uint32_t ret = VOLC_STATUS_SUCCESS;
-    FILE* fp = NULL;
+    int fd = -1;
 
     VOLC_CHK(path != NULL, VOLC_STATUS_NULL_ARG);
 
-    fp = fopen(path, "w+b");
-    VOLC_CHK(fp != NULL, VOLC_STATUS_OPEN_FILE_FAILED);
+    fd = open(path, O_RDWR | O_CREAT);
+    VOLC_CHK(fd != -1, VOLC_STATUS_OPEN_FILE_FAILED);
 
     if (size != 0) {
-        VOLC_CHK(0 == fseek(fp, (uint32_t)(size - 1), SEEK_SET), VOLC_STATUS_INVALID_OPERATION);
-        VOLC_CHK(0 == fputc(0, fp), VOLC_STATUS_INVALID_OPERATION);
+        VOLC_CHK(size == ftruncate(fd, (uint32_t)(size)), VOLC_STATUS_INVALID_OPERATION);
     }
 
 err_out_label:
 
-    if (fp != NULL) {
-        fclose(fp);
-        fp = NULL;
+    if (fd != -1) {
+        close(fd);
+        fd = -1;
     }
 
     return ret;
@@ -220,7 +226,8 @@ err_out_label:
 
 uint32_t volc_file_delete(const char* path) {
     uint32_t ret = VOLC_STATUS_SUCCESS;
-    unlink(path);
+    ret = unlink(path);
+
 // err_out_label:
     return ret;
 }
