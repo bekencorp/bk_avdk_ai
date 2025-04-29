@@ -226,8 +226,6 @@ static g722_decode_state_t g722_dec = {0};
 #elif CONFIG_AUD_INTF_SUPPORT_OPUS
 static OpusEncoder *opus_encoder = NULL;
 static OpusDecoder *opus_decoder = NULL;
-uint32_t opus_enc_output_buf_size = 0;
-uint32_t opus_dec_input_buf_size = 0;
 #define OPUS_ENC_DEC_LOOPBACK 0
 #if OPUS_ENC_DEC_LOOPBACK
 typedef struct
@@ -3727,7 +3725,7 @@ static bk_err_t aud_tras_drv_prompt_tone_play_close(void)
 #endif
 
 #if CONFIG_AUD_INTF_SUPPORT_OPUS
-int opus_init(uint32_t *enc_output_buf_size,uint32_t *dec_input_buf_size)
+int opus_init(void)
 {
     int error;            
     int ret = BK_OK;
@@ -3777,8 +3775,6 @@ int opus_init(uint32_t *enc_output_buf_size,uint32_t *dec_input_buf_size)
     }
     
     opus_encoder_ctl(opus_encoder, OPUS_SET_EXPERT_FRAME_DURATION(frame_len));
-    *enc_output_buf_size = aud_tras_drv_info.voc_info.aud_codec_setup.enc_output_size_in_byte; //BITRATE*FRAME_DURATION/8,double size if vbr enable
-    *dec_input_buf_size = aud_tras_drv_info.voc_info.aud_codec_setup.dec_input_size_in_byte;   //Net OPUS encoder BITRATE*FRAME_DURATION/8,double size if vbr enable
 
     opus_decoder = opus_decoder_create(aud_tras_drv_info.voc_info.aud_codec_setup.dac_samp_rate, 1, &error);
     if(NULL == opus_encoder)
@@ -3805,9 +3801,6 @@ void opus_deinit(void)
         opus_decoder_destroy(opus_decoder);
         opus_decoder = NULL;
     }
-
-    opus_enc_output_buf_size = 0;
-    opus_dec_input_buf_size = 0;
 }
 #endif
 
@@ -4463,20 +4456,20 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 		{      
 			int ret;
             LOGI("opus_init!\n");
-			ret = opus_init(&opus_enc_output_buf_size,&opus_dec_input_buf_size);
+			ret = opus_init();
 			if (BK_OK != ret) {
 				err = BK_ERR_AUD_INTF_MEMY;
 				goto aud_tras_drv_voc_init_exit;
 			}
-            LOGI("opus_init done! enc output buf size:%d\n",opus_enc_output_buf_size);
-			aud_tras_drv_info.voc_info.encoder_temp.law_data = (uint8_t *)audio_tras_drv_malloc(opus_enc_output_buf_size);
+
+			aud_tras_drv_info.voc_info.encoder_temp.law_data = (uint8_t *)audio_tras_drv_malloc(aud_tras_drv_info.voc_info.aud_codec_setup.enc_output_size_in_byte);
 			if (aud_tras_drv_info.voc_info.encoder_temp.law_data == NULL) {
 				LOGE("%s, %d, malloc law_data of encoder used fail \n", __func__, __LINE__);
 				err = BK_ERR_AUD_INTF_MEMY;
 				goto aud_tras_drv_voc_init_exit;
 			}
       
-			aud_tras_drv_info.voc_info.decoder_temp.law_data = (unsigned char *)audio_tras_drv_malloc(opus_dec_input_buf_size);
+			aud_tras_drv_info.voc_info.decoder_temp.law_data = (unsigned char *)audio_tras_drv_malloc(aud_tras_drv_info.voc_info.aud_codec_setup.dec_input_size_in_byte);
 			if (aud_tras_drv_info.voc_info.decoder_temp.law_data == NULL) {
 				LOGE("%s, %d, malloc law_data of decoder used fail \n", __func__, __LINE__);
 				err = BK_ERR_AUD_INTF_MEMY;
