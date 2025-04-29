@@ -18,6 +18,8 @@
 #include "ring_buffer.h"
 #include "audio_play.h"
 #include <modules/pm.h>
+#include "gpio_driver.h"
+#include <driver/gpio.h>
 
 
 #define ONBOARD_SPK_PLAY_TAG "ob_spk"
@@ -379,6 +381,76 @@ bk_err_t spk_data_read_task_deinit(onboard_speaker_play_priv_t *spk_data_read_ha
 }
 
 
+static bk_err_t pa_control_config(onboard_speaker_play_priv_t *onboard_spk)
+{
+    if (onboard_spk == NULL)
+    {
+        return BK_FAIL;
+    }
+
+    if (!onboard_spk->config.pa_ctl_en)
+    {
+        return BK_OK;
+    }
+
+    gpio_dev_unmap(onboard_spk->config.pa_ctl_gpio);
+    bk_gpio_enable_output(onboard_spk->config.pa_ctl_gpio);
+
+    return BK_OK;
+}
+
+static bk_err_t pa_control(onboard_speaker_play_priv_t *onboard_spk, bool en, bool delay_flag)
+{
+    if (onboard_spk == NULL)
+    {
+        return BK_FAIL;
+    }
+
+    if (!onboard_spk->config.pa_ctl_en)
+    {
+        return BK_OK;
+    }
+
+    if (en)
+    {
+        LOGD("%s, %d, PA turn on \n", __func__, __LINE__);
+        if (delay_flag)
+        {
+            /* delay XXms to avoid po audio data, and then open pa */
+            rtos_delay_milliseconds(onboard_spk->config.pa_on_delay);
+        }
+
+        /* open pa according to congfig */
+        if (onboard_spk->config.pa_on_level)
+        {
+            bk_gpio_set_output_high(onboard_spk->config.pa_ctl_gpio);
+        }
+        else
+        {
+            bk_gpio_set_output_low(onboard_spk->config.pa_ctl_gpio);
+        }
+    }
+    else
+    {
+        LOGD("%s, %d, PA turn off \n", __func__, __LINE__);
+        if (onboard_spk->config.pa_on_level)
+        {
+            bk_gpio_set_output_low(onboard_spk->config.pa_ctl_gpio);
+        }
+        else
+        {
+            bk_gpio_set_output_high(onboard_spk->config.pa_ctl_gpio);
+        }
+
+        if (delay_flag)
+        {
+            rtos_delay_milliseconds(onboard_spk->config.pa_off_delay);
+        }
+    }
+
+    return BK_OK;
+}
+
 static bk_err_t aud_dac_dma_deconfig(onboard_speaker_play_priv_t *onboard_spk)
 {
     if (onboard_spk == NULL)
@@ -629,6 +701,8 @@ static bk_err_t onboard_speaker_start(onboard_speaker_play_priv_t *onboard_spk)
         LOGE("%s, %d, dac stop fail\n", __func__, __LINE__);
     }
 
+    pa_control(onboard_spk, true, true);
+
     return ret;
 }
 
@@ -643,6 +717,8 @@ static bk_err_t onboard_speaker_stop(onboard_speaker_play_priv_t *onboard_spk)
     {
         LOGE("%s, %d, dac dma stop fail\n", __func__, __LINE__);
     }
+
+    pa_control(onboard_spk, false, true);
 
     ret = bk_aud_dac_stop();
     if (ret != BK_OK)
@@ -747,18 +823,11 @@ static int onboard_speaker_play_open(audio_play_t *play, audio_play_cfg_t *confi
     temp_onboard_speaker_play->frame_num = DMA_CARRY_SPK_FRAME_NUM;
     temp_onboard_speaker_play->rb_size = config->pool_size;
 
-    temp_onboard_speaker_play->config.port = config->port;
-    temp_onboard_speaker_play->config.nChans = config->nChans;
-    temp_onboard_speaker_play->config.sampRate = config->sampRate;
-    temp_onboard_speaker_play->config.bitsPerSample = config->bitsPerSample;
-    temp_onboard_speaker_play->config.volume = config->volume;
-    temp_onboard_speaker_play->config.play_mode = config->play_mode;
-    temp_onboard_speaker_play->config.frame_size = config->frame_size;
-    temp_onboard_speaker_play->config.pool_size = config->pool_size;
-    temp_onboard_speaker_play->config.pool_empty_notify_cb = config->pool_empty_notify_cb;
-    temp_onboard_speaker_play->config.usr_data = config->usr_data;
+    os_memcpy(&temp_onboard_speaker_play->config, config, sizeof(audio_play_cfg_t));
 
     bk_pm_module_vote_cpu_freq(PM_DEV_ID_AUDIO, PM_CPU_FRQ_480M);
+
+    pa_control_config(temp_onboard_speaker_play);
 
     ret = onboard_speaker_open(temp_onboard_speaker_play);
     if (ret != BK_OK)
@@ -902,6 +971,8 @@ static int onboard_speaker_play_control(audio_play_t *play, audio_play_ctl_t ctl
     }
     else if (ctl == AUDIO_PLAY_MUTE)
     {
+        pa_control(priv, false, false);
+
         ret = onboard_speaker_mute();
         if (ret != BK_OK)
         {
@@ -915,6 +986,8 @@ static int onboard_speaker_play_control(audio_play_t *play, audio_play_ctl_t ctl
         {
             LOGE("%s, onboard spk paly unmute fail, ret: %d, %d \n", __func__, ret, __LINE__);
         }
+
+        pa_control(priv, true, false);
     }
     else if (ctl == AUDIO_PLAY_SET_VOLUME)
     {

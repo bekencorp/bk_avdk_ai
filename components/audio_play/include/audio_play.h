@@ -67,6 +67,11 @@ typedef struct
     uint32_t pool_size;                         /*!< the size (unit byte) of ringbuffer pool saved speaker data need to play */
     pool_empty_notify pool_empty_notify_cb;     /*!< call this callback when ringbuffer pool saved speaker data is empty.(play finish) */
     void *usr_data;                             /*!< the parameter of pool_empty_notify_cb callback */
+    bool pa_ctl_en;                             /*!< control pa enable */
+    uint32_t pa_ctl_gpio;                       /*!< the gpio id of control pa */
+    uint8_t pa_on_level;                        /*!< the gpio level of turn on pa */
+    uint32_t pa_on_delay;                       /*!< the delay time(ms) of turn on pa after enable audio dac */
+    uint32_t pa_off_delay;                      /*!< the delay time(ms) of disable audio dac after turn off pa */
 } audio_play_cfg_t;
 
 #define DEFAULT_AUDIO_PLAY_CONFIG() {       \
@@ -80,6 +85,11 @@ typedef struct
     .pool_size = 640,                       \
     .pool_empty_notify_cb = NULL,           \
     .usr_data = NULL,                       \
+    .pa_ctl_en = false,                      \
+    .pa_ctl_gpio = 50,                      \
+    .pa_on_level = 1,                       \
+    .pa_on_delay = 2,                       \
+    .pa_off_delay = 2,                      \
 }
 
 typedef struct audio_play audio_play_t;
