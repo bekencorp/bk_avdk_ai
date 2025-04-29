@@ -66,6 +66,7 @@ typedef struct {
      * @brief 线程绑定的 CPU 核心。
      */
     int  bind_cpu;
+    int stack_in_ext;
 } volc_thread_param_t;
 
 /**

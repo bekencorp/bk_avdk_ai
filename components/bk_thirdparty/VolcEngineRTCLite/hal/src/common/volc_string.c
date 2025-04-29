@@ -122,7 +122,7 @@ uint32_t volc_string_snprintf(volc_string_t * str, int32_t length, const char * 
     vsnprintf(str->buffer, len + 1, format, arg);
     va_end(arg);
 
-    if (len <= length) {
+    if (len > length) {
         return VOLC_FAILED;
     }
     str->length = len;

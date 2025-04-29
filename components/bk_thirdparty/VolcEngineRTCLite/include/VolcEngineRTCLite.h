@@ -24,8 +24,8 @@ extern "C" {
 #define __byte_rtc_api__ __attribute__((visibility("default")))
 #endif
 
-#define BYTE_RTC_API_VERSION "1.0.3"
-#define BYTE_RTC_API_VERSION_NUM 0x1003
+#define BYTE_RTC_API_VERSION "1.0.4"
+#define BYTE_RTC_API_VERSION_NUM 0x1004
 
 
 /**
@@ -326,6 +326,12 @@ typedef enum {
      * @brief G711A
      */
     AUDIO_CODEC_TYPE_G711A  = 4,
+
+    /**
+     * @locale zh
+     * @brief G711U
+     */
+    AUDIO_CODEC_TYPE_G711U  = 5,
     
 } audio_codec_type_e;
 
@@ -401,6 +407,12 @@ typedef enum {
      * @brief PCM
      */
     AUDIO_DATA_TYPE_PCM = 5,
+
+    /**
+     * @locale zh
+     * @brief PCMU
+     */
+    AUDIO_DATA_TYPE_PCMU = 6,
 } audio_data_type_e;
 
 /**
