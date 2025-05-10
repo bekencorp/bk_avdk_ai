@@ -160,6 +160,7 @@ if (CONFIG_MEDIA_MAJOR)
 	list(APPEND srcs
 		aud/aud_tras_drv.c
 		aud/audio_process.c
+		aud/audio_debug.c
 	)
 endif()
 

@@ -151,6 +151,8 @@ typedef struct {
 	int16_t vad_start_threshold;
 	int16_t vad_stop_threshold;
 	int16_t vad_silence_threshold;
+	int16_t vad_eng_threshold;
+	
 } vad_config_t;
 
 

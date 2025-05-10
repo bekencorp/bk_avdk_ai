@@ -27,6 +27,7 @@
 #endif
 #include "aud_tras.h"
 #include <modules/audio_process.h>
+#include "audio_debug.h"
 
 
 #define AUD_INTF_TAG "aud_intf"
@@ -1174,6 +1175,7 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 #if CONFIG_AUD_INTF_SUPPORT_OPUS
     aud_intf_info.voc_info.aud_tx_pkt_len_rb = aud_tras_get_tx_pkt_len_rb();
 #endif
+	audio_intf_debug_init();
 
 	/* callback config */
 //	aud_intf_info.voc_info.aud_tras_drv_voc_event_cb = aud_tras_drv_voc_event_cb_handle;
@@ -1681,17 +1683,17 @@ static void aec_vad_status_set(int val)
 {    
     if(val == 1)
     {
-        //os_printf("------------vad start----------\r\n");
+        LOGD("------------vad start----------\r\n");
         aud_intf_aec_vad_flag = 1;//FLAG_VAD_START;
     }
     else if(val == 2)
     {
-        //os_printf("------------vad end:%d----------\r\n",rtos_get_time());
+        LOGD("------------vad end:%d----------\r\n",rtos_get_time());
         aud_intf_aec_vad_flag = 2;//FLAG_VAD_END;
     }
     else if(val == 3)
     {
-        //os_printf("------------silence----------\r\n");
+        LOGD("------------silence----------\r\n");
         aud_intf_aec_silence_flag = 1;
     }
 }
@@ -1746,6 +1748,9 @@ bk_err_t bk_aud_intf_set_vad_para(aud_intf_voc_vad_para_t vad_para, uint32_t val
 		case AUD_INTF_VOC_VAD_SILENCE_THRESHOLD:
 			aud_intf_info.voc_info.vad_setup->vad_silence_threshold = vad_para;
 			break;
+		case AUD_INTF_VOC_VAD_ENG_THRESHOLD:
+			aud_intf_info.voc_info.vad_setup->vad_eng_threshold = vad_para;
+			break;
 
 		default:
 			break;
@@ -1756,9 +1761,51 @@ bk_err_t bk_aud_intf_set_vad_para(aud_intf_voc_vad_para_t vad_para, uint32_t val
 		return ret;
 }
 
+bk_err_t bk_aud_intf_set_vad_enable(bool val)
+{
+	if (aud_intf_info.voc_status == AUD_INTF_VOC_STA_NULL)
+		return BK_ERR_AUD_INTF_STA;
+
+	CHECK_AUD_INTF_BUSY_STA();
+	return mailbox_media_aud_send_msg(EVENT_AUD_VOC_SET_VAD_ENABLE, (void *)val);
+}
 bk_err_t bk_aud_intf_audio_para_set(app_aud_para_t *aud_para_ptr)
 {
 		bk_err_t ret = BK_OK;
 		ret = mailbox_media_aud_send_msg(EVENT_AUD_SET_AUD_PARA_REQ, aud_para_ptr);
 		return ret;
+}
+bk_err_t bk_aud_intf_update_sys_config_para(app_aud_sys_config_t *aud_sys_config_ptr)
+{
+		bk_err_t ret = BK_OK;
+		ret = mailbox_media_aud_send_msg(EVENT_AUD_UPDATE_SYS_CONFIG_PARA_REQ, aud_sys_config_ptr);
+		return ret;
+}
+
+bk_err_t bk_aud_intf_update_dl_eq_para(app_eq_t *dl_eq_para_ptr)
+{
+		bk_err_t ret = BK_OK;
+		ret = mailbox_media_aud_send_msg(EVENT_AUD_UPDATE_DL_EQ_PARA_REQ, dl_eq_para_ptr);
+		bk_printf("bk_aud_intf_update_dl_eq_para\r\n");
+		return ret;
+}
+
+bk_err_t bk_aud_intf_update_aec_para(app_aud_aec_config_t *aec_para_ptr)
+{
+		bk_err_t ret = BK_OK;
+		ret = mailbox_media_aud_send_msg(EVENT_AUD_UPDATE_AEC_PARA_REQ, aec_para_ptr);
+		return ret;
+}
+
+
+void audio_intf_debug_init()
+{
+ 
+    #if CONFIG_SYS_CPU0
+    
+    bk_aud_debug_register_update_dl_eq_para_cb(bk_aud_intf_update_dl_eq_para);
+    bk_aud_debug_register_update_aec_config_cb(bk_aud_intf_update_aec_para);
+    bk_aud_debug_register_update_sys_config_cb(bk_aud_intf_update_sys_config_para);
+
+    #endif
 }

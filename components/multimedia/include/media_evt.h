@@ -124,9 +124,13 @@ typedef enum
 	EVENT_AUD_VOC_SET_AEC_PARA_REQ,		/**< set AEC parameters */
 	EVENT_AUD_VOC_GET_AEC_PARA_REQ,		/**< get AEC parameters */
 	EVENT_AUD_VOC_SET_VAD_PARA_REQ,		/**< set VAD parameters */
+	EVENT_AUD_VOC_SET_VAD_ENABLE,
 	EVENT_AUD_VOC_GET_VAD_PARA_REQ,		/**< get VAD parameters */
 	EVENT_AUD_SET_AUD_PARA_REQ,		/**< set VAD parameters */
 	EVENT_AUD_GET_AUD_PARA_REQ,		/**< get VAD parameters */
+	EVENT_AUD_UPDATE_SYS_CONFIG_PARA_REQ,			/**< update sys config parameter */
+	EVENT_AUD_UPDATE_DL_EQ_PARA_REQ,			/**< update dl eq parameter */
+	EVENT_AUD_UPDATE_AEC_PARA_REQ,			/**< update dl eq parameter */
 	
 	EVENT_AUD_VOC_TX_DEBUG_REQ,			/**< dump tx data */
 	EVENT_AUD_VOC_RX_DEBUG_REQ,			/**< dump rx data */

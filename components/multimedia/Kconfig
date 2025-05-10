@@ -266,7 +266,7 @@ menu "Media"
 
 	choice AEC_VERSION
 		prompt "Select AEC Version"
-		default AEC_VERSION_V1
+		default AEC_VERSION_V2
 
 		config AEC_VERSION_V1
 		bool "Enable AEC V1 Version"
@@ -291,6 +291,14 @@ menu "Media"
 		help
 			need connect speaker to mic2
 	endchoice
+
+	config AUD_AI_NS_SUPPORT
+		bool "Enable AI NS"
+		default n
+
+	config AUD_AI_NS_USE_STATIC_SRAM
+		bool "AI NS use static sram"
+		default n
 
 	config AUD_SWEEP_TEST
 		bool "Enable AUD sweep test"

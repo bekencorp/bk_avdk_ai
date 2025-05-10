@@ -67,8 +67,13 @@ typedef enum {
 	AUD_TRAS_DRV_VOC_GET_AEC_PARA,		/**< get AEC parameters */
 	AUD_TRAS_DRV_VOC_SET_VAD_PARA,		/**< set VAD parameters */
 	AUD_TRAS_DRV_VOC_GET_VAD_PARA,		/**< get VAD parameters */
+	AUD_TRAS_DRV_VOC_SET_VAD_ENABLE,
 	AUD_TRAS_DRV_SET_AUD_PARA,		/**< set audio parameters */
 	AUD_TRAS_DRV_GET_AUD_PARA,		/**< get audio parameters */
+	AUD_TRAS_DRV_UPDATE_SYS_CONFIG_PARA,		/**< update audio sys config para */
+	AUD_TRAS_DRV_UPDATE_DL_EQ_PARA,		/**< update voice dl eq para */
+	AUD_TRAS_DRV_UPDATE_AEC_PARA,		/**< update voice aec para */
+	
 	
 	AUD_TRAS_DRV_VOC_TX_DEBUG,			/**< dump tx data */
 	AUD_TRAS_DRV_VOC_RX_DEBUG,			/**< dump rx data */
