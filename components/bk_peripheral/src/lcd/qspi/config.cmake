@@ -28,3 +28,7 @@ endif()
 if (CONFIG_LCD_QSPI_JD9855)
 	list(APPEND QSPI_LCD_DEVICE_FILES ${QSPI_LCD_PATH}/lcd_qspi_jd9855.c)
 endif()
+
+if (CONFIG_LCD_QSPI_ST77916)
+	list(APPEND QSPI_LCD_DEVICE_FILES ${QSPI_LCD_PATH}/lcd_qspi_st77916.c)
+endif()
