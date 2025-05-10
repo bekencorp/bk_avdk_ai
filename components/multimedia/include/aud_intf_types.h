@@ -256,7 +256,6 @@ typedef enum {
 	AUD_INTF_VOC_SPK_MAX,
 } aud_intf_voc_spk_ctrl_t;
 
-#if CONFIG_AUD_INTF_SUPPORT_OPUS
 typedef struct {
     uint32_t adc_samp_rate;
     uint32_t enc_bitrate;
@@ -272,7 +271,6 @@ typedef struct {
     uint8_t dec_vbr_en;
     uint8_t reserved1;
 } aud_codec_setup_input_t;
-#endif
 
 
 /* audio interface voice setup configuration */
@@ -294,9 +292,7 @@ typedef struct {
 	uint8_t frame_num;						/**< the max number of frames in rx buffer to save rx data, the time of one frame is 20ms */
 	uint8_t fifo_frame_num;					/**< the number of frames in rx buffer before start voice transfer, the time of one frame is 20ms */
 	RingBufferContext *aud_tx_rb;
-#if CONFIG_AUD_INTF_SUPPORT_OPUS
 	aud_codec_setup_input_t aud_codec_setup_input;
-#endif
 } aud_intf_voc_setup_t;
 
 #if CONFIG_AUD_INTF_SUPPORT_OPUS
@@ -370,7 +366,20 @@ typedef struct {
             .frame_num = 15,                                           \
             .fifo_frame_num = 10,                                      \
             .aud_tx_rb = NULL,                                         \
-        }
+            .aud_codec_setup_input = {                                 \
+                                       .adc_samp_rate = 16000,         \
+                                       .enc_bitrate = 64000,           \
+                                       .enc_frame_len_in_ms = 20,      \
+                                       .enc_data_depth_in_byte = 2,    \
+                                       .enc_vbr_en = 0,                \
+                                       .dac_samp_rate = 16000,         \
+                                       .dec_bitrate = 64000,           \
+                                       .dec_frame_len_in_ms = 20,      \
+                                       .dec_data_depth_in_byte = 2,    \
+                                       .dec_vbr_en = 0,                \
+                                     },                                \
+                    }
+
 #endif
 
 #ifdef __cplusplus

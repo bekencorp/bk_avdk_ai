@@ -1877,7 +1877,7 @@ static bk_err_t aud_tras_enc(void)
 	if (aud_tras_drv_info.voc_info.mic_type == AUD_INTF_MIC_TYPE_BOARD) {
 		if (aud_tras_drv_info.voc_info.aec_enable) {
 			/* get data from aec_ring_buff */
-			#if CONFIG_AUD_INTF_SUPPORT_OPUS
+			#if CONFIG_AUD_INTF_SUPPORT_OPUS || CONFIG_AUD_INTF_SUPPORT_G722
 			uint8_t *addr = (uint8_t *)aud_tras_drv_info.voc_info.encoder_temp.pcm_data;
 			uint32_t adc_20ms_sample_cnt = aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate*20/1000;
 			uint32_t enc_trigger_20ms_frame_cnt = (aud_tras_drv_info.voc_info.aud_codec_setup.enc_frame_len_in_ms/20);
@@ -1946,20 +1946,28 @@ static bk_err_t aud_tras_enc(void)
 			break;
 
 #if CONFIG_AUD_INTF_SUPPORT_G722
-		case AUD_INTF_VOC_DATA_TYPE_G722:
+        case AUD_INTF_VOC_DATA_TYPE_G722:
         {
-			/* G722 encoding pcm data to G722 data*/
-            enc_size = g722_encode(&g722_enc, aud_tras_drv_info.voc_info.encoder_temp.law_data, aud_tras_drv_info.voc_info.encoder_temp.pcm_data, temp_mic_samp_rate_points);
-            LOGD("%s, %d, len: %d, enc_size:%d \n", __func__, __LINE__, temp_mic_samp_rate_points, enc_size);
-			break;
+            /* G722 encoding pcm data to G722 data*/
+            uint32_t enc_trigger_20ms_frame_cnt = (aud_tras_drv_info.voc_info.aud_codec_setup.enc_frame_len_in_ms/20);
+            if(0 == (aud_tras_drv_info.voc_info.encoder_temp.frame_20ms_cnt%enc_trigger_20ms_frame_cnt))
+            {
+                enc_size = g722_encode(&g722_enc, aud_tras_drv_info.voc_info.encoder_temp.law_data, aud_tras_drv_info.voc_info.encoder_temp.pcm_data, aud_tras_drv_info.voc_info.aud_codec_setup.enc_input_size_in_byte);
+                LOGD("g722 enc:20ms cnt:%d enc!enc_size:%d\n",aud_tras_drv_info.voc_info.encoder_temp.frame_20ms_cnt,enc_size);
+            }
+            else
+            {
+                LOGD("g722 enc:20ms cnt:%d skip!\n",aud_tras_drv_info.voc_info.encoder_temp.frame_20ms_cnt);
+            }
+            break;
         }
 #elif CONFIG_AUD_INTF_SUPPORT_OPUS
-		case AUD_INTF_VOC_DATA_TYPE_OPUS:
+        case AUD_INTF_VOC_DATA_TYPE_OPUS:
         {
             //uint32 start,end,int_mask;
             //int_mask = rtos_disable_int();
-		    //start = timer_hal_get_timer0_cnt();
-			/* OPUS encoding pcm data to OPUS data*/
+            //start = timer_hal_get_timer0_cnt();
+            /* OPUS encoding pcm data to OPUS data*/
             uint32_t enc_trigger_20ms_frame_cnt = (aud_tras_drv_info.voc_info.aud_codec_setup.enc_frame_len_in_ms/20);
             if(0 == (aud_tras_drv_info.voc_info.encoder_temp.frame_20ms_cnt%enc_trigger_20ms_frame_cnt))
             {
@@ -1978,7 +1986,7 @@ static bk_err_t aud_tras_enc(void)
             //rtos_enable_int(int_mask);
             //LOGI("opus enc s:%d e:%d, dur:%d us,enc_len:%d\r\n", start,end,get_duration_clk_cycles(start,end)/26,enc_size);
             LOGD("%s, %d, len: %d, enc_size:%d \n", __func__, __LINE__, temp_mic_samp_rate_points, enc_size);
-			break;
+            break;
         }
 #else
 #endif
@@ -1999,9 +2007,12 @@ static bk_err_t aud_tras_enc(void)
 			break;
 
 #if CONFIG_AUD_INTF_SUPPORT_G722
-		case AUD_INTF_VOC_DATA_TYPE_G722:
-			os_memcpy(temp_tx_info.ping.buff_addr, aud_tras_drv_info.voc_info.encoder_temp.law_data, temp_mic_samp_rate_points / 2);
-			break;
+        case AUD_INTF_VOC_DATA_TYPE_G722:
+            if(0 < enc_size)
+            {
+                os_memcpy(temp_tx_info.ping.buff_addr, aud_tras_drv_info.voc_info.encoder_temp.law_data, enc_size);
+            }
+            break;
 #elif CONFIG_AUD_INTF_SUPPORT_OPUS
         case AUD_INTF_VOC_DATA_TYPE_OPUS:
         {
@@ -2063,15 +2074,27 @@ static bk_err_t aud_tras_enc(void)
                     LOGE("tx trans rb not enough,data free_size: %d,len free size:%d \n", free_size2,free_size1);
                 }
             }
+        #elif CONFIG_AUD_INTF_SUPPORT_G722
+            if(0 < enc_size)
+            {
+                int free_size = ring_buffer_get_free_size(aud_tras_drv_info.voc_info.aud_tx_rb);
+                if (free_size > temp_tx_info.buff_length) {
+                    //GPIO_UP(4);
+                    ring_buffer_write(aud_tras_drv_info.voc_info.aud_tx_rb, (uint8_t *)temp_tx_info.ping.buff_addr, temp_tx_info.buff_length);
+                    //GPIO_DOWN(4);
+                } else {
+                    //LOGE("aud_tx_rb free_size: %d \n", free_size);
+                }
+            }
         #else
-    		int free_size = ring_buffer_get_free_size(aud_tras_drv_info.voc_info.aud_tx_rb);
-    		if (free_size > temp_tx_info.buff_length) {
-    			//GPIO_UP(4);
-    			ring_buffer_write(aud_tras_drv_info.voc_info.aud_tx_rb, (uint8_t *)temp_tx_info.ping.buff_addr, temp_tx_info.buff_length);
-    			//GPIO_DOWN(4);
-    		} else {
-    			//LOGE("aud_tx_rb free_size: %d \n", free_size);
-    		}
+            int free_size = ring_buffer_get_free_size(aud_tras_drv_info.voc_info.aud_tx_rb);
+            if (free_size > temp_tx_info.buff_length) {
+                //GPIO_UP(4);
+                ring_buffer_write(aud_tras_drv_info.voc_info.aud_tx_rb, (uint8_t *)temp_tx_info.ping.buff_addr, temp_tx_info.buff_length);
+                //GPIO_DOWN(4);
+            } else {
+                //LOGE("aud_tx_rb free_size: %d \n", free_size);
+            }
         #endif
     	}
 #if CONFIG_AUD_INTF_SUPPORT_AI_DIALOG_FREE
@@ -3945,7 +3968,7 @@ static bk_err_t aud_tras_drv_voc_deinit(void)
 		aud_tras_drv_info.voc_info.decoder_temp.pcm_data = NULL;
 	}
 
-#if CONFIG_AUD_INTF_SUPPORT_OPUS
+#if CONFIG_AUD_INTF_SUPPORT_OPUS || CONFIG_AUD_INTF_SUPPORT_G722
 	aud_tras_drv_info.voc_info.encoder_temp.frame_20ms_cnt = 0;
 	aud_tras_drv_info.voc_info.decoder_temp.frame_20ms_cnt = 0;
 #endif
@@ -4125,7 +4148,7 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 #else
 			aud_tras_drv_info.voc_info.adc_config->adc_chl = AUD_ADC_CHL_L;
 #endif
-			#if CONFIG_AUD_INTF_SUPPORT_OPUS
+			#if CONFIG_AUD_INTF_SUPPORT_OPUS || CONFIG_AUD_INTF_SUPPORT_G722
 			aud_tras_drv_info.voc_info.adc_config->samp_rate = voc_cfg->aud_codec_setup.adc_samp_rate;
 			#else
 			aud_tras_drv_info.voc_info.adc_config->samp_rate = voc_cfg->samp_rate;
@@ -4164,7 +4187,7 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 			err = BK_ERR_AUD_INTF_MEMY;
 			goto aud_tras_drv_voc_init_exit;
 		} else {
-			#if CONFIG_AUD_INTF_SUPPORT_OPUS
+			#if CONFIG_AUD_INTF_SUPPORT_OPUS || CONFIG_AUD_INTF_SUPPORT_G722
 			aud_tras_drv_info.voc_info.dac_config->samp_rate = voc_cfg->aud_codec_setup.dac_samp_rate;
 			#else
 			aud_tras_drv_info.voc_info.dac_config->samp_rate = voc_cfg->samp_rate;
@@ -4179,7 +4202,7 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 
 	/* get ring buffer config */
 	//aud_tras_drv_info.voc_info.mode = setup->aud_trs_mode;
-	#if CONFIG_AUD_INTF_SUPPORT_OPUS
+	#if CONFIG_AUD_INTF_SUPPORT_OPUS || CONFIG_AUD_INTF_SUPPORT_G722
 	aud_tras_drv_info.voc_info.aud_codec_setup = voc_cfg->aud_codec_setup;
 	aud_tras_drv_info.voc_info.mic_samp_rate_points = aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate* \
 													aud_tras_drv_info.voc_info.aud_codec_setup.enc_frame_len_in_ms/1000;
@@ -4272,7 +4295,7 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 		}
 
 		/* config audio adc dma to carry mic data to "mic_ring_buff" */
-#if CONFIG_AUD_INTF_SUPPORT_OPUS
+#if CONFIG_AUD_INTF_SUPPORT_OPUS || CONFIG_AUD_INTF_SUPPORT_G722
 		uint32_t adc_20ms_sample_cnt = aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate*20/1000;
 		#if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
 		ret = aud_tras_adc_dma_config(aud_tras_drv_info.voc_info.adc_dma_id, aud_tras_drv_info.voc_info.mic_ring_buff, (aud_tras_drv_info.voc_info.mic_samp_rate_points*4)*aud_tras_drv_info.voc_info.mic_frame_number + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, adc_20ms_sample_cnt*4, AUD_INTF_MIC_CHL_DUAL);
@@ -4395,7 +4418,7 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 
 	/*  -------------------------step6: init all audio ring buffers -------------------------------- */
 	/* init encoder and decoder temp buffer */
-    #if CONFIG_AUD_INTF_SUPPORT_OPUS
+    #if CONFIG_AUD_INTF_SUPPORT_OPUS || CONFIG_AUD_INTF_SUPPORT_G722
 	aud_tras_drv_info.voc_info.encoder_temp.frame_20ms_cnt = 0;
 	#endif
 	aud_tras_drv_info.voc_info.encoder_temp.pcm_data = (int16_t *)audio_tras_drv_malloc(aud_tras_drv_info.voc_info.mic_samp_rate_points * 2);
@@ -4405,7 +4428,7 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 		goto aud_tras_drv_voc_init_exit;
 	}
 
-	#if CONFIG_AUD_INTF_SUPPORT_OPUS
+	#if CONFIG_AUD_INTF_SUPPORT_OPUS || CONFIG_AUD_INTF_SUPPORT_G722
 	aud_tras_drv_info.voc_info.decoder_temp.frame_20ms_cnt = 0;
 	#endif
 	aud_tras_drv_info.voc_info.decoder_temp.pcm_data = (int16_t *)audio_tras_drv_malloc(aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
@@ -4445,14 +4468,14 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
             g722_decode_init(&g722_dec, 64000, 0);
 
 			LOGI("%s, %d, malloc law_data temp buffer \n", __func__, __LINE__);
-			aud_tras_drv_info.voc_info.encoder_temp.law_data = (uint8_t *)audio_tras_drv_malloc(aud_tras_drv_info.voc_info.mic_samp_rate_points / 2);
+			aud_tras_drv_info.voc_info.encoder_temp.law_data = (uint8_t *)audio_tras_drv_malloc(aud_tras_drv_info.voc_info.aud_codec_setup.enc_output_size_in_byte);
 			if (aud_tras_drv_info.voc_info.encoder_temp.law_data == NULL) {
 				LOGE("%s, %d, malloc law_data of encoder used fail \n", __func__, __LINE__);
 				err = BK_ERR_AUD_INTF_MEMY;
 				goto aud_tras_drv_voc_init_exit;
 			}
 
-			aud_tras_drv_info.voc_info.decoder_temp.law_data = (unsigned char *)audio_tras_drv_malloc(aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2);
+			aud_tras_drv_info.voc_info.decoder_temp.law_data = (unsigned char *)audio_tras_drv_malloc(aud_tras_drv_info.voc_info.aud_codec_setup.dec_input_size_in_byte);
 			if (aud_tras_drv_info.voc_info.decoder_temp.law_data == NULL) {
 				LOGE("%s, %d, malloc law_data of decoder used fail \n", __func__, __LINE__);
 				err = BK_ERR_AUD_INTF_MEMY;

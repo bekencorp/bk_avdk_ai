@@ -24,6 +24,7 @@
 #if (CONFIG_CACHE_ENABLE)
 #include "cache.h"
 #endif
+#include "aud_intf.h"
 
 
 #define AUD_TRAS "aud_tras"
@@ -193,6 +194,7 @@ static void aud_tras_main(beken_thread_arg_t param_data)
 	aud_trs_setup = (aud_tras_setup_t *)param_data;
 	uint8_t *aud_temp_data = NULL;
 	int tx_size = 0;
+	uint32_t enc_output_size = bk_aud_get_enc_output_size_in_byte();
 
 
 #ifdef AUD_TX_DEBUG
@@ -223,16 +225,14 @@ static void aud_tras_main(beken_thread_arg_t param_data)
 	}
 	LOGI("start audio tx count timer complete \r\n");
 #endif
-
 	GLOBAL_INT_DECLARATION();
-	aud_temp_data = audio_tras_malloc(320);
+	aud_temp_data = audio_tras_malloc(enc_output_size);
 	if (!aud_temp_data)
 	{
 		LOGE("malloc aud_temp_data\n");
 		goto aud_tras_exit;
 	}
-	os_memset(aud_temp_data, 0, 320);
-
+	os_memset(aud_temp_data, 0, enc_output_size);
 
 	rtos_set_semaphore(&aud_tras_task_sem);
 
@@ -278,18 +278,18 @@ static void aud_tras_main(beken_thread_arg_t param_data)
                     }
                     #else
 					fill_size = ring_buffer_get_fill_size(&aud_tras_info->aud_tras_rb);
-					for (int n = 0; n < fill_size/320; n++) {
+					for (int n = 0; n < fill_size/enc_output_size; n++) {
 //						GPIO_UP(6);
 #if (CONFIG_CACHE_ENABLE)
 						flush_all_dcache();
 #endif
 						GLOBAL_INT_DISABLE();
-						ring_buffer_read(&aud_tras_info->aud_tras_rb, aud_temp_data, 320);
+						ring_buffer_read(&aud_tras_info->aud_tras_rb, aud_temp_data, enc_output_size);
 						GLOBAL_INT_RESTORE();
 #ifdef AUD_TX_DEBUG
-						bk_uart_write_bytes(UART_ID_1, aud_temp_data, 320);
+						bk_uart_write_bytes(UART_ID_1, aud_temp_data, enc_output_size);
 #endif
-						tx_size = aud_trs_setup->aud_tras_send_data_cb(aud_temp_data, 320);
+						tx_size = aud_trs_setup->aud_tras_send_data_cb(aud_temp_data, enc_output_size);
 						if (tx_size > 0) {
 #ifdef CONFIG_AUD_TX_COUNT_DEBUG
 							aud_tx_count.complete_size+=tx_size;

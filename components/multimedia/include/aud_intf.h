@@ -657,9 +657,11 @@ void bk_aud_intf_clear_aec_vad_flag(void);
 void bk_aud_intf_clear_aec_slience_flag(void);
 bk_err_t bk_aud_intf_set_vad_para(aud_intf_voc_vad_para_t vad_para, uint32_t value);
 bk_err_t bk_aud_intf_audio_para_set(app_aud_para_t *aud_para_ptr);
-#if CONFIG_AUD_INTF_SUPPORT_OPUS
+void bk_aud_intf_aud_codec_init(aud_codec_setup_input_t *input);
 uint32_t bk_aud_get_dec_input_size_in_byte(void);
-#endif
+uint32_t bk_aud_get_dec_output_size_in_byte(void);
+uint32_t bk_aud_get_enc_input_size_in_byte(void);
+uint32_t bk_aud_get_enc_output_size_in_byte(void);
 
 /**
  * @}
