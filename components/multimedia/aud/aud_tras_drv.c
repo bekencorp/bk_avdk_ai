@@ -215,7 +215,7 @@ static beken_semaphore_t aud_tras_drv_task_sem = NULL;
 #if CONFIG_AUD_INTF_SUPPORT_AI_DIALOG_FREE
 static aud_tras_drv_aec_output_callback gl_aec_output_callback = NULL;
 static void *gl_user_data = NULL;
-static bool gl_dialog_running = false;
+static bool gl_dialog_running = true;
 #endif
 
 #if CONFIG_AUD_TRAS_AEC_MIC_DELAY_DEBUG
@@ -4280,6 +4280,7 @@ static bk_err_t aud_tras_drv_voc_deinit(void)
 
     vote_stop_cpu2_core(CPU2_USER_ASR);
 
+    gl_dialog_running = true;
 #endif
 
 	/* change status:
@@ -4824,6 +4825,8 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
         err = BK_ERR_AUD_INTF_START_CPU2;
         goto aud_tras_drv_voc_init_exit;
     }
+    /* config dialog_running default is fasle, and not send mic data to wifi */
+    gl_dialog_running = false;
 #endif
 
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
@@ -6419,6 +6422,7 @@ bk_err_t aud_tras_drv_register_aec_ouput_callback(aud_tras_drv_aec_output_callba
     return BK_OK;
 }
 
+#if CONFIG_AI_ASR_MODE_CPU2
 bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result)
 {
     if (asr_result == HI_ARMINO) {
@@ -6458,6 +6462,7 @@ bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result)
 
     return BK_OK;
 }
+#endif  //#if CONFIG_AI_ASR_MODE_CPU2
 #endif
 
 

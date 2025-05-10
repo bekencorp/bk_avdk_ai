@@ -547,7 +547,9 @@ typedef int (*aud_tras_drv_aec_output_callback)(unsigned char *data, unsigned in
 
 bk_err_t aud_tras_drv_register_aec_ouput_callback(aud_tras_drv_aec_output_callback cb, void *user_data);
 
+#if CONFIG_AI_ASR_MODE_CPU2
 bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result);
+#endif
 #endif
 
 #if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
