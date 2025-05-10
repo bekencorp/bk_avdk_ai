@@ -129,6 +129,7 @@ bk_err_t media_app_lvgl_open(void *lcd_open);
 bk_err_t media_app_lvgl_close(void);
 bk_err_t media_app_lvcam_lvgl_open(void *lcd_open);
 bk_err_t media_app_lvcam_lvgl_close(void);
+bk_err_t media_app_lvgl_send_data(void *data);
 
 bk_err_t media_app_rtsp_open(video_config_t *config);
 bk_err_t media_app_rtsp_close();

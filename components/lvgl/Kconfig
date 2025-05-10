@@ -23,6 +23,10 @@ menu "Lvgl_source"
 		help
 			Enable features to draw on transparent background
 
+	config LV_USE_FREETYPE
+		bool "Enable Lv Use Freetype"
+		default n
+
 	config LV_FONT_MONTSERRAT_8
 		bool "Enable Lv Font Montserrat 8"
 		default n
@@ -152,11 +156,11 @@ menu "Lvgl_source"
 		bool "Enable Lv Code load psram"
 		default n
 
-    config LV_IMG_UTILITY_CUSTOMIZE
-        bool "Enable LVGL use customized image decoding method"
-        default n
+	config LV_IMG_UTILITY_CUSTOMIZE
+		bool "Enable LVGL use customized image decoding method"
+		default n
 
-    config LVGL_USE_TRIPLE_BUFFERS
-        bool "Enable LVGL use three buffers"
-        default n
+	config LVGL_USE_TRIPLE_BUFFERS
+		bool "Enable LVGL use three buffers"
+		default n
 endmenu

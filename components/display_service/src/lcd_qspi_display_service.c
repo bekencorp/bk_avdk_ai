@@ -79,7 +79,7 @@ void bk_lcd_qspi_disp_task_start(const lcd_device_t *device)
     lcd_qspi_disp_task_running = true;
 
     ret = rtos_create_thread(&lcd_qspi_disp_thread_hdl,
-                             3,
+                             5,
                              "qspi_disp",
                              (beken_thread_function_t)lcd_qspi_disp_task_entry,
                              4096,

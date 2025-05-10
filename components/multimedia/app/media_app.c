@@ -1277,7 +1277,7 @@ bk_err_t media_app_lvcam_lvgl_open(void *lcd_open)
     }
     os_memcpy(ptr, (lcd_open_t *)lcd_open, sizeof(lcd_open_t));
 
-    ret =  media_send_msg_sync(EVENT_LVCAM_LVGL_OPEN_IND, (uint32_t)ptr);
+    ret =  media_send_msg_sync(EVENT_LVGL_LVCAM_OPEN_IND, (uint32_t)ptr);
 
     if (ptr) {
         os_free(ptr);
@@ -1293,9 +1293,20 @@ bk_err_t media_app_lvcam_lvgl_close(void)
 {
     bk_err_t ret = 0;
 
-    ret =  media_send_msg_sync(EVENT_LVCAM_LVGL_CLOSE_IND, 0);
+    ret =  media_send_msg_sync(EVENT_LVGL_LVCAM_CLOSE_IND, 0);
 
     LOGI("%s complete\n", __func__);
+
+    return ret;
+}
+
+bk_err_t media_app_lvgl_send_data(void *data)
+{
+    bk_err_t ret = BK_OK;
+
+    ret = media_send_msg_sync(EVENT_LVGL_SEND_DATA_IND, (uint32_t)data);
+
+    LOGI("%s complete %x\n", __func__, ret);
 
     return ret;
 }
