@@ -127,9 +127,10 @@ static void uart_dump_mic_data(uart_id_t id, uint32_t baud_rate)
 #ifdef CONFIG_AUD_TX_COUNT_DEBUG
 static void aud_tx_lost_count_dump(void *param)
 {
+    uint32_t complete_size_temp = aud_tx_count.complete_size;
 	aud_tx_count.complete_size = aud_tx_count.complete_size / 1024 / (AUD_TX_DEBUG_INTERVAL / 1000);
 
-	LOGI("[AUD Tx] %uKB/s \r\n", aud_tx_count.complete_size);
+	LOGI("[AUD Tx] size: %d(Bytes), %uKB/s\n", complete_size_temp, aud_tx_count.complete_size);
 	aud_tx_count.complete_size  = 0;
 }
 #endif

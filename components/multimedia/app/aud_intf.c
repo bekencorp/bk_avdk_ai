@@ -887,9 +887,10 @@ static void aud_intf_voc_deconfig(void)
 #ifdef CONFIG_AUD_RX_COUNT_DEBUG
 static void aud_rx_lost_count_dump(void *param)
 {
+    uint32_t rx_size_temp = aud_rx_count.rx_size;
 	aud_rx_count.rx_size = aud_rx_count.rx_size / 1024 / (AUD_RX_DEBUG_INTERVAL / 1000);
 
-	LOGI("[AUD Rx] %uKB/s \r\n", aud_rx_count.rx_size);
+	LOGI("[AUD Rx] size: %d(Bytes), %uKB/s\n", rx_size_temp, aud_rx_count.rx_size);
 	aud_rx_count.rx_size = 0;
 }
 #endif
