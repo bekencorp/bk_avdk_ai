@@ -1960,7 +1960,7 @@ static bk_err_t aud_tras_enc(void)
             //int_mask = rtos_disable_int();
 		    //start = timer_hal_get_timer0_cnt();
 			/* OPUS encoding pcm data to OPUS data*/
-            #if CONFIG_AUD_INTF_SUPPORT_OPUS
+
             uint32_t enc_trigger_20ms_frame_cnt = (aud_tras_drv_info.voc_info.aud_codec_setup.enc_frame_len_in_ms/20);
             if(0 == (aud_tras_drv_info.voc_info.encoder_temp.frame_20ms_cnt%enc_trigger_20ms_frame_cnt))
             {
@@ -1971,9 +1971,7 @@ static bk_err_t aud_tras_enc(void)
             {
                 LOGD("opus enc:20ms cnt:%d skip!\n",aud_tras_drv_info.voc_info.encoder_temp.frame_20ms_cnt);
             }
-            #else
-            enc_size = opus_encode(opus_encoder, (int16_t *)aud_tras_drv_info.voc_info.encoder_temp.pcm_data, temp_mic_samp_rate_points, aud_tras_drv_info.voc_info.encoder_temp.law_data, temp_mic_samp_rate_points);
-            #endif
+
             //end = timer_hal_get_timer0_cnt();
             //rtos_enable_int(int_mask);
             //LOGI("opus enc s:%d e:%d, dur:%d us,enc_len:%d\r\n", start,end,get_duration_clk_cycles(start,end)/26,enc_size);
@@ -2564,7 +2562,15 @@ static bk_err_t aud_tras_dec(void)
                                                        (int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 
                                                        aud_tras_drv_info.voc_info.speaker_samp_rate_points*2, 
                                                        0);
-                            LOGD("%s, %d, len: %d, dec_size: %d \n", __func__, __LINE__, pkt_len, dec_size * 2);
+                            if(0 >= dec_size)
+                            {
+                                os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                                LOGE("dec fail len: %d, ret: %d,insert slience frame.\n",pkt_len, dec_size);
+                            }
+                            else
+                            {
+                                LOGD("dec succ len: %d, dec_size: %d \n",pkt_len, dec_size * 2);
+                            }
                         }
                         #endif
                         break;
