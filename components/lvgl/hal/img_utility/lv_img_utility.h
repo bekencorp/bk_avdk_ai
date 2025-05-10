@@ -3,7 +3,7 @@
 
 #include "lvgl.h"
 
-bk_err_t lv_img_read_filelen(char *filename);
+int lv_img_read_filelen(char *filename);
 s32 lv_jpeg_img_load_with_sw_dec(char *filename, lv_img_dsc_t *img_dst);
 s32 lv_jpeg_img_load_yuyv(char *filename, lv_img_dsc_t *img_dst);
 s32 lv_jpeg_img_load_with_hw_dec(char *filename, lv_img_dsc_t *img_dst);

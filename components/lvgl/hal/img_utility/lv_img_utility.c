@@ -129,7 +129,7 @@ bk_err_t lv_img_read_file_to_mem(char *filename, uint32* paddr)
     return ret;
 }
 
-bk_err_t lv_img_read_filelen(char *filename)
+int lv_img_read_filelen(char *filename)
 {
     int ret = BK_FAIL;
     struct stat statbuf;
