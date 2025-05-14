@@ -2964,79 +2964,37 @@ voice_dl_process((int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data,aud
 #endif
 	{
 	/* save the data after G711A processed to encoder_ring_buffer */
-		if ((ring_buffer_get_free_size(&(aud_tras_drv_info.voc_info.speaker_rb)) == aud_tras_drv_info.voc_info.speaker_rb.capacity))
-		{
-#if CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP
-            if (spk_source_type == SPK_SOURCE_TYPE_A2DP)
-            {
-				size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)a2dp_read_buff, a2dp_frame_size);
-				if (size != a2dp_frame_size) {
-					LOGE("%s, %d, the data writeten to speaker_ring_buff is not a frame, size=%d \n", __func__, __LINE__, size);
-					goto decoder_exit;
-				}
-                //SPK_DATA_DUMP_BY_UART_DATA(a2dp_read_buff, a2dp_frame_size);
-				size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)a2dp_read_buff, a2dp_frame_size);
-				if (size != a2dp_frame_size) {
-					LOGE("%s, %d, the data writeten to speaker_ring_buff is not a frame, size=%d \n", __func__, __LINE__, size);
-					goto decoder_exit;
-				}
-                //SPK_DATA_DUMP_BY_UART_DATA(a2dp_read_buff, a2dp_frame_size);
-			}
-            else
-#endif
-			{
-				size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
-				if (size != aud_tras_drv_info.voc_info.speaker_samp_rate_points*2) {
-					LOGE("%s, %d, the data writeten to speaker_ring_buff is not a frame, size=%d \n", __func__, __LINE__, size);
-					goto decoder_exit;
-				}
-                //SPK_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
+        if ((ring_buffer_get_free_size(&(aud_tras_drv_info.voc_info.speaker_rb)) == aud_tras_drv_info.voc_info.speaker_rb.capacity)) {
+            LOGW("%s, %d, speaker rb is empty, fill data again\n", __func__, __LINE__);
+            aud_tras_drv_send_msg(AUD_TRAS_DRV_DECODER, NULL);
+        }
 
-			#if 1
+#if CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP
+        if (spk_source_type == SPK_SOURCE_TYPE_A2DP) {
+            if (ring_buffer_get_free_size(&(aud_tras_drv_info.voc_info.speaker_rb)) > a2dp_frame_size) {
+                size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)a2dp_read_buff, a2dp_frame_size);
+                if (size != a2dp_frame_size) {
+                    LOGE("%s, %d, the data writeten to speaker_ring_buff is not a frame, size=%d \n", __func__, __LINE__, size);
+                    goto decoder_exit;
+                }
+                //SPK_DATA_DUMP_BY_UART_DATA(a2dp_read_buff, a2dp_frame_size);
+                aud_tras_drv_info.voc_info.rx_info.aud_trs_read_seq++;
+                LOGD("write a2dp data to audio dac\n");
+            }
+        }
+        else
+#endif
+        {
+			if (ring_buffer_get_free_size(&(aud_tras_drv_info.voc_info.speaker_rb)) > aud_tras_drv_info.voc_info.speaker_samp_rate_points*2) {
 				size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
 				if (size != aud_tras_drv_info.voc_info.speaker_samp_rate_points*2) {
 					LOGE("%s, %d, the data writeten to speaker_ring_buff is not a frame, size=%d \n", __func__, __LINE__, size);
 					goto decoder_exit;
 				}
                 //SPK_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
-			#else
-				os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
-				size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
-				if (size != aud_tras_drv_info.voc_info.speaker_samp_rate_points*2) {
-					LOGE("%s, %d, the data writeten to speaker_ring_buff is not a frame, size=%d \n", __func__, __LINE__, size);
-					goto decoder_exit;
-				}
-			#endif
+				aud_tras_drv_info.voc_info.rx_info.aud_trs_read_seq++;
 			}
-			aud_tras_drv_info.voc_info.rx_info.aud_trs_read_seq++;
-		}else {
-#if CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP
-            if (spk_source_type == SPK_SOURCE_TYPE_A2DP) {
-                if (ring_buffer_get_free_size(&(aud_tras_drv_info.voc_info.speaker_rb)) > a2dp_frame_size) {
-                    size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)a2dp_read_buff, a2dp_frame_size);
-                    if (size != a2dp_frame_size) {
-                        LOGE("%s, %d, the data writeten to speaker_ring_buff is not a frame, size=%d \n", __func__, __LINE__, size);
-                        goto decoder_exit;
-                    }
-                    //SPK_DATA_DUMP_BY_UART_DATA(a2dp_read_buff, a2dp_frame_size);
-                    aud_tras_drv_info.voc_info.rx_info.aud_trs_read_seq++;
-                    LOGD("write a2dp data to audio dac\n");
-                }
-            }
-            else
-#endif
-            {
-    			if (ring_buffer_get_free_size(&(aud_tras_drv_info.voc_info.speaker_rb)) > aud_tras_drv_info.voc_info.speaker_samp_rate_points*2) {
-    				size = ring_buffer_write(&(aud_tras_drv_info.voc_info.speaker_rb), (uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
-    				if (size != aud_tras_drv_info.voc_info.speaker_samp_rate_points*2) {
-    					LOGE("%s, %d, the data writeten to speaker_ring_buff is not a frame, size=%d \n", __func__, __LINE__, size);
-    					goto decoder_exit;
-    				}
-                    //SPK_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
-    				aud_tras_drv_info.voc_info.rx_info.aud_trs_read_seq++;
-    			}
-            }
-		}
+        }
 
 		if (aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_UAC) {
 			size = ring_buffer_read(&aud_tras_drv_info.voc_info.speaker_rb, (uint8_t *)aud_tras_drv_info.voc_info.uac_spk_buff, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);

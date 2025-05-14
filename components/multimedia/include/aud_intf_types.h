@@ -83,7 +83,7 @@ typedef struct {
 
 #define DEFAULT_AUD_INTF_DRV_SETUP_CONFIG() {          \
         .work_mode = AUD_INTF_WORK_MODE_NULL,          \
-        .task_config = {.priority = 5},                \
+        .task_config = {.priority = 4},                \
         .aud_intf_tx_mic_data = NULL,                  \
         .aud_intf_rx_spk_data = NULL,                  \
 		.aud_intf_update_vad_flag = NULL,                  \
