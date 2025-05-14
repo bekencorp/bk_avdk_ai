@@ -16,13 +16,6 @@ if (CONFIG_VIDEO_AVI)
 	)
 endif()
 
-if (CONFIG_NTP_SYNC_RTC AND !CONFIG_STARBURST_AIDIALOG_SDK)
-	list(APPEND srcs
-	time/time.c
-	time/ntp.c
-	time/app_time_intf.c
-	)
-endif()
 
 if (CONFIG_APP_DEMO_VIDEO_TRANSFER AND CONFIG_SYS_CPU0)
 	list(APPEND srcs
