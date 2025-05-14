@@ -47,7 +47,7 @@ volatile debug_dump_data_header_t dump_header[HEADER_ARRAY_CNT] =
         .data_flow_num = 1,
         .data_flow[0] = 
          {
-            .dump_type = DUMP_TYPE_AGORA_RX_SPK,
+            .dump_type = DUMP_TYPE_RX_SPK,
             .dump_file_type = DUMP_FILE_TYPE_G722,
             .len = 0,
          },
@@ -59,7 +59,7 @@ volatile debug_dump_data_header_t dump_header[HEADER_ARRAY_CNT] =
         .data_flow_num = 1,
         .data_flow[0] = 
          {
-            .dump_type = DUMP_TYPE_AGORA_TX_MIC,
+            .dump_type = DUMP_TYPE_TX_MIC,
             .dump_file_type = DUMP_FILE_TYPE_G722,
             .len = 0,
          },
@@ -94,8 +94,8 @@ volatile debug_dump_data_header_t dump_header[HEADER_ARRAY_CNT] =
 const uint8_t g_dump_type2header_array_idx[DUMP_TYPE_MAX] = 
 {
     DUMP_TYPE_AUD_MIC,
-    DUMP_TYPE_AGORA_RX_SPK,
-    DUMP_TYPE_AGORA_TX_MIC,
+    DUMP_TYPE_RX_SPK,
+    DUMP_TYPE_TX_MIC,
     DUMP_TYPE_AEC_MIC_DATA,
     DUMP_TYPE_AEC_MIC_DATA,
     DUMP_TYPE_AEC_MIC_DATA,

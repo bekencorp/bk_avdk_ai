@@ -2295,17 +2295,17 @@ static bk_err_t aud_tras_enc(void)
             if(0 < enc_size)
             {
                 os_memcpy(temp_tx_info.ping.buff_addr, aud_tras_drv_info.voc_info.encoder_temp.law_data, enc_size);
-                #if CONFIG_DEBUG_DUMP
-                extern bool agoora_tx_mic_data_flag;
-                if(agoora_tx_mic_data_flag)
-                {
-                    DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AGORA_TX_MIC,0,enc_size);
-                    DEBUG_DATA_DUMP_UPDATE_HEADER_TIMESTAMP(DUMP_TYPE_AGORA_TX_MIC);
-                    DEBUG_DATA_DUMP_BY_UART_HEADER(DUMP_TYPE_AGORA_TX_MIC);
-                    DEBUG_DATA_DUMP_UPDATE_HEADER_SEQ_NUM(DUMP_TYPE_AGORA_TX_MIC);
-                    DEBUG_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.encoder_temp.law_data, enc_size);
-                }
-                #endif
+                //#if CONFIG_DEBUG_DUMP
+                //extern bool tx_mic_data_flag;
+                //if(tx_mic_data_flag)
+                //{
+                //    DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_TX_MIC,0,enc_size);
+                //    DEBUG_DATA_DUMP_UPDATE_HEADER_TIMESTAMP(DUMP_TYPE_TX_MIC);
+                //    DEBUG_DATA_DUMP_BY_UART_HEADER(DUMP_TYPE_TX_MIC);
+                //    DEBUG_DATA_DUMP_UPDATE_HEADER_SEQ_NUM(DUMP_TYPE_TX_MIC);
+                //    DEBUG_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.encoder_temp.law_data, enc_size);
+                //}
+                //#endif
                 #if OPUS_ENC_DEC_LOOPBACK
                 enc_output_save[enc_save_wr_idx].len = enc_size;
                 os_memcpy(&enc_output_save[enc_save_wr_idx].output[0], aud_tras_drv_info.voc_info.encoder_temp.law_data, enc_size);
