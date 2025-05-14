@@ -2228,7 +2228,7 @@ static bk_err_t aud_tras_enc(void)
             uint32_t enc_trigger_20ms_frame_cnt = (aud_tras_drv_info.voc_info.aud_codec_setup.enc_frame_len_in_ms/20);
             if(0 == (aud_tras_drv_info.voc_info.encoder_temp.frame_20ms_cnt%enc_trigger_20ms_frame_cnt))
             {
-                enc_size = g722_encode(&g722_enc, aud_tras_drv_info.voc_info.encoder_temp.law_data, aud_tras_drv_info.voc_info.encoder_temp.pcm_data, aud_tras_drv_info.voc_info.aud_codec_setup.enc_input_size_in_byte);
+                enc_size = g722_encode(&g722_enc, aud_tras_drv_info.voc_info.encoder_temp.law_data, aud_tras_drv_info.voc_info.encoder_temp.pcm_data, temp_mic_samp_rate_points);
                 LOGD("g722 enc:20ms cnt:%d enc!enc_size:%d\n",aud_tras_drv_info.voc_info.encoder_temp.frame_20ms_cnt,enc_size);
             }
             else
