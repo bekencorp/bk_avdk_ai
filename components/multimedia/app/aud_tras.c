@@ -25,6 +25,7 @@
 #include "cache.h"
 #endif
 #include "aud_intf.h"
+#include <modules/audio_process.h>
 
 
 #define AUD_TRAS "aud_tras"
@@ -196,7 +197,11 @@ static void aud_tras_main(beken_thread_arg_t param_data)
 	uint8_t *aud_temp_data = NULL;
 	int tx_size = 0;
 	uint32_t enc_output_size = bk_aud_get_enc_output_size_in_byte();
-
+	#if CONFIG_AUD_VAD_SUPPORT
+	#ifdef CONFIG_AUD_TX_COUNT_DEBUG
+	app_aud_para_t * aud_para = get_app_aud_cust_para();
+	#endif
+	#endif
 
 #ifdef AUD_TX_DEBUG
 	uart_dump_mic_data(1, 2000000);
@@ -271,7 +276,12 @@ static void aud_tras_main(beken_thread_arg_t param_data)
                                 tx_size = aud_trs_setup->aud_tras_send_data_cb(aud_temp_data, pkt_len);
                                 if (tx_size > 0) {
 #ifdef CONFIG_AUD_TX_COUNT_DEBUG
-                                    aud_tx_count.complete_size+=tx_size;
+                                    #if CONFIG_AUD_VAD_SUPPORT
+                                    if(!aud_para->aec_config_voice.vad_enable)
+                                    #endif
+                                    { 
+                                        aud_tx_count.complete_size+=tx_size;
+                                    }
 #endif
                                 }
                             }
@@ -293,7 +303,12 @@ static void aud_tras_main(beken_thread_arg_t param_data)
 						tx_size = aud_trs_setup->aud_tras_send_data_cb(aud_temp_data, enc_output_size);
 						if (tx_size > 0) {
 #ifdef CONFIG_AUD_TX_COUNT_DEBUG
-							aud_tx_count.complete_size+=tx_size;
+							#if CONFIG_AUD_VAD_SUPPORT
+							if(!aud_para->aec_config_voice.vad_enable)
+							#endif
+							{ 
+								aud_tx_count.complete_size+=tx_size;
+							}
 #endif
 						}
 //						GPIO_DOWN(6);
@@ -496,4 +511,16 @@ RingBufferContext *aud_tras_get_tx_pkt_len_rb(void)
 }
 #endif
 
+void aud_tras_update_tx_size(int tx_size)
+{
+#ifdef CONFIG_AUD_TX_COUNT_DEBUG
+    #if CONFIG_AUD_VAD_SUPPORT
+    app_aud_para_t * aud_para = get_app_aud_cust_para();
+    if(aud_para->aec_config_voice.vad_enable)
+    #endif
+    { 
+        aud_tx_count.complete_size += tx_size;
+    }    
+#endif
+}
 

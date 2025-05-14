@@ -969,6 +969,12 @@ uint32_t bk_aud_get_enc_output_size_in_byte(void)
     return aud_intf_info.voc_info.aud_codec_setup.enc_output_size_in_byte;
 }
 
+uint32_t bk_aud_get_enc_frame_len_in_ms(void)
+{
+    return aud_intf_info.voc_info.aud_codec_setup.enc_frame_len_in_ms;
+}
+
+
 bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 {
 	bk_err_t ret = BK_OK;
@@ -1684,17 +1690,17 @@ static void aec_vad_status_set(int val)
 {    
     if(val == 1)
     {
-        LOGD("------------vad start----------\r\n");
+        LOGI("------------vad start----------\r\n");
         aud_intf_aec_vad_flag = 1;//FLAG_VAD_START;
     }
     else if(val == 2)
     {
-        LOGD("------------vad end:%d----------\r\n",rtos_get_time());
+        LOGI("------------vad end----------\r\n");
         aud_intf_aec_vad_flag = 2;//FLAG_VAD_END;
     }
     else if(val == 3)
     {
-        LOGD("------------silence----------\r\n");
+        LOGI("------------silence----------\r\n");
         aud_intf_aec_silence_flag = 1;
     }
 }

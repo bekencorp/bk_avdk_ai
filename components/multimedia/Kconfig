@@ -311,4 +311,8 @@ menu "Media"
 	        depends on AUD_INTF_SUPPORT_OPUS
 		bool "Support prompt tone resample"
 		default n
+	config AUD_VAD_SUPPORT
+		depends on AEC_VERSION_V3
+		bool "Support Voice activity detection"
+		default n
 endmenu
