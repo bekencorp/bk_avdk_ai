@@ -1779,6 +1779,7 @@ bk_err_t bk_aud_intf_set_vad_enable(bool val)
 bk_err_t bk_aud_intf_audio_para_set(app_aud_para_t *aud_para_ptr)
 {
 		bk_err_t ret = BK_OK;
+		bk_aud_debug_get_audpara(aud_para_ptr);
 		ret = mailbox_media_aud_send_msg(EVENT_AUD_SET_AUD_PARA_REQ, aud_para_ptr);
 		return ret;
 }
@@ -1793,7 +1794,6 @@ bk_err_t bk_aud_intf_update_dl_eq_para(app_eq_t *dl_eq_para_ptr)
 {
 		bk_err_t ret = BK_OK;
 		ret = mailbox_media_aud_send_msg(EVENT_AUD_UPDATE_DL_EQ_PARA_REQ, dl_eq_para_ptr);
-		bk_printf("bk_aud_intf_update_dl_eq_para\r\n");
 		return ret;
 }
 
@@ -1807,12 +1807,9 @@ bk_err_t bk_aud_intf_update_aec_para(app_aud_aec_config_t *aec_para_ptr)
 
 void audio_intf_debug_init()
 {
- 
-    #if CONFIG_SYS_CPU0
-    
-    bk_aud_debug_register_update_dl_eq_para_cb(bk_aud_intf_update_dl_eq_para);
-    bk_aud_debug_register_update_aec_config_cb(bk_aud_intf_update_aec_para);
-    bk_aud_debug_register_update_sys_config_cb(bk_aud_intf_update_sys_config_para);
-
-    #endif
+#if CONFIG_SYS_CPU0
+	bk_aud_debug_register_update_dl_eq_para_cb(bk_aud_intf_update_dl_eq_para);
+	bk_aud_debug_register_update_aec_config_cb(bk_aud_intf_update_aec_para);
+	bk_aud_debug_register_update_sys_config_cb(bk_aud_intf_update_sys_config_para);
+#endif
 }

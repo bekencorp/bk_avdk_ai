@@ -20,8 +20,7 @@ extern "C" {
 #endif
 
 
-
-
+void bk_aud_debug_get_audpara(app_aud_para_t * aud_para_ptr);
 void bk_aud_debug_register_update_dl_eq_para_cb(bk_aud_intf_update_dl_eq_para_cb_t dl_eq_para_cb);
 void bk_aud_debug_register_update_aec_config_cb(bk_aud_intf_update_aec_config_cb_t aec_config_cb);
 void bk_aud_debug_register_update_sys_config_cb(bk_aud_intf_update_sys_config_cb_t sys_config_cb);
