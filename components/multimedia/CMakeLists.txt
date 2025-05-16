@@ -81,6 +81,13 @@ if (CONFIG_MEDIA_MAJOR)
 	list(APPEND srcs
 		transfer/transfer_major_act.c
 	)
+
+if (CONFIG_IMAGE_DEBUG_DUMP)
+	list(APPEND srcs
+		transfer/transfer_major_storage_debug.c
+	)
+endif()
+
 endif()
 
 endif()#CONFIG_WIFI_TRANSFER

@@ -44,6 +44,10 @@
 #include "diskio.h"
 #endif
 
+#if (CONFIG_IMAGE_DEBUG_DUMP)
+#include "transfer_major_storage_debug.h"
+#endif
+
 #define TAG "trs_major"
 
 #define LOGI(...) BK_LOGW(TAG, ##__VA_ARGS__)
@@ -94,6 +98,10 @@ static beken_queue_t transfer_major_msg_que = NULL;
 static beken_semaphore_t transfer_major_sem = NULL;
 static bool transfer_major_task_running = false;
 extern media_debug_t *media_debug;
+
+#if (CONFIG_IMAGE_DEBUG_DUMP)
+bool image_debug_en = false;
+#endif
 
 extern u64 riscv_get_mtimer(void);
 
@@ -153,6 +161,14 @@ static void transfer_major_task_transfer_data(uint32_t param)
 		before = riscv_get_mtimer();
 #else
 		before = 0;
+#endif
+
+#if (CONFIG_IMAGE_DEBUG_DUMP)
+        /* storage image */
+        if (image_debug_en)
+        {
+            transfer_major_storage_image(encode_frame->frame, encode_frame->length);
+        }
 #endif
 
 		// send msg to cpu0
@@ -283,7 +299,11 @@ static bk_err_t transfer_major_task_init(void)
 								BEKEN_DEFAULT_WORKER_PRIORITY,
 								"transfer_major_task",
 								(beken_thread_function_t)transfer_major_task_entry,
+#if (CONFIG_IMAGE_DEBUG_DUMP)
+								1024 * 2,
+#else
 								1024,
+#endif
 								NULL);
 
 		if (BK_OK != ret)

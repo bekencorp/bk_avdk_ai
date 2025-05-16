@@ -315,4 +315,8 @@ menu "Media"
 		depends on AEC_VERSION_V3
 		bool "Support Voice activity detection"
 		default n
+
+	config IMAGE_DEBUG_DUMP
+		bool "Eable image dump sended to agent"
+		default n
 endmenu
