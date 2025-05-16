@@ -122,8 +122,14 @@ void transfer_major_storage_image(uint8_t *frame, uint32_t len)
     {
         image_index = 1;
     }
+#if (CONFIG_AGORA_VIDEO_FORMAT_JPEG)
+    os_snprintf(image_url, 20, "/%d.jpeg", image_index);
+#endif
 
+#if (CONFIG_AGORA_VIDEO_FORMAT_JPEG)
     os_snprintf(image_url, 20, "/%d.h264", image_index);
+#endif
+
     LOGI("%s, url: %s\n", __func__, image_url);
 
     int fd = open(image_url, O_WRONLY | O_CREAT);
