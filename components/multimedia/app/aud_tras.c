@@ -188,20 +188,93 @@ bk_err_t aud_tras_deinit(void)
 	return kNoResourcesErr;
 }
 
+static void aud_tras_read_enc_data(aud_tras_setup_t * aud_trs_setup, uint8_t *buf)
+{
+    uint32_t fill_size = 0;
+    int tx_size = 0;
+    uint32_t enc_output_size = bk_aud_get_enc_output_size_in_byte();
+#if CONFIG_AUD_VAD_SUPPORT
+#ifdef CONFIG_AUD_TX_COUNT_DEBUG
+    app_aud_para_t * aud_para = get_app_aud_cust_para();
+#endif
+#endif
+	GLOBAL_INT_DECLARATION();
+
+    fill_size = ring_buffer_get_fill_size(&aud_tras_info->aud_tras_rb);
+    for (int n = 0; n < fill_size/enc_output_size; n++) {
+#if (CONFIG_CACHE_ENABLE)
+        flush_all_dcache();
+#endif
+        GLOBAL_INT_DISABLE();
+        ring_buffer_read(&aud_tras_info->aud_tras_rb, buf, enc_output_size);
+        GLOBAL_INT_RESTORE();
+#ifdef AUD_TX_DEBUG
+        bk_uart_write_bytes(UART_ID_1, buf, enc_output_size);
+#endif
+        tx_size = aud_trs_setup->aud_tras_send_data_cb(buf, enc_output_size);
+        if (tx_size > 0) {
+#ifdef CONFIG_AUD_TX_COUNT_DEBUG
+#if CONFIG_AUD_VAD_SUPPORT
+            if(!aud_para->aec_config_voice.vad_enable)
+#endif
+            { 
+                aud_tx_count.complete_size+=tx_size;
+            }
+#endif
+        }
+    }
+}
+
+static void aud_tras_read_enc_data_opus(aud_tras_setup_t * aud_trs_setup, uint8_t *buf)
+{
+    #if CONFIG_AUD_INTF_SUPPORT_OPUS
+    uint16_t pkt_len;
+    uint32_t fill_size = 0;
+    int tx_size = 0;
+#if CONFIG_AUD_VAD_SUPPORT
+#ifdef CONFIG_AUD_TX_COUNT_DEBUG
+    app_aud_para_t * aud_para = get_app_aud_cust_para();
+#endif
+#endif
+	GLOBAL_INT_DECLARATION();
+
+
+    fill_size = ring_buffer_get_fill_size(&aud_tras_info->aud_tras_pkt_len_rb);
+    if(fill_size >= sizeof(uint16))
+    {
+        for (int n = 0; n < fill_size/sizeof(uint16); n++) 
+        {
+            GLOBAL_INT_DISABLE();
+            ring_buffer_read(&aud_tras_info->aud_tras_pkt_len_rb, (uint8 *)&pkt_len, sizeof(uint16));
+            ring_buffer_read(&aud_tras_info->aud_tras_rb, buf, pkt_len);
+            GLOBAL_INT_RESTORE();
+
+            tx_size = aud_trs_setup->aud_tras_send_data_cb(buf, pkt_len);
+            if (tx_size > 0) {
+#ifdef CONFIG_AUD_TX_COUNT_DEBUG
+                #if CONFIG_AUD_VAD_SUPPORT
+                if(!aud_para->aec_config_voice.vad_enable)
+                #endif
+                { 
+                    aud_tx_count.complete_size+=tx_size;
+                }
+#endif
+            }
+        }
+    }
+    #else
+    LOGE("%s,%d,OPUS codec is disabled!\r\n",__func__, __LINE__);
+    #endif
+}
+
+
 static void aud_tras_main(beken_thread_arg_t param_data)
 {
 	bk_err_t ret = BK_OK;
-	uint32_t fill_size = 0;
 	aud_tras_setup_t *aud_trs_setup = NULL;
 	aud_trs_setup = (aud_tras_setup_t *)param_data;
 	uint8_t *aud_temp_data = NULL;
-	int tx_size = 0;
 	uint32_t enc_output_size = bk_aud_get_enc_output_size_in_byte();
-	#if CONFIG_AUD_VAD_SUPPORT
-	#ifdef CONFIG_AUD_TX_COUNT_DEBUG
-	app_aud_para_t * aud_para = get_app_aud_cust_para();
-	#endif
-	#endif
 
 #ifdef AUD_TX_DEBUG
 	uart_dump_mic_data(1, 2000000);
@@ -231,7 +304,7 @@ static void aud_tras_main(beken_thread_arg_t param_data)
 	}
 	LOGI("start audio tx count timer complete \r\n");
 #endif
-	GLOBAL_INT_DECLARATION();
+
 	aud_temp_data = audio_tras_malloc(enc_output_size);
 	if (!aud_temp_data)
 	{
@@ -260,61 +333,14 @@ static void aud_tras_main(beken_thread_arg_t param_data)
 					break;
 
 				case AUD_TRAS_TX:
-                    #if  CONFIG_AUD_INTF_SUPPORT_OPUS
-                    {
-                        uint16_t pkt_len;
-                        fill_size = ring_buffer_get_fill_size(&aud_tras_info->aud_tras_pkt_len_rb);
-                        if(fill_size >= sizeof(uint16))
-                        {
-                            for (int n = 0; n < fill_size/sizeof(uint16); n++) 
-                            {
-                                GLOBAL_INT_DISABLE();
-                                ring_buffer_read(&aud_tras_info->aud_tras_pkt_len_rb, (uint8 *)&pkt_len, sizeof(uint16));
-                                ring_buffer_read(&aud_tras_info->aud_tras_rb, aud_temp_data, pkt_len);
-                                GLOBAL_INT_RESTORE();
-
-                                tx_size = aud_trs_setup->aud_tras_send_data_cb(aud_temp_data, pkt_len);
-                                if (tx_size > 0) {
-#ifdef CONFIG_AUD_TX_COUNT_DEBUG
-                                    #if CONFIG_AUD_VAD_SUPPORT
-                                    if(!aud_para->aec_config_voice.vad_enable)
-                                    #endif
-                                    { 
-                                        aud_tx_count.complete_size+=tx_size;
-                                    }
-#endif
-                                }
-                            }
-                        }
-                    }
-                    #else
-					fill_size = ring_buffer_get_fill_size(&aud_tras_info->aud_tras_rb);
-					for (int n = 0; n < fill_size/enc_output_size; n++) {
-//						GPIO_UP(6);
-#if (CONFIG_CACHE_ENABLE)
-						flush_all_dcache();
-#endif
-						GLOBAL_INT_DISABLE();
-						ring_buffer_read(&aud_tras_info->aud_tras_rb, aud_temp_data, enc_output_size);
-						GLOBAL_INT_RESTORE();
-#ifdef AUD_TX_DEBUG
-						bk_uart_write_bytes(UART_ID_1, aud_temp_data, enc_output_size);
-#endif
-						tx_size = aud_trs_setup->aud_tras_send_data_cb(aud_temp_data, enc_output_size);
-						if (tx_size > 0) {
-#ifdef CONFIG_AUD_TX_COUNT_DEBUG
-							#if CONFIG_AUD_VAD_SUPPORT
-							if(!aud_para->aec_config_voice.vad_enable)
-							#endif
-							{ 
-								aud_tx_count.complete_size+=tx_size;
-							}
-#endif
-						}
-//						GPIO_DOWN(6);
+					if(AUD_INTF_VOC_DATA_TYPE_OPUS == bk_aud_get_encoder_type())
+					{
+						aud_tras_read_enc_data_opus(aud_trs_setup,aud_temp_data);
 					}
-                    #endif
-
+					else
+					{
+						aud_tras_read_enc_data(aud_trs_setup,aud_temp_data);
+					}
 					rtos_delay_milliseconds(5);
 					aud_tras_send_msg(AUD_TRAS_TX, NULL);
 					break;
@@ -398,6 +424,7 @@ bk_err_t aud_tras_init(aud_tras_setup_t *setup_cfg)
 	}
 	ring_buffer_init(&aud_tras_info->aud_tras_pkt_len_rb, aud_tras_info->aud_tras_pkt_len_buff_addr, sizeof(uint16_t)*5 + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, DMA_ID_MAX, RB_DMA_TYPE_NULL);
 	LOGI("aud_tras_info->aud_tras_pkt_len_rb: %p \n", &aud_tras_info->aud_tras_pkt_len_rb);
+	#endif
 
 	aud_tras_info->aud_tras_buff_addr = audio_tras_malloc(AUD_TRAS_BUFF_SIZE + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
 	if (!aud_tras_info->aud_tras_buff_addr) {
@@ -405,16 +432,7 @@ bk_err_t aud_tras_init(aud_tras_setup_t *setup_cfg)
 		goto out;
 	}
 	ring_buffer_init(&aud_tras_info->aud_tras_rb, aud_tras_info->aud_tras_buff_addr, AUD_TRAS_BUFF_SIZE + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, DMA_ID_MAX, RB_DMA_TYPE_NULL);
-	LOGI("aud_tras_info->aud_tras_rb: %p \n", &aud_tras_info->aud_tras_rb);
-    #else
-	aud_tras_info->aud_tras_buff_addr = audio_tras_malloc(AUD_TRAS_BUFF_SIZE + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
-	if (!aud_tras_info->aud_tras_buff_addr) {
-		LOGE("malloc aud_tras_buff_addr\n");
-		goto out;
-	}
-	ring_buffer_init(&aud_tras_info->aud_tras_rb, aud_tras_info->aud_tras_buff_addr, AUD_TRAS_BUFF_SIZE + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, DMA_ID_MAX, RB_DMA_TYPE_NULL);
 	LOGD("aud_tras_info->aud_tras_rb: %p \n", &aud_tras_info->aud_tras_rb);
-    #endif
 
 	os_memcpy(&aud_trs_setup_bk, setup_cfg, sizeof(aud_tras_setup_t));
 

@@ -925,7 +925,7 @@ void aud_codec_buf_len_cal(aud_codec_setup_input_t *para, aud_codec_setup_t *out
         para->dec_bitrate,
         para->dec_frame_len_in_ms,
         para->dec_data_depth_in_byte,
-        para->enc_vbr_en);
+        para->dec_vbr_en);
 
     LOGI("enc in s:%d,out s:%d,dec in s:%d,out s:%d\n",
         output->enc_input_size_in_byte,
@@ -946,6 +946,8 @@ void bk_aud_intf_aud_codec_init(aud_codec_setup_input_t *input)
     aud_intf_info.voc_info.aud_codec_setup.dec_frame_len_in_ms = input->dec_frame_len_in_ms;
     aud_intf_info.voc_info.aud_codec_setup.dec_data_depth_in_byte = input->dec_data_depth_in_byte;
     aud_intf_info.voc_info.aud_codec_setup.dec_vbr_en = input->dec_vbr_en;
+    aud_intf_info.voc_info.aud_codec_setup.encoder_type = input->encoder_type;
+    aud_intf_info.voc_info.aud_codec_setup.decoder_type = input->decoder_type;
     aud_codec_buf_len_cal(input,&aud_intf_info.voc_info.aud_codec_setup);
 }
 
@@ -972,6 +974,16 @@ uint32_t bk_aud_get_enc_output_size_in_byte(void)
 uint32_t bk_aud_get_enc_frame_len_in_ms(void)
 {
     return aud_intf_info.voc_info.aud_codec_setup.enc_frame_len_in_ms;
+}
+
+uint32_t bk_aud_get_encoder_type(void)
+{
+    return aud_intf_info.voc_info.aud_codec_setup.encoder_type;
+}
+
+uint32_t bk_aud_get_decoder_type(void)
+{
+    return aud_intf_info.voc_info.aud_codec_setup.decoder_type;
 }
 
 
@@ -1016,17 +1028,9 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 	/* audio config */
 	aud_intf_info.voc_info.aud_setup.adc_gain = setup.mic_gain;	//default: 0x2d
 	aud_intf_info.voc_info.aud_setup.dac_gain = setup.spk_gain;	//default: 0x2d
-#if CONFIG_AUD_INTF_SUPPORT_OPUS || CONFIG_AUD_INTF_SUPPORT_G722
-	//bk_aud_intf_aud_codec_init(&setup.aud_codec_setup_input);
-#else
-	if (aud_intf_info.voc_info.samp_rate == 16000) {
-		aud_intf_info.voc_info.aud_setup.mic_samp_rate_points = 320;	//if AEC enable , the value is equal to aec_samp_rate_points, and the value not need to set
-		aud_intf_info.voc_info.aud_setup.speaker_samp_rate_points = 320;	//if AEC enable , the value is equal to aec_samp_rate_points, and the value not need to set
-	} else {
-		aud_intf_info.voc_info.aud_setup.mic_samp_rate_points = 160;	//if AEC enable , the value is equal to aec_samp_rate_points, and the value not need to set
-		aud_intf_info.voc_info.aud_setup.speaker_samp_rate_points = 160;	//if AEC enable , the value is equal to aec_samp_rate_points, and the value not need to set
-	}
-#endif
+	aud_intf_info.voc_info.aud_setup.mic_samp_rate_points = setup.aud_codec_setup_input.adc_samp_rate*setup.aud_codec_setup_input.enc_frame_len_in_ms/1000;
+    aud_intf_info.voc_info.aud_setup.speaker_samp_rate_points = setup.aud_codec_setup_input.dac_samp_rate*setup.aud_codec_setup_input.dec_frame_len_in_ms/1000;
+
 #if CONFIG_AEC_ECHO_COLLECT_MODE_HARDWARE
 	aud_intf_info.voc_info.aud_setup.mic_frame_number = 4;
 #else
@@ -1071,7 +1075,7 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 		aud_intf_info.voc_info.vad_setup->vad_stop_threshold = setup.vad_cfg.vad_stop_threshold;
 		aud_intf_info.voc_info.vad_setup->vad_silence_threshold = setup.vad_cfg.vad_silence_threshold;
 	/* tx config */
-	switch (aud_intf_info.voc_info.data_type) {
+	switch (aud_intf_info.voc_info.aud_codec_setup.encoder_type) {
 		case AUD_INTF_VOC_DATA_TYPE_G711A:
 		case AUD_INTF_VOC_DATA_TYPE_G711U:
 			aud_intf_info.voc_info.tx_info.buff_length = aud_intf_info.voc_info.aud_setup.mic_samp_rate_points;
@@ -1085,11 +1089,11 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 		case AUD_INTF_VOC_DATA_TYPE_G722:
 			aud_intf_info.voc_info.tx_info.buff_length = (aud_intf_info.voc_info.aud_codec_setup.enc_output_size_in_byte);
 			break;
-#elif CONFIG_AUD_INTF_SUPPORT_OPUS
+#endif
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
 		case AUD_INTF_VOC_DATA_TYPE_OPUS:
 			aud_intf_info.voc_info.tx_info.buff_length = (aud_intf_info.voc_info.aud_codec_setup.enc_output_size_in_byte);
 			break;
-#else
 #endif             
 		default:
 			break;
@@ -1101,6 +1105,9 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 		err = BK_ERR_AUD_INTF_MEMY;
 		goto aud_intf_voc_init_exit;
 	}
+    LOGI("%s, %d, malloc aud_intf_info.voc_info.tx_info.ping.buff:%p, size:%d \r\n", __func__, __LINE__, 
+         aud_intf_info.voc_info.tx_info.ping.buff_addr, 
+         aud_intf_info.voc_info.tx_info.buff_length);
 	aud_intf_info.voc_info.tx_info.pang.busy_status = false;
 	aud_intf_info.voc_info.tx_info.pang.buff_addr = audio_intf_malloc(aud_intf_info.voc_info.tx_info.buff_length);
 	if (aud_intf_info.voc_info.tx_info.pang.buff_addr == NULL) {
@@ -1108,11 +1115,14 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 		err = BK_ERR_AUD_INTF_MEMY;
 		goto aud_intf_voc_init_exit;
 	}
+    LOGI("%s, %d, malloc aud_intf_info.voc_info.tx_info.pang.buff:%p, size:%d \r\n", __func__, __LINE__, 
+         aud_intf_info.voc_info.tx_info.pang.buff_addr, 
+         aud_intf_info.voc_info.tx_info.buff_length);
 	aud_intf_info.voc_info.tx_info.tx_buff_status = true;
 
 	/* rx config */
 	aud_intf_info.voc_info.rx_info.aud_trs_read_seq = 0;
-	switch (aud_intf_info.voc_info.data_type) {
+	switch (aud_intf_info.voc_info.aud_codec_setup.decoder_type) {
 		case AUD_INTF_VOC_DATA_TYPE_G711A:
 		case AUD_INTF_VOC_DATA_TYPE_G711U:
 			aud_intf_info.voc_info.rx_info.frame_size = 320;		//apk receive one frame 40ms
@@ -1129,11 +1139,11 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 			aud_intf_info.voc_info.rx_info.frame_size = aud_intf_info.voc_info.aud_codec_setup.dec_input_size_in_byte;		//apk receive one frame 40ms
 			//aud_intf_info.voc_info.rx_info.frame_size = aud_intf_info.voc_info.aud_setup.mic_samp_rate_points;
 			break;
-#elif CONFIG_AUD_INTF_SUPPORT_OPUS
+#endif
+#if CONFIG_AUD_INTF_SUPPORT_OPUS
 		case AUD_INTF_VOC_DATA_TYPE_OPUS:
 			aud_intf_info.voc_info.rx_info.frame_size = aud_intf_info.voc_info.aud_codec_setup.dec_input_size_in_byte;
 			break;
-#else
 #endif  
 		default:
 			break;
@@ -1313,7 +1323,7 @@ bk_err_t bk_aud_intf_voc_start(void)
 				if (temp_buff == NULL) {
 					return BK_ERR_AUD_INTF_MEMY;
 				} else {
-					switch (aud_intf_info.voc_info.data_type) {
+					switch (aud_intf_info.voc_info.aud_codec_setup.decoder_type) {
 						case AUD_INTF_VOC_DATA_TYPE_G711A:
 							os_memset(temp_buff, 0xD5, temp_size);
 							break;
@@ -1341,12 +1351,12 @@ bk_err_t bk_aud_intf_voc_start(void)
                             }
                         }
 							break;
-#elif CONFIG_AUD_INTF_SUPPORT_OPUS 
+#endif                        
+#if CONFIG_AUD_INTF_SUPPORT_OPUS 
                         case AUD_INTF_VOC_DATA_TYPE_OPUS:
                         {
                             break;
                         }
-#else
 #endif
 						default:
 							break;
@@ -1524,19 +1534,48 @@ bk_err_t bk_aud_intf_drv_deinit(void)
 	return BK_ERR_AUD_INTF_OK;
 }
 
-/* write speaker data in voice work mode */
-static bk_err_t aud_intf_voc_write_spk_data(uint8_t *dac_buff, uint32_t size)
+static bk_err_t aud_intf_voc_write_dec_data(uint8_t *dac_buff, uint32_t size)
 {
-#if CONFIG_AUD_INTF_SUPPORT_OPUS
-	uint32_t write_size[2] = {0};
-	uint16_t pkt_len = size;
+    uint32_t write_size = 0;
 
-	/* check aud_intf status */
-	if (aud_intf_info.voc_status == AUD_INTF_VOC_STA_NULL)
-		return BK_ERR_AUD_INTF_STA;
+
+    /* check aud_intf status */
+    if (aud_intf_info.voc_status == AUD_INTF_VOC_STA_NULL)
+        return BK_ERR_AUD_INTF_STA;
 
 #if (CONFIG_CACHE_ENABLE)
 	flush_all_dcache();
+#endif
+
+    if (ring_buffer_get_free_size(aud_intf_info.voc_info.rx_info.decoder_rb) >= size) {
+        write_size = ring_buffer_write(aud_intf_info.voc_info.rx_info.decoder_rb, dac_buff, size);
+        if (write_size != size) {
+            LOGE("%s, %d, write decoder_ring_buff fail, size:%d \n", __func__, __LINE__, size);
+            return BK_FAIL;
+        }
+        aud_intf_info.voc_info.rx_info.rx_buff_seq_tail += size/(aud_intf_info.voc_info.rx_info.frame_size);
+    }
+    else
+    {
+        //LOGE("write fail, decoder_ring_buff is full!\r\n");
+        //return BK_FAIL;
+    }
+
+    return BK_OK;
+}
+
+static bk_err_t aud_intf_voc_write_dec_data_opus(uint8_t *dac_buff, uint32_t size)
+{
+    #if CONFIG_AUD_INTF_SUPPORT_OPUS
+    uint32_t write_size[2] = {0};
+    uint16_t pkt_len = size;
+
+    /* check aud_intf status */
+    if (aud_intf_info.voc_status == AUD_INTF_VOC_STA_NULL)
+        return BK_ERR_AUD_INTF_STA;
+
+#if (CONFIG_CACHE_ENABLE)
+    flush_all_dcache();
 #endif
 
     if (ring_buffer_get_free_size(aud_intf_info.voc_info.rx_info.decoder_len_rbc) >= (sizeof(uint16_t)))
@@ -1554,39 +1593,36 @@ static bk_err_t aud_intf_voc_write_spk_data(uint8_t *dac_buff, uint32_t size)
         }
         else
         {
-            LOGE("write decoder_ring_buff full!\r\n");
+            LOGE("write fail, decoder_ring_buff is full!\r\n");
+            return BK_FAIL;
         }
     }
     else
     {
-        LOGE("write decoder_len_ring_buff full!\r\n");
+        LOGE("write fail, decoder_len_ring_buff is full!\r\n");
+        return BK_FAIL;
     }
 
-#else // non CONFIG_AUD_INTF_SUPPORT_OPUS
-	uint32_t write_size = 0;
+    return BK_OK;
+    #else
+    LOGE("%s,%d,OPUS codec is disabled!\r\n",__func__, __LINE__);
+    return BK_FAIL;
+    #endif
+}
 
-//	LOGI("enter: %s \r\n", __func__);
 
-	/* check aud_intf status */
-	if (aud_intf_info.voc_status == AUD_INTF_VOC_STA_NULL)
-		return BK_ERR_AUD_INTF_STA;
+/* write speaker data in voice work mode */
+static bk_err_t aud_intf_voc_write_spk_data(uint8_t *dac_buff, uint32_t size)
+{
 
-#if (CONFIG_CACHE_ENABLE)
-	flush_all_dcache();
-#endif
-
-	if (ring_buffer_get_free_size(aud_intf_info.voc_info.rx_info.decoder_rb) >= size) {
-		write_size = ring_buffer_write(aud_intf_info.voc_info.rx_info.decoder_rb, dac_buff, size);
-		//write_size = ring_buffer_write(aud_intf_info.voc_info.rx_info.decoder_rb, (uint8_t *)PCM_8000, size);
-		if (write_size != size) {
-			LOGE("%s, %d, write decoder_ring_buff fail, size:%d \n", __func__, __LINE__, size);
-			return BK_FAIL;
-		}
-		aud_intf_info.voc_info.rx_info.rx_buff_seq_tail += size/(aud_intf_info.voc_info.rx_info.frame_size);
-	}
-#endif
-
-	return BK_OK;
+    if(AUD_INTF_VOC_DATA_TYPE_OPUS == bk_aud_get_decoder_type())
+    {
+        return aud_intf_voc_write_dec_data_opus(dac_buff, size);
+    }
+    else
+    {
+        return aud_intf_voc_write_dec_data(dac_buff, size);
+    }
 }
 
 /* write speaker data in general work mode */

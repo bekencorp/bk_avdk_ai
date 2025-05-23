@@ -222,14 +222,14 @@ typedef struct {
     uint8_t enc_frame_len_in_ms;
     uint8_t enc_data_depth_in_byte;
     uint8_t enc_vbr_en;
-    uint8_t reserved;
+    uint8_t encoder_type;
 
     uint32_t dac_samp_rate;
     uint32_t dec_bitrate;
     uint8_t dec_frame_len_in_ms;
     uint8_t dec_data_depth_in_byte;
     uint8_t dec_vbr_en;
-    uint8_t reserved1;
+    uint8_t decoder_type;
     
     uint32_t enc_input_size_in_byte;
     uint32_t enc_output_size_in_byte;
