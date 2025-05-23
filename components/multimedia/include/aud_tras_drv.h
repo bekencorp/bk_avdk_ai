@@ -16,6 +16,9 @@
 #include <driver/psram_types.h>
 #include <driver/psram.h>
 
+#include <modules/audio_rsp_types.h>
+#include <modules/audio_rsp.h>
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -355,6 +358,10 @@ typedef struct {
 	bool uac_auto_connect;
 	bool uac_connect_state_cb_exist;
 	void (*aud_tras_drv_uac_connect_state_cb)(uint8_t state);		/**< the api is called when uac abnormal disconnet and recover connect */
+
+    aud_rsp_cfg_t asr_rsp_cfg;
+    uint16_t *asr_rsp_out_buff;
+    void *asr_rsp_handler;
 } aud_tras_drv_info_t;
 
 #define DEFAULT_AUD_TRAS_DRV_INFO() {                                              \
@@ -577,7 +584,7 @@ int aud_tras_drv_get_prompt_tone_data_bytes_filled(void);
 void aud_cp2_ready_notify(void);
 #endif
 
-#if CONFIG_AUD_INTF_SUPPORT_OPUS_PROMPT_TONE_RESAMPLE
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE_RESAMPLE
 uint8_t * aud_tras_drv_get_rsp_output_buff(void);
 uint32_t aud_tras_drv_get_dac_samp_rate(void);
 #endif

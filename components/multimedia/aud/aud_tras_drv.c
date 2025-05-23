@@ -191,6 +191,9 @@ static uart_util_t g_spk_data_uart_util = {0};
 #endif
 
 #define TU_QITEM_COUNT      (120)
+#define ASR_SAMPLE_RATE     (16000)//ASR only support 16000 sample rate
+#define ASR_SAMP_CNT_20MS   (ASR_SAMPLE_RATE*20/1000*2)
+#define EQ_SAMPLE_RATE      (16000)//EQ only support 16000 sample rate now
 static beken_thread_t  aud_trs_drv_thread_hdl = NULL;
 static beken_queue_t aud_trs_drv_int_msg_que = NULL;
 
@@ -1516,10 +1519,6 @@ uint8_t check_rx_spk_data_silence(int16_t *data, uint16_t size) {
 	}
 }
 
-
-
-
-
 static bk_err_t aud_tras_aec(void)
 {
 	bk_err_t ret = BK_OK;
@@ -1546,7 +1545,7 @@ static bk_err_t aud_tras_aec(void)
 
 		if(aud_para.sys_config_voice.main_mic_select == 0)
 		{
-			for(uint32_t i = 0; i < 320; i++)
+			for(uint32_t i = 0; i < aec_info_pr->samp_rate_points; i++)
 			{
 				aec_info_pr->mic_addr[i] = temp_buf[2 *i];
 				aec_info_pr->ref_addr[i] = temp_buf[2*i+1];
@@ -1554,7 +1553,7 @@ static bk_err_t aud_tras_aec(void)
 		}
 		else
 		{
-			for(uint32_t i = 0; i < 320; i++)
+			for(uint32_t i = 0; i < aec_info_pr->samp_rate_points; i++)
 			{
 				aec_info_pr->mic_addr[i] = temp_buf[2 *i+1];
 				aec_info_pr->ref_addr[i] = temp_buf[2*i];
@@ -1706,10 +1705,34 @@ if(aud_get_production_mode())
 		aud_tras_drv_info.voc_info.aud_tras_dump_aec_cb((uint8_t *)aec_info_pr->out_addr, aec_info_pr->samp_rate_points*2);
 	}
 
+    if(ASR_SAMPLE_RATE != aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate)
+    {
+        uint32_t rsp_out_len,rsp_in_len;
+        rsp_out_len = ASR_SAMP_CNT_20MS/2;
+        rsp_in_len = aec_info_pr->samp_rate_points;
+        ret = bk_aud_rsp_process_multi_instance(aec_info_pr->out_addr, 
+                                                &rsp_in_len, 
+                                                (int16_t *)aud_tras_drv_info.asr_rsp_out_buff, 
+                                                &rsp_out_len,
+                                                aud_tras_drv_info.asr_rsp_handler);
+        if (BK_OK != ret)
+        {
+            LOGE("%s:%d bk_aud_rsp_process_multi_instance fail\n", __func__, __LINE__);
+        }
+    }
+
 #if CONFIG_AI_ASR_MODE_CPU2
-    gl_asr_data.data = (unsigned char *)aec_info_pr->out_addr;
-    gl_asr_data.size = (unsigned int)aec_info_pr->samp_rate_points*2;
-	gl_asr_data.spk_play_flag = spk_play_flag;	
+    if(ASR_SAMPLE_RATE != aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate)
+    {
+        gl_asr_data.data = (unsigned char *)aud_tras_drv_info.asr_rsp_out_buff;
+        gl_asr_data.size = ASR_SAMP_CNT_20MS;
+    }
+    else
+    {
+        gl_asr_data.data = (unsigned char *)aec_info_pr->out_addr;
+        gl_asr_data.size = (unsigned int)aec_info_pr->samp_rate_points*2;
+    }
+    gl_asr_data.spk_play_flag = spk_play_flag;	
     gl_asr_data_msg.event = EVENT_ASR_DATA_NOTIFY;
     gl_asr_data_msg.param = (uint32_t)&gl_asr_data;
     msg_send_notify_to_media_major_mailbox(&gl_asr_data_msg, MINOR_MODULE);
@@ -3021,7 +3044,10 @@ static bk_err_t aud_tras_dec(void)
 	aud_production_data_generate(sweep, (int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points);			
 #endif
 
-voice_dl_process((int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data,aud_tras_drv_info.voc_info.speaker_samp_rate_points);
+	if(EQ_SAMPLE_RATE == aud_tras_drv_info.voc_info.aud_codec_setup.dac_samp_rate)
+	{
+		voice_dl_process((int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data,aud_tras_drv_info.voc_info.speaker_samp_rate_points);
+	}
 #if CONFIG_AEC_ECHO_COLLECT_MODE_SOFTWARE
 	if (aud_tras_drv_info.voc_info.aec_enable) {
 		/* read mic fill data size */
@@ -4094,7 +4120,7 @@ static bk_err_t aud_tras_drv_prompt_tone_play_close(void)
     return BK_OK;
 }
 
-#if CONFIG_AUD_INTF_SUPPORT_OPUS_PROMPT_TONE_RESAMPLE
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE_RESAMPLE
 uint8_t * aud_tras_drv_get_rsp_output_buff(void)
 {
     return gl_prompt_tone_play_handle->config.rsp_out_buff;
@@ -4372,6 +4398,13 @@ static bk_err_t aud_tras_drv_voc_deinit(void)
 #if CONFIG_AUD_TRAS_AEC_DUMP_MODE_UART
 	bk_uart_deinit(CONFIG_AUD_TRAS_AEC_DUMP_UART_ID);
 #endif
+
+    if (!aud_tras_drv_info.asr_rsp_out_buff)
+    {
+        bk_aud_rsp_deinit_multi_instance(aud_tras_drv_info.asr_rsp_handler);
+        psram_free(aud_tras_drv_info.asr_rsp_out_buff);
+        aud_tras_drv_info.asr_rsp_out_buff = NULL;
+    }
 
     AEC_DATA_DUMP_BY_UART_CLOSE();
     SPK_DATA_DUMP_BY_UART_CLOSE();
@@ -4948,6 +4981,39 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
         goto aud_tras_drv_voc_init_exit;
     }
 #endif
+
+    /*asr input data need resample if adc sample rate is not equal to 16000*/
+    if(ASR_SAMPLE_RATE != aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate)
+    {
+        aud_tras_drv_info.asr_rsp_cfg.complexity = 6;
+        aud_tras_drv_info.asr_rsp_cfg.src_ch = 1;//only enable SPK left channel
+        aud_tras_drv_info.asr_rsp_cfg.dest_ch = 1;//only enable SPK left channel
+        aud_tras_drv_info.asr_rsp_cfg.src_bits = 16;
+        aud_tras_drv_info.asr_rsp_cfg.dest_bits = 16;
+        aud_tras_drv_info.asr_rsp_cfg.src_rate = aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate;
+        aud_tras_drv_info.asr_rsp_cfg.dest_rate = ASR_SAMPLE_RATE;
+        aud_tras_drv_info.asr_rsp_cfg.down_ch_idx = 0;
+        
+        ret = bk_aud_rsp_init_multi_instance(aud_tras_drv_info.asr_rsp_cfg,&aud_tras_drv_info.asr_rsp_handler);
+        if (ret != BK_OK)
+        {
+            LOGE("%s, %d, audio resampler init fail\n", __func__, __LINE__);
+            goto aud_tras_drv_voc_init_exit;
+        }
+
+        aud_tras_drv_info.asr_rsp_out_buff = psram_malloc(ASR_SAMP_CNT_20MS);
+        if (!aud_tras_drv_info.asr_rsp_out_buff)
+        {
+            LOGE("%s, %d, malloc asr rsp output buffer fail\n", __func__, __LINE__);
+            goto aud_tras_drv_voc_init_exit;
+        }
+        LOGI("%s:%d asr rsp_init done!src sr:%d,dest sr:%d,cplx:%d,out buf:0x%x\n",
+            __func__, __LINE__,
+            aud_tras_drv_info.asr_rsp_cfg.src_rate,
+            aud_tras_drv_info.asr_rsp_cfg.dest_rate,
+            aud_tras_drv_info.asr_rsp_cfg.complexity,
+            aud_tras_drv_info.asr_rsp_out_buff);
+    }
 
     AEC_DATA_DUMP_BY_UART_OPEN();
     SPK_DATA_DUMP_BY_UART_OPEN();
@@ -7137,7 +7203,7 @@ bk_err_t audio_event_handle(media_mailbox_msg_t * msg)
 	return ret;
 }
 
-#if CONFIG_AUD_INTF_SUPPORT_OPUS_PROMPT_TONE_RESAMPLE
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE_RESAMPLE
 uint32_t aud_tras_drv_get_dac_samp_rate(void)
 {
     return aud_tras_drv_info.voc_info.aud_codec_setup.dac_samp_rate;
