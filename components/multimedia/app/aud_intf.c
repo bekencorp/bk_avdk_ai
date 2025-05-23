@@ -875,7 +875,7 @@ static void aud_intf_voc_deconfig(void)
 		aud_intf_info.voc_info.rx_info.decoder_len_rbc = NULL;
 	}
 #endif
-	os_memset(&aud_intf_info.voc_info.aud_codec_setup,0,sizeof(aud_intf_info.voc_info.aud_codec_setup));
+	//os_memset(&aud_intf_info.voc_info.aud_codec_setup,0,sizeof(aud_intf_info.voc_info.aud_codec_setup));
 
 	aud_intf_info.voc_info.rx_info.frame_num = 0;
 	aud_intf_info.voc_info.rx_info.frame_size = 0;

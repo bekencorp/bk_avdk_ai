@@ -4399,7 +4399,7 @@ static bk_err_t aud_tras_drv_voc_deinit(void)
 	bk_uart_deinit(CONFIG_AUD_TRAS_AEC_DUMP_UART_ID);
 #endif
 
-    if (!aud_tras_drv_info.asr_rsp_out_buff)
+    if (aud_tras_drv_info.asr_rsp_out_buff)
     {
         bk_aud_rsp_deinit_multi_instance(aud_tras_drv_info.asr_rsp_handler);
         psram_free(aud_tras_drv_info.asr_rsp_out_buff);
