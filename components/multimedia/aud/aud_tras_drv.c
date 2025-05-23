@@ -1599,7 +1599,7 @@ static bk_err_t aud_tras_aec(void)
 #if CONFIG_AEC_ECHO_COLLECT_MODE_SOFTWARE
 	/* read ref data from ref_ring_buff */
 	if (ring_buffer_get_fill_size(&(aec_info_pr->ref_rb)) >= aec_info_pr->samp_rate_points*2) {
-		size = ring_buffer_read(&(aec_info_pr->ref_rb), (uint8_t*)temp_buf, aec_info_pr->samp_rate_points*2);
+		size = ring_buffer_read(&(aec_info_pr->ref_rb), (uint8_t*)aec_info_pr->ref_addr, aec_info_pr->samp_rate_points*2);
 		if (size != aec_info_pr->samp_rate_points*2) {
 			LOGE("%s, %d, the ref data readed from ref_ring_buff is not a frame \n", __func__, __LINE__);
 			//return BK_FAIL;
