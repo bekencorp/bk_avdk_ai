@@ -2523,7 +2523,7 @@ static bk_err_t aud_tras_dec(void)
                             }
                         } else {
                             if (r_size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
-                                os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
+                                os_memset((uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
                             }
                         }
                         SPK_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
@@ -2676,7 +2676,7 @@ static bk_err_t aud_tras_dec(void)
                             }
                         } else {
                             if (r_size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
-                                os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
+                                os_memset((uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
                             }
                         }
                         SPK_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
@@ -2789,7 +2789,7 @@ static bk_err_t aud_tras_dec(void)
                             }
                         } else {
                             if (r_size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
-                                os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
+                                os_memset((uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
                             }
                         }
                         SPK_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
@@ -2917,7 +2917,7 @@ static bk_err_t aud_tras_dec(void)
                             }
                         } else {
                             if (r_size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
-                                os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
+                                os_memset((uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
                             }
                         }
                         SPK_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
