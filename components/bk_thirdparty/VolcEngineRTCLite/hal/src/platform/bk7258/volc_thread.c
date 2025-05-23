@@ -68,7 +68,7 @@ uint32_t volc_thread_create(volc_tid_t* thread, const volc_thread_param_t* param
     }
     *thread = (volc_tid_t *)handle;
     // xTaskCreate((TaskFunction_t)start_routine, param->name, stack_size, args, priority, handle);
-    ret = rtos_create_thread((beken_thread_t *)thread,
+    ret = rtos_create_thread((beken_thread_t *)handle,
                                 priority,
                                 param->name,
                                 (beken_thread_function_t)start_routine,
@@ -82,6 +82,7 @@ uint32_t volc_thread_create(volc_tid_t* thread, const volc_thread_param_t* param
 }
 
 void volc_thread_destroy(volc_tid_t thread) {
+	os_printf("%s LINE:%d thread:%p\r\n", __func__, __LINE__, thread);
     if (NULL == thread) {
         return;
     }
@@ -89,11 +90,9 @@ void volc_thread_destroy(volc_tid_t thread) {
 }
 
 void volc_thread_exit(volc_tid_t thread) {
-    if(thread != volc_thread_get_id()) {
-        rtos_delete_thread((beken_thread_t *)thread);
-    } else {
-        rtos_delete_thread(NULL);
-    }
+    os_printf("%s LINE:%d thread:%p\r\n", __func__, __LINE__, thread);
+    (void)thread;
+    rtos_delete_thread(NULL);
 }
 
 void volc_thread_sleep(uint64_t time) {
