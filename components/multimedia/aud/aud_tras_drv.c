@@ -256,7 +256,6 @@ int aud_get_production_mode(void);
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
 #define PROMPT_TONE_RB_SIZE     (1280 * 8)
 static ringbuf_handle_t gl_prompt_tone_rb = NULL;
-static bool gl_prompt_tone_play_flag = false;
 static prompt_tone_pool_empty_notify gl_prompt_tone_empty_notify = NULL;
 static void *gl_notify_user_data = NULL;
 static prompt_tone_play_handle_t gl_prompt_tone_play_handle = NULL;
@@ -2472,40 +2471,116 @@ static bk_err_t aud_tras_dec(void)
 			/* check the frame number in decoder_ring_buffer */
 			if (aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_BOARD) {
 				if (ring_buffer_get_fill_size(aud_tras_drv_info.voc_info.rx_info.decoder_rb) >= aud_tras_drv_info.voc_info.speaker_samp_rate_points) {
-					//os_printf("decoder process \r\n", size);
 					/* get G711A data from decoder_ring_buff */
 					size = ring_buffer_read(aud_tras_drv_info.voc_info.rx_info.decoder_rb, (uint8_t*)aud_tras_drv_info.voc_info.decoder_temp.law_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points);
 					if (size != aud_tras_drv_info.voc_info.speaker_samp_rate_points) {
 						LOGE("%s, %d, read decoder_ring_buff G711A data fail \n", __func__, __LINE__);
-						if (aud_tras_drv_info.voc_info.data_type == AUD_INTF_VOC_DATA_TYPE_G711U)
-							os_memset(aud_tras_drv_info.voc_info.decoder_temp.law_data, 0xFF, aud_tras_drv_info.voc_info.speaker_samp_rate_points);
-						else
-							os_memset(aud_tras_drv_info.voc_info.decoder_temp.law_data, 0xD5, aud_tras_drv_info.voc_info.speaker_samp_rate_points);
+						fill_slience_flag = true;
 					}
 				} else {
-					if (aud_tras_drv_info.voc_info.data_type == AUD_INTF_VOC_DATA_TYPE_G711U)
-						os_memset(aud_tras_drv_info.voc_info.decoder_temp.law_data, 0xFF, aud_tras_drv_info.voc_info.speaker_samp_rate_points);
-					else
-						os_memset(aud_tras_drv_info.voc_info.decoder_temp.law_data, 0xD5, aud_tras_drv_info.voc_info.speaker_samp_rate_points);
+					fill_slience_flag = true;
 				}
+
+#if CONFIG_AUD_INTF_SUPPORT_AI_DIALOG_FREE
+                /* force fill slience when dialog not running */
+                if (!gl_dialog_running) {
+                    fill_slience_flag = true;
+                }
+#endif
 
 				/* dump rx data */
 				if (aud_tras_drv_info.voc_info.aud_tras_dump_rx_cb) {
 					aud_tras_drv_info.voc_info.aud_tras_dump_rx_cb(aud_tras_drv_info.voc_info.decoder_temp.law_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points);
 				}
 
-				if (aud_tras_drv_info.voc_info.data_type == AUD_INTF_VOC_DATA_TYPE_G711U) {
-					/* G711U decoding u-law data to pcm data*/
-					for (i=0; i<aud_tras_drv_info.voc_info.speaker_samp_rate_points; i++) {
-						aud_tras_drv_info.voc_info.decoder_temp.pcm_data[i] = ulaw2linear(aud_tras_drv_info.voc_info.decoder_temp.law_data[i]);
-					}
-				} else {
-					/* G711A decoding a-law data to pcm data*/
-					for (i=0; i<aud_tras_drv_info.voc_info.speaker_samp_rate_points; i++) {
-						aud_tras_drv_info.voc_info.decoder_temp.pcm_data[i] = alaw2linear(aud_tras_drv_info.voc_info.decoder_temp.law_data[i]);
-					}
-				}
+#if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
+                int r_size = 0;
+
+                switch (spk_source_type)
+                {
+                    case SPK_SOURCE_TYPE_PROMPT_TONE:
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+                    /* Check whether play prompt tone */
+                        r_size = aud_tras_drv_read_prompt_tone_data((char *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2, 0);
+                        if (r_size <= 0 && gl_prompt_tone_empty_notify) {
+                            /* prompt tone pool empty */
+                            gl_prompt_tone_empty_notify(gl_notify_user_data);
+                            os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                            /* send message to aud_tras_drv_main to stop prompt_tone play */
+                            if (aud_tras_drv_send_msg(AUD_TRAS_STOP_PROMPT_TONE, NULL) != BK_OK)
+                            {
+                                LOGE("%s, %d, send tras stop prompt tone fail\n", __func__, __LINE__);
+                            }
+                        } else {
+                            if (r_size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
+                                os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
+                            }
+                        }
+                        SPK_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
+#else
+                        LOGW("%s, SPK_SOURCE_TYPE_PROMPT_TONE not support, please enable CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE\n", __func__);
+#endif
+                        break;
+
+                    case SPK_SOURCE_TYPE_A2DP:
+#if CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP
+                        /* play a2dp music */
+                        //LOGI("%s, %d, read a2dp music data\n", __func__, __LINE__);
+                        r_size = aud_tras_drv_read_prompt_tone_data((char *)a2dp_read_buff, a2dp_frame_size, 0);
+                        if (r_size <= 0) {
+                            /* prompt tone pool empty */
+                            if (r_size != a2dp_frame_size) {
+                                os_memset(a2dp_read_buff, 0, a2dp_frame_size);
+                            }
+                        }
+                        SPK_DATA_DUMP_BY_UART_DATA(a2dp_read_buff, a2dp_frame_size);
+#else
+                        LOGW("%s, SPK_SOURCE_TYPE_A2DP not support, please enable CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP\n", __func__);
+#endif
+                        break;
+
+                    case SPK_SOURCE_TYPE_VOICE:
+                        if (fill_slience_flag) {
+                            os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                        } else {
+                            if (aud_tras_drv_info.voc_info.data_type == AUD_INTF_VOC_DATA_TYPE_G711U) {
+                                /* G711U decoding u-law data to pcm data*/
+                                for (i=0; i<aud_tras_drv_info.voc_info.speaker_samp_rate_points; i++) {
+                                    aud_tras_drv_info.voc_info.decoder_temp.pcm_data[i] = ulaw2linear(aud_tras_drv_info.voc_info.decoder_temp.law_data[i]);
+                                }
+                            } else {
+                                /* G711A decoding a-law data to pcm data*/
+                                for (i=0; i<aud_tras_drv_info.voc_info.speaker_samp_rate_points; i++) {
+                                    aud_tras_drv_info.voc_info.decoder_temp.pcm_data[i] = alaw2linear(aud_tras_drv_info.voc_info.decoder_temp.law_data[i]);
+                                }
+                            }
+                        }
+                        break;
+
+                    default:
+                        break;
+                }
+#else
+
+                    if (fill_slience_flag) {
+                        os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                    } else {
+                        if (aud_tras_drv_info.voc_info.data_type == AUD_INTF_VOC_DATA_TYPE_G711U) {
+                            /* G711U decoding u-law data to pcm data*/
+                            for (i=0; i<aud_tras_drv_info.voc_info.speaker_samp_rate_points; i++) {
+                                aud_tras_drv_info.voc_info.decoder_temp.pcm_data[i] = ulaw2linear(aud_tras_drv_info.voc_info.decoder_temp.law_data[i]);
+                            }
+                        } else {
+                            /* G711A decoding a-law data to pcm data*/
+                            for (i=0; i<aud_tras_drv_info.voc_info.speaker_samp_rate_points; i++) {
+                                aud_tras_drv_info.voc_info.decoder_temp.pcm_data[i] = alaw2linear(aud_tras_drv_info.voc_info.decoder_temp.law_data[i]);
+                            }
+                        }
+                    }
+#endif  //CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
 			} else {
+			    /* uac not support prompt tone */
+                //need TODO
 				if (ring_buffer_get_free_size(&aud_tras_drv_info.voc_info.speaker_rb) > aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
 					/* check the frame number in decoder_ring_buffer */
 					if (ring_buffer_get_fill_size(aud_tras_drv_info.voc_info.rx_info.decoder_rb) >= aud_tras_drv_info.voc_info.speaker_samp_rate_points) {
@@ -2551,17 +2626,14 @@ static bk_err_t aud_tras_dec(void)
 		case AUD_INTF_VOC_DATA_TYPE_PCM:
 			if (aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_BOARD) {
 				if (ring_buffer_get_fill_size(aud_tras_drv_info.voc_info.rx_info.decoder_rb) >= aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
-					//os_printf("decoder process \r\n", size);
 					/* get pcm data from decoder_ring_buff */
 					size = ring_buffer_read(aud_tras_drv_info.voc_info.rx_info.decoder_rb, (uint8_t*)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
 					if (size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
 						LOGE("%s, %d, read decoder_ring_buff pcm data fail \n", __func__, __LINE__);
                         fill_slience_flag = true;
-						//os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
 					}
 				} else {
 				    fill_slience_flag = true;
-					//os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
 				}
 
 #if CONFIG_AUD_INTF_SUPPORT_AI_DIALOG_FREE
@@ -2575,33 +2647,67 @@ static bk_err_t aud_tras_dec(void)
 					aud_tras_drv_info.voc_info.aud_tras_dump_rx_cb((uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
 				}
 
+#if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
+                int r_size = 0;
+
+                switch (spk_source_type)
+                {
+                    case SPK_SOURCE_TYPE_PROMPT_TONE:
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
-                /* Check whether play prompt tone */
-                if (gl_prompt_tone_play_flag) {
-                    int r_size = aud_tras_drv_read_prompt_tone_data((char *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2, 0);
-                    if (r_size <= 0 && gl_prompt_tone_empty_notify) {
-                        /* prompt tone pool empty */
-                        gl_prompt_tone_empty_notify(gl_notify_user_data);
-                        os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
-                        /* send message to aud_tras_drv_main to stop prompt_tone play */
-                        if (aud_tras_drv_send_msg(AUD_TRAS_STOP_PROMPT_TONE, NULL) != BK_OK)
-                        {
-                            LOGE("%s, %d, send tras stop prompt tone fail\n", __func__, __LINE__);
+                    /* Check whether play prompt tone */
+                        r_size = aud_tras_drv_read_prompt_tone_data((char *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2, 0);
+                        if (r_size <= 0 && gl_prompt_tone_empty_notify) {
+                            /* prompt tone pool empty */
+                            gl_prompt_tone_empty_notify(gl_notify_user_data);
+                            os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                            /* send message to aud_tras_drv_main to stop prompt_tone play */
+                            if (aud_tras_drv_send_msg(AUD_TRAS_STOP_PROMPT_TONE, NULL) != BK_OK)
+                            {
+                                LOGE("%s, %d, send tras stop prompt tone fail\n", __func__, __LINE__);
+                            }
+                        } else {
+                            if (r_size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
+                                os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
+                            }
                         }
-                    } else {
-                        if (r_size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
-                            os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
-                        }
-                    }
-                } else {
+                        SPK_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
+#else
+                        LOGW("%s, SPK_SOURCE_TYPE_PROMPT_TONE not support, please enable CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE\n", __func__);
 #endif
+                        break;
+
+                    case SPK_SOURCE_TYPE_A2DP:
+#if CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP
+                        /* play a2dp music */
+                        //LOGI("%s, %d, read a2dp music data\n", __func__, __LINE__);
+                        r_size = aud_tras_drv_read_prompt_tone_data((char *)a2dp_read_buff, a2dp_frame_size, 0);
+                        if (r_size <= 0) {
+                            /* prompt tone pool empty */
+                            if (r_size != a2dp_frame_size) {
+                                os_memset(a2dp_read_buff, 0, a2dp_frame_size);
+                            }
+                        }
+                        SPK_DATA_DUMP_BY_UART_DATA(a2dp_read_buff, a2dp_frame_size);
+#else
+                        LOGW("%s, SPK_SOURCE_TYPE_A2DP not support, please enable CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP\n", __func__);
+#endif
+                        break;
+
+                    case SPK_SOURCE_TYPE_VOICE:
+                        if (fill_slience_flag) {
+                            os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                        }
+                        break;
+
+                    default:
+                        break;
+                }
+#else
+
                     if (fill_slience_flag) {
                         os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
                     }
-#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
-                }
-#endif
-
+#endif  //CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
 			} else {
 				if (ring_buffer_get_free_size(&aud_tras_drv_info.voc_info.speaker_rb) > aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
 					/* check the frame number in decoder_ring_buffer */
@@ -2637,11 +2743,9 @@ static bk_err_t aud_tras_dec(void)
 					if (size != aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2) {
 						LOGE("%s, %d, read decoder_ring_buff G722 data fail \n", __func__, __LINE__);
                         fill_slience_flag = true;
-						//os_memset(aud_tras_drv_info.voc_info.decoder_temp.law_data, 0xD5, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2);
 					}
 				} else {
 				    fill_slience_flag = true;
-					//os_memset(aud_tras_drv_info.voc_info.decoder_temp.law_data, 0xD5, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2);
 				}
 
 #if CONFIG_AUD_INTF_SUPPORT_AI_DIALOG_FREE
