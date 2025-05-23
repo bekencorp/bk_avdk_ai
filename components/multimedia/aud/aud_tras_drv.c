@@ -4441,7 +4441,7 @@ static bk_err_t aud_tras_drv_codec_init(void)
 #if CONFIG_AUD_INTF_SUPPORT_G722
         case AUD_INTF_VOC_DATA_TYPE_G722:
         {
-            g722_encode_init(&g722_enc, 64000, 0);
+            g722_encode_init(&g722_enc, aud_tras_drv_info.voc_info.aud_codec_setup.enc_bitrate, 0);
 
             aud_tras_drv_info.voc_info.encoder_temp.law_data = (uint8_t *)audio_tras_drv_malloc(aud_tras_drv_info.voc_info.aud_codec_setup.enc_output_size_in_byte);
             if (aud_tras_drv_info.voc_info.encoder_temp.law_data == NULL) 
@@ -4503,7 +4503,7 @@ static bk_err_t aud_tras_drv_codec_init(void)
         case AUD_INTF_VOC_DATA_TYPE_G722:
         {
 
-            g722_decode_init(&g722_dec, 64000, 0);
+            g722_decode_init(&g722_dec, aud_tras_drv_info.voc_info.aud_codec_setup.dec_bitrate, 0);
 
             aud_tras_drv_info.voc_info.decoder_temp.law_data = (unsigned char *)audio_tras_drv_malloc(aud_tras_drv_info.voc_info.aud_codec_setup.dec_input_size_in_byte);
             if (aud_tras_drv_info.voc_info.decoder_temp.law_data == NULL) 
