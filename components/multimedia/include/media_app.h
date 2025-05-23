@@ -60,6 +60,13 @@ typedef enum
 	MEDIA_APP_EVT_ASR_STANDBY_IND,
 } media_app_evt_type_t;
 
+typedef enum
+{
+	LVGL_UI_DISP_IN_INIT,
+	LVGL_UI_DISP_IN_TEXT,
+	LVGL_UI_DISP_IN_TEXT_AND_IMAGE,
+} lvgl_ui_index_t;
+
 
 typedef int (*media_transfer_send_cb)(uint8_t *data, uint32_t length, uint16_t *retry_cnt);
 typedef int (*media_transfer_prepare_cb)(uint8_t *data, uint32_t length);
@@ -130,7 +137,7 @@ bk_err_t media_app_lvgl_close(void);
 bk_err_t media_app_lvcam_lvgl_open(void *lcd_open);
 bk_err_t media_app_lvcam_lvgl_close(void);
 bk_err_t media_app_lvgl_send_data(void *data);
-bk_err_t media_app_lvgl_switch_ui(void);
+bk_err_t media_app_lvgl_switch_ui(lvgl_ui_index_t ui_index);
 
 bk_err_t media_app_rtsp_open(video_config_t *config);
 bk_err_t media_app_rtsp_close();

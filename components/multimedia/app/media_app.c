@@ -1311,11 +1311,11 @@ bk_err_t media_app_lvgl_send_data(void *data)
     return ret;
 }
 
-bk_err_t media_app_lvgl_switch_ui(void)
+bk_err_t media_app_lvgl_switch_ui(lvgl_ui_index_t ui_index)
 {
     bk_err_t ret = BK_OK;
 
-    ret = media_send_msg_sync(EVENT_LVGL_SWITCH_UI_IND, 0);
+    ret = media_send_msg_sync(EVENT_LVGL_SWITCH_UI_IND, ui_index);
 
     LOGI("%s complete %x\n", __func__, ret);
 
