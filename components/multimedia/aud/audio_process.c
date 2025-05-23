@@ -3,7 +3,7 @@
 #include <os/str.h>
 #include <modules/audio_process.h>
 #include <components/log.h>
-#include "audio_para.h"
+#include "audio_default_para.h"
 #include "audio_debug.h"
 
 
