@@ -126,7 +126,7 @@ void transfer_major_storage_image(uint8_t *frame, uint32_t len)
     os_snprintf(image_url, 20, "/%d.jpeg", image_index);
 #endif
 
-#if (CONFIG_AGORA_VIDEO_FORMAT_JPEG)
+#if (CONFIG_AGORA_VIDEO_FORMAT_H264)
     os_snprintf(image_url, 20, "/%d.h264", image_index);
 #endif
 
