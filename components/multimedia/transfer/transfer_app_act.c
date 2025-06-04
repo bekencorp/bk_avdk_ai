@@ -17,7 +17,7 @@
 #include "media_evt.h"
 #include "media_app.h"
 #include "transfer_act.h"
-#include <driver/aon_rtc.h>
+#include "timer_util.h"
 
 #if (CONFIG_CACHE_ENABLE)
 #include "cache.h"
@@ -63,23 +63,6 @@ static bk_err_t transfer_app_task_send_msg(uint8_t type, uint32_t data)
 	return kGeneralErr;
 }
 
-static uint32_t transfer_app_get_current_timer(void)
-{
-	uint64_t timer = 0;
-
-#ifdef CONFIG_ARCH_RISCV
-	timer = (riscv_get_mtimer() / 26) & 0xFFFFFFFF;// tick
-#else // CONFIG_ARCH_RISCV
-
-#ifdef CONFIG_AON_RTC
-	timer = bk_aon_rtc_get_us() & 0xFFFFFFFF;
-#endif
-
-#endif // CONFIG_ARCH_RISCV
-
-	return (uint32_t)timer;
-}
-
 static void transfer_app_task_send_handle(uint32_t param)
 {
 	uint32_t before = 0, after = 0;
@@ -90,14 +73,14 @@ static void transfer_app_task_send_handle(uint32_t param)
 		flush_dcache(current_frame->frame, current_frame->size);
 #endif
 
-		before = transfer_app_get_current_timer();
+		before = bk_get_current_timer();
 
 		if (frame_read_callback)
 		{
 			frame_read_callback(current_frame);
 		}
 
-		after = transfer_app_get_current_timer();
+		after = bk_get_current_timer();
 
 		transfer_log->meantimes += (after - before);
 

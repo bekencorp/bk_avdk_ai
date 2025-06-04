@@ -3,6 +3,7 @@ set(srcs
 	src/uart_util.c
 	src/count_util.c
 	src/ring_buffer.c
+	src/timer_util.c
 )
 
 if (CONFIG_FATFS)
