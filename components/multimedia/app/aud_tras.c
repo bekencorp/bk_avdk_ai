@@ -36,7 +36,8 @@
 #define LOGD(...) BK_LOGD(AUD_TRAS, ##__VA_ARGS__)
 
 #define TU_QITEM_COUNT      (40)
-#define AUD_TRAS_BUFF_SIZE    (320 * 5)
+#define AUD_PACKET_NUM          (10)
+#define AUD_TRAS_BUFF_SIZE    (320 * AUD_PACKET_NUM)
 
 //#define AUD_TX_DEBUG
 
@@ -417,12 +418,12 @@ bk_err_t aud_tras_init(aud_tras_setup_t *setup_cfg)
 	}
 	os_memset(aud_tras_info, 0, sizeof(aud_tras_info_t));
     #if CONFIG_AUD_INTF_SUPPORT_OPUS
-	aud_tras_info->aud_tras_pkt_len_buff_addr = audio_tras_malloc(sizeof(uint16_t)*5 + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
+	aud_tras_info->aud_tras_pkt_len_buff_addr = audio_tras_malloc(sizeof(uint16_t)*AUD_PACKET_NUM + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL);
 	if (!aud_tras_info->aud_tras_pkt_len_buff_addr) {
 		LOGE("malloc aud_tras_pkt_len_buff_addr\n");
 		goto out;
 	}
-	ring_buffer_init(&aud_tras_info->aud_tras_pkt_len_rb, aud_tras_info->aud_tras_pkt_len_buff_addr, sizeof(uint16_t)*5 + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, DMA_ID_MAX, RB_DMA_TYPE_NULL);
+	ring_buffer_init(&aud_tras_info->aud_tras_pkt_len_rb, aud_tras_info->aud_tras_pkt_len_buff_addr, sizeof(uint16_t)*AUD_PACKET_NUM + CONFIG_AUD_RING_BUFF_SAFE_INTERVAL, DMA_ID_MAX, RB_DMA_TYPE_NULL);
 	LOGI("aud_tras_info->aud_tras_pkt_len_rb: %p \n", &aud_tras_info->aud_tras_pkt_len_rb);
 	#endif
 
