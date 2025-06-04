@@ -366,7 +366,7 @@ s32 lv_jpeg_img_load_with_hw_dec(char *filename, lv_img_dsc_t *img_dst)
             lv_dma2d_is_init = 1;
         }
 
-        lv_jpeg_hw_decode_output_fmt_set(JH_OUTPUT_YUYV);
+        lv_jpeg_hw_decode_output_fmt_set(JH_OUTPUT_RGB565);
         ret = lv_img_file_jpeg_hw_dec(filename, img_dst);
         if (ret != BK_OK) {
             bk_printf("%s jpeg hw decode fail\r\n", __func__);

@@ -571,10 +571,10 @@ bk_err_t lcd_display_open(lcd_open_t *config)
 #endif
 
     if (g_lcd_device->type == LCD_TYPE_QSPI) {
-        #if (CONFIG_LCD_QSPI && CONFIG_LCD_QSPI_DEVICE_NUM == 1)
-            bk_lcd_qspi_disp_task_start(g_lcd_device);
-            lcd_disp_config->disp_task_running = true;
-        #endif
+#if (CONFIG_LCD_QSPI && CONFIG_LCD_QSPI_DEVICE_NUM == 1)
+        bk_lcd_qspi_disp_task_start(g_lcd_device);
+        lcd_disp_config->disp_task_running = true;
+#endif
     } else {
         ret = lcd_display_task_start();
         if (ret != BK_OK)
@@ -610,12 +610,17 @@ bk_err_t lcd_display_close(void)
 
 	lcd_driver_backlight_close();
 
+    if (lcd_disp_config->lcd_type == LCD_TYPE_QSPI)
+    {
 #if (CONFIG_LCD_QSPI && CONFIG_LCD_QSPI_DEVICE_NUM == 1)
-    bk_lcd_qspi_disp_task_stop();
-    lcd_disp_config->disp_task_running = false;
-#else
-    lcd_display_task_stop();
+        bk_lcd_qspi_disp_task_stop();
+        lcd_disp_config->disp_task_running = false;
 #endif
+    }
+    else
+    {
+        lcd_display_task_stop();
+    }
 
 	lcd_display_config_free();
 #if (CONFIG_LCD_DMA2D_BLEND || CONFIG_LCD_FONT_BLEND)
