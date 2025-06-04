@@ -43,6 +43,19 @@ uint32_t volc_get_local_ip(volc_ip_addr_t* dest_ip_list, uint32_t* p_dest_ip_lis
             }
         }
     }
+
+#if CONFIG_NET_PAN
+    if (pan_ip_is_start()) {
+        ret = bk_netif_get_ip4_config(NETIF_IF_PAN, &ip4_config);
+        if (BK_OK == ret) {
+            snprintf(ipv4,64,"%s:0",ip4_config.ip);
+            if(_volc_ip_address_from_string(&dest_ip_list[ip_count], ipv4) == VOLC_STATUS_SUCCESS) {
+                ip_count++;
+            }
+        }
+    }
+#endif
+
 #endif
 
     *p_dest_ip_list_len = ip_count;
