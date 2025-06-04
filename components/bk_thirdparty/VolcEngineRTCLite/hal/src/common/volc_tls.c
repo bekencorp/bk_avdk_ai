@@ -105,7 +105,7 @@ bool volc_tls_is_handshake_over(volc_tls_t tls) {
     if (NULL == tls) {
         return false;
     }
-#if MBEDTLS_VERSION_NUMBER >= 0x03060000
+#if MBEDTLS_VERSION_NUMBER >= 0x03050200
     ret = mbedtls_ssl_is_handshake_over(&ctx->ssl_ctx);
 #else
     ret = (ctx->ssl_ctx.state == MBEDTLS_SSL_HANDSHAKE_OVER);
