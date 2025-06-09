@@ -18,11 +18,7 @@ extern bk_err_t audio_osi_funcs_init(void *config);
 
 static void *psram_malloc_wrapper(size_t size)
 {
-#if CONFIG_PSRAM
 	return psram_malloc(size);
-#else
-	return NULL;
-#endif
 }
 
 static void *malloc_wrapper(size_t size)

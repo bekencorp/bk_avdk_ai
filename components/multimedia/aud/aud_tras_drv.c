@@ -258,7 +258,11 @@ void aud_set_production_mode(int val);
 int aud_get_production_mode(void);
 
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+#if CONFIG_BK_WSS_TRANS_NOPSRAM
+#define PROMPT_TONE_RB_SIZE     (1280 * 4)
+#else
 #define PROMPT_TONE_RB_SIZE     (1280 * 8)
+#endif
 static ringbuf_handle_t gl_prompt_tone_rb = NULL;
 //static bool gl_prompt_tone_play_flag = false;
 static prompt_tone_pool_empty_notify gl_prompt_tone_empty_notify = NULL;
@@ -6499,12 +6503,22 @@ bk_err_t aud_tras_drv_init(aud_intf_drv_config_t *setup_cfg)
 
 		//create audio transfer driver task
 		#if CONFIG_AUD_INTF_SUPPORT_OPUS
-		rtos_create_psram_thread(&aud_trs_drv_thread_hdl,
+		#if CONFIG_PSRAM_AS_SYS_MEMORY
+		ret = rtos_create_psram_thread(&aud_trs_drv_thread_hdl,
 							 setup_cfg->setup.task_config.priority,
 							 "aud_tras_drv",
 							 (beken_thread_function_t)aud_tras_drv_main,
 							 34*1024,
 							 (beken_thread_arg_t)&aud_trs_drv_setup_bak);
+		#else
+		ret = rtos_create_thread(&aud_trs_drv_thread_hdl,
+							 setup_cfg->setup.task_config.priority,
+							 "aud_tras_drv",
+							 (beken_thread_function_t)aud_tras_drv_main,
+							 27*1024,
+							 (beken_thread_arg_t)&aud_trs_drv_setup_bak);
+
+		#endif
 		#else
 		ret = rtos_create_sram_thread(&aud_trs_drv_thread_hdl,
 							 setup_cfg->setup.task_config.priority,

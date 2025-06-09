@@ -281,7 +281,11 @@ int frame_buffer_fb_deinit(fb_type_t type)
 			{
 				if (tmp->frame.base_addr)
 				{
+#if CONFIG_PSRAM
 					bk_psram_frame_buffer_free(tmp->frame.base_addr);
+#else
+					os_free(tmp->frame.base_addr);
+#endif
 					tmp->frame.base_addr = tmp->frame.frame = NULL;
 				}
 				list_del(pos);
@@ -303,7 +307,11 @@ int frame_buffer_fb_deinit(fb_type_t type)
 			{
 				if (tmp->frame.base_addr)
 				{
+#if CONFIG_PSRAM
 					bk_psram_frame_buffer_free(tmp->frame.base_addr);
+#else
+					os_free(tmp->frame.base_addr);
+#endif
 					tmp->frame.base_addr = tmp->frame.frame = NULL;
 				}
 				list_del(pos);
@@ -551,22 +559,41 @@ frame_buffer_t *frame_buffer_fb_dual_malloc(fb_type_t type, uint32_t size)
 				// need align 64K
 #if CONFIG_SOC_BK7256XX
 				node->frame.size += 64 * 1024;
+#if CONFIG_PSRAM
 				node->frame.base_addr = (uint8_t *)bk_psram_frame_buffer_malloc(PSRAM_HEAP_YUV, node->frame.size);
+#else
+				node->frame.base_addr = (uint8_t *)os_malloc(node->frame.size);
+#endif
 				if (node->frame.base_addr != NULL)
 				{
+					LOGE("%s, %d, malloc fail \n", __func__, __LINE__);
 					if ((uint32_t)node->frame.base_addr & 0xFFFF)
 					{
 						node->frame.frame = (uint8_t *)((((uint32_t)node->frame.base_addr >> 16) + 1) << 16);
 					}
 				}
 #else
+#if CONFIG_PSRAM
 				node->frame.base_addr = (uint8_t *)bk_psram_frame_buffer_malloc(PSRAM_HEAP_YUV, node->frame.size);
+#else
+				node->frame.base_addr = (uint8_t *)os_malloc(node->frame.size);
+#endif
+				if (node->frame.base_addr == NULL)
+					LOGE("%s, %d, malloc fail \n", __func__, __LINE__);
+
 				node->frame.frame = node->frame.base_addr;
 #endif
 			}
 			else
 			{
+#if CONFIG_PSRAM
 				node->frame.base_addr = (uint8_t *)bk_psram_frame_buffer_malloc(PSRAM_HEAP_ENCODE, node->frame.size);
+#else
+				node->frame.base_addr = (uint8_t *)os_malloc(node->frame.size);
+#endif
+				if (node->frame.base_addr == NULL)
+					LOGE("%s, %d, malloc fail \n", __func__, __LINE__);
+
 				node->frame.frame = node->frame.base_addr;
 			}
 
@@ -697,13 +724,27 @@ frame_buffer_t *frame_buffer_fb_malloc(fb_type_t type, uint32_t size)
 					}
 				}
 #else
+#if CONFIG_PSRAM
 				node->frame.base_addr = (uint8_t *)bk_psram_frame_buffer_malloc(PSRAM_HEAP_YUV, node->frame.size);
+#else
+				node->frame.base_addr = (uint8_t *)os_malloc(node->frame.size);
+#endif
+				if (node->frame.base_addr == NULL)
+					LOGE("%s, %d, malloc fail \n", __func__, __LINE__);
+
 				node->frame.frame = node->frame.base_addr;
 #endif
 			}
 			else
 			{
+#if CONFIG_PSRAM
 				node->frame.base_addr = (uint8_t *)bk_psram_frame_buffer_malloc(PSRAM_HEAP_ENCODE, node->frame.size);
+#else
+				node->frame.base_addr = (uint8_t *)os_malloc(node->frame.size);
+#endif
+				if (node->frame.base_addr == NULL)
+					LOGE("%s, %d, malloc fail \n", __func__, __LINE__);
+
 				node->frame.frame = node->frame.base_addr;
 			}
 
@@ -1436,8 +1477,9 @@ void frame_buffer_init(void)
 			fb_info->modules[index].handle = xEventGroupCreate();
 		}
 	}
-
+#if CONFIG_PSRAM
 	bk_psram_frame_buffer_init();
+#endif
 }
 
 
@@ -1458,10 +1500,15 @@ void frame_buffer_deinit(void)
 
 frame_buffer_t *frame_buffer_display_malloc(uint32_t size)
 {
+#if CONFIG_PSRAM
 	frame_buffer_t *frame = bk_psram_frame_buffer_malloc(PSRAM_HEAP_YUV, size + sizeof(frame_buffer_t) + 32);
+#else
+	frame_buffer_t *frame = os_malloc(size + sizeof(frame_buffer_t) + 32);
+#endif
 
 	if (frame == NULL)
 	{
+		LOGE("%s, %d, malloc fail \n", __func__, __LINE__);
 		return NULL;
 	}
 
@@ -1475,7 +1522,11 @@ frame_buffer_t *frame_buffer_display_malloc(uint32_t size)
 void frame_buffer_display_free(frame_buffer_t *frame)
 {
 	if (frame->cb == NULL) {
+#if CONFIG_PSRAM
 		bk_psram_frame_buffer_free(frame);
+#else
+		os_free(frame);
+#endif
 	} else {
 		if (frame->cb->free) {
 			frame->cb->free(frame);
