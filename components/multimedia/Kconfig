@@ -219,7 +219,6 @@ menu "Media"
 
     config AUD_INTF_SUPPORT_BLUETOOTH_A2DP
         depends on AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
-		depends on AEC_ECHO_COLLECT_MODE_HARDWARE
         bool "Enable supoort bluetooth a2dp music"
         default n
 
