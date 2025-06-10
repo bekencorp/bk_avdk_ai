@@ -1372,13 +1372,15 @@ void aud_tras_aec_vad_enable(bool val)
     if(!aec_info_pr)
     {
         g_aec_vad_enable = false;
+        aud_para.aec_config_voice.vad_enable = val;
         LOGI("[%s][%d] aec is close\r\n", __FUNCTION__, __LINE__);
         return ;
     }
-    
+
     if(val)
     {
         g_aec_vad_enable = true;
+        aud_para.aec_config_voice.vad_enable = val;
         badframe = 16;    //按键模式，前面16*20ms=320ms音频数据不作为vad的判断条件
         aec_info_pr->aec->spcnt = 0;
         aec_info_pr->aec->test = 0;
@@ -1388,6 +1390,7 @@ void aud_tras_aec_vad_enable(bool val)
     else
     {
         g_aec_vad_enable = false;
+        aud_para.aec_config_voice.vad_enable = val;
         LOGI("[%s][%d] off\r\n", __FUNCTION__, __LINE__);
     }
 }
@@ -1398,11 +1401,11 @@ static void aud_tras_drv_vad_flag_send(uint32 flag)
 	if(last_val != flag && 0 != flag)  //1 vad start 2 vad end 3 slience
 	{
 		LOGD("[%s:%d]:0x%x\r\n", __func__,__LINE__,flag);
-	vad_notify.ptr_data = flag;
-	vad_notify.length = 1;
-	vad_to_media_app_msg.event = EVENT_AUD_VAD_FLAG_NOTIFY;
-	vad_to_media_app_msg.param = (uint32_t)&vad_notify;
-	msg_send_notify_to_media_major_mailbox(&vad_to_media_app_msg, APP_MODULE);
+		vad_notify.ptr_data = flag;
+		vad_notify.length = 1;
+		vad_to_media_app_msg.event = EVENT_AUD_VAD_FLAG_NOTIFY;
+		vad_to_media_app_msg.param = (uint32_t)&vad_notify;
+		msg_send_notify_to_media_major_mailbox(&vad_to_media_app_msg, APP_MODULE);
 	}
 }
 
@@ -1413,77 +1416,76 @@ static void aud_aec_vad_process(void)
 #if CONFIG_AEC_VERSION_V3
     aec_info_t *aec_info_pr = aud_tras_drv_info.voc_info.aec_info;
 
+    static int aec_vad_flag=0;
+    static int aec_vad_mem=0;
 
-        static int aec_vad_flag=0;
-        static int aec_vad_mem=0;
-		
-		if(aud_para.aec_config_voice.vad_enable == 0)
-		{
-			aec_vad_flag = 0;
-			aec_vad_mem = 0;
-			badframe = 16;
-			return;
-		}
+	if(aud_para.aec_config_voice.vad_enable == 0)
+	{
+		aec_vad_flag = 0;
+		aec_vad_mem = 0;
+		badframe = 16;
+		return;
+	}
 
-        int dc = aec_info_pr->aec->dc >> 14;
-        if (dc<0)
-		{
-			dc = -dc;
-		}
-        if ( (dc>800) && (aec_info_pr->aec->mic_max>10000) )
+    int dc = aec_info_pr->aec->dc >> 14;
+    if (dc<0)
+	{
+		dc = -dc;
+	}
+    if ( (dc>800) && (aec_info_pr->aec->mic_max>10000) )
+    {
+        badframe = 10;
+    }
+	else if (aec_info_pr->aec->mic_max>30000)
+	{
+        badframe = 8;
+	}
+    else
+    {
+        badframe--;
+        if (badframe < 0)
         {
-            badframe = 10;
+            badframe = 0;
         }
-		else if (aec_info_pr->aec->mic_max>30000)
-		{
-            badframe = 8;
-		}
+    }
+    if (badframe)
+    {
+        aec_info_pr->aec->spcnt >>= 1;
+    }
+
+    if(aec_info_pr->aec->test)
+    {
+        if(aec_vad_mem==0)
+        {
+            aec_vad_flag = 1;
+            aec_info_pr->aec->spcnt = aec_info_pr->aec->SPthr[2];
+            aec_info_pr->aec->test = aec_info_pr->aec->SPthr[2];
+        }
         else
         {
-            badframe--;
-            if (badframe < 0)
-            {
-                badframe = 0;
+            if(aec_info_pr->aec->dcnt*20 == aec_info_pr->aec->SPthr[6])
+			{
+				aec_vad_flag = 3;
+			}
+			else
+			{
+				aec_vad_flag = 0;
 			}
         }
-        if (badframe)
+        aec_vad_mem = aec_info_pr->aec->test;
+    }
+    else
+    {
+        if(0 == aec_vad_mem)
         {
-            aec_info_pr->aec->spcnt >>= 1;
+            aec_vad_flag = 0;
         }
-				
-        if(aec_info_pr->aec->test)
+        if(aec_vad_mem > 0)
         {
-            if(aec_vad_mem==0)
-            {
-                aec_vad_flag = 1;
-                aec_info_pr->aec->spcnt = aec_info_pr->aec->SPthr[2];	
-				aec_info_pr->aec->test = aec_info_pr->aec->SPthr[2];
-            }
-            else
-            {
-                if(aec_info_pr->aec->dcnt*20 == aec_info_pr->aec->SPthr[6])
-    			{
-    				aec_vad_flag = 3;
-    			}
-    			else
-    			{
-    				aec_vad_flag = 0;
-    			}
-            }
-            aec_vad_mem = aec_info_pr->aec->test;
+            aec_vad_flag = 2;  // vad end
         }
-        else
-        {
-            if(0 == aec_vad_mem)
-            {
-                aec_vad_flag = 0;
-            }
-            if(aec_vad_mem > 0)
-            {
-                aec_vad_flag = 2;  // vad end
-            }
-            aec_vad_mem = aec_info_pr->aec->test;
-        }
+        aec_vad_mem = aec_info_pr->aec->test;
+    }
 	aud_tras_drv_vad_flag_send(aec_vad_flag);
 
 #endif
@@ -1697,7 +1699,7 @@ if(aud_get_production_mode())
 	if(aud_para.aec_config_voice.aec_enable)
 	{
 		aec_proc(aec_info_pr->aec, aec_info_pr->ref_addr, aec_info_pr->mic_addr, aec_info_pr->out_addr);
-		aud_aec_vad_process(); 
+		aud_aec_vad_process();
 	}
 	else
 	{
