@@ -25,14 +25,7 @@ endif()
 
 set(priv_req bk_init bt media_service lwip_intf_v2_1)
 
-
-if ("${ARMINO_SOC}" STREQUAL "bk7256") 
-list(APPEND priv_req media cs2p2p aud_intf)
-endif()
-
-if ("${ARMINO_SOC}" STREQUAL "bk7258")
 list(APPEND priv_req multimedia cs2p2p)
-endif()
 
 if (CONFIG_OVERRIDE_FLASH_PARTITION)
 	list(APPEND srcs

@@ -36,7 +36,7 @@
 #include "aud_tras.h"
 #include "storage_act.h"
 #include "lcd_act.h"
-#include "camera_driver.h"
+
 #if (CONFIG_CACHE_ENABLE)
 #include "cache.h"
 #endif
@@ -573,11 +573,11 @@ static void media_app_mailbox_msg_handle(media_mailbox_msg_t *msg)
 		switch (msg->event)
 		{
 			case EVENT_DVP_EOF_NOTIFY:
-				bk_dvp_camera_eof_handler();
+				//bk_dvp_camera_eof_handler();
 				break;
 
 			case EVENT_DMA_RESTART_NOTIFY:
-				dvp_camera_reset_dma();
+				//dvp_camera_reset_dma();
 				break;
 
 			case EVENT_AUD_SPK_DATA_NOTIFY:

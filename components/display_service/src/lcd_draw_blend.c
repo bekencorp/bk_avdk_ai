@@ -136,7 +136,7 @@ bk_err_t lcd_font_handle(frame_buffer_t *frame, uint16_t lcd_width, uint16_t lcd
         lcd_font_config.bg_height = frame->height;
         lcd_driver_font_blend(&lcd_font_config);
     }
-#if (CONFIG_SOC_BK7258)
+
     if ((g_blend_data.lcd_blend_type & LCD_BLEND_WIFI) != 0)      /// start display lcd (lcd_width,0)
     {
         lcd_blend_t lcd_blend = {0};
@@ -156,9 +156,7 @@ bk_err_t lcd_font_handle(frame_buffer_t *frame, uint16_t lcd_width, uint16_t lcd
         lcd_blend.bg_height = frame->height;
         lcd_driver_blend(&lcd_blend);
     }
-#else
-        lcd_dma2d_handle(frame, lcd_width, lcd_height);
-#endif
+
     if ((g_blend_data.lcd_blend_type & LCD_BLEND_DATA) != 0)   /// tart display lcd (DATA_POSTION_X,DATA_POSTION_Y)
     {
         if ((DATA_POSTION_X + DATA_LOGO_W) > lcd_width)

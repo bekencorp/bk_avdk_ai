@@ -53,15 +53,9 @@ static void draw_border_simple(lv_draw_ctx_t * draw_ctx, const lv_area_t * outer
  *  STATIC VARIABLES
  **********************/
 #if defined(LV_SHADOW_CACHE_SIZE) && LV_SHADOW_CACHE_SIZE > 0
-#if CONFIG_SOC_BK7258
     static __attribute__((section(".dtcm_sec_data "))) uint8_t sh_cache[LV_SHADOW_CACHE_SIZE * LV_SHADOW_CACHE_SIZE];
     static __attribute__((section(".dtcm_sec_data "))) int32_t sh_cache_size = -1;
     static __attribute__((section(".dtcm_sec_data "))) int32_t sh_cache_r = -1;
-#else
-    static uint8_t sh_cache[LV_SHADOW_CACHE_SIZE * LV_SHADOW_CACHE_SIZE];
-    static int32_t sh_cache_size = -1;
-    static int32_t sh_cache_r = -1;
-#endif
 #endif
 
 /**********************

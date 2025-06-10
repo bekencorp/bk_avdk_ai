@@ -222,14 +222,10 @@ int lv_vendor_display_frame_cnt(void)
 
 int lv_vendor_draw_buffer_cnt(void)
 {
-#if CONFIG_SOC_BK7258
     if (vendor_config.draw_buf_2_1 && vendor_config.draw_buf_2_2) {
         return 2;
     } else {
         return 1;
     }
-#else
-    return 1;
-#endif
 }
 

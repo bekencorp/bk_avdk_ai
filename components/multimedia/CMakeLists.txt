@@ -1,4 +1,3 @@
-if (CONFIG_SOC_BK7258) # CONFIG_SOC_BK7258
 if (CONFIG_MEDIA)
 set(incs include pipeline)
 
@@ -253,10 +252,10 @@ endif()
 
 endif()# CONFIG_MEDIA
 
-endif() # CONFIG_SOC_BK7258
-armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES bk_cli lvgl net_transfer avdk_libs video unity media_utils  bk_draw_blend display_service avdk_utils bk_vfs)
 
-if (CONFIG_SOC_BK7258) # CONFIG_SOC_BK7258
+armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES bk_cli lvgl avdk_libs unity media_utils  bk_draw_blend display_service avdk_utils bk_vfs)
+
+
 if (CONFIG_MEDIA_MAJOR)
 if (CONFIG_AEC_VERSION_V3)
 	set(avdk_lib $ENV{ARMINO_PATH}/../components/avdk_libs/${ARMINO_SOC}/libs)
@@ -280,4 +279,3 @@ if (CONFIG_AEC_VERSION_V1)
 	target_link_libraries(${COMPONENT_LIB} INTERFACE ${lib_name})
 endif()
 endif()
-endif() # CONFIG_SOC_BK7258

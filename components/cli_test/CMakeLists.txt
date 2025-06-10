@@ -30,10 +30,8 @@ else()
         )
 endif()
 endif()
-if ("${ARMINO_SOC}" STREQUAL "bk7258")
-    list(APPEND priv_req multimedia)
-else()
-    list(APPEND priv_req media)
-endif()
+
+list(APPEND priv_req multimedia)
+
 
 armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES "${priv_req}")

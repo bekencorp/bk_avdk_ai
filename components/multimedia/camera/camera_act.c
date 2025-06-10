@@ -333,70 +333,12 @@ end:
 
 static bk_err_t camera_rtsp_open_handle(media_mailbox_msg_t *msg)
 {
-	int ret = BK_OK;
-
-	LOGI("%s\n", __func__);
-#ifdef CONFIG_DVP_CAMERA
-
-	if (CAMERA_STATE_DISABLED != get_camera_state())
-	{
-		LOGI("%s already opened\n", __func__);
-		goto end;
-	}
-
-	LOGI("%s, %d\r\n", __func__, __LINE__);
-
-	ret = bk_dvp_camera_init(msg);
-
-	if (ret != BK_OK)
-	{
-		LOGE("%s open failed\n", __func__);
-		goto end;
-	}
-
-	//dvp_camera_reset_open_ind = true;
-
-	set_camera_state(CAMERA_STATE_ENABLED);
-#else
-	LOGW("%s NOT SUPPORT DVP_CAMERA\n", __func__);
-	goto end;
-#endif
-
-end:
-	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
-
-	return ret;
+	return BK_FAIL;
 }
 
 static bk_err_t camera_rtsp_close_handle(media_mailbox_msg_t *msg)
 {
-	int ret = BK_OK;
-
-	LOGI("%s\n", __func__);
-
-#ifdef CONFIG_DVP_CAMERA
-
-	if (CAMERA_STATE_DISABLED == get_camera_state())
-	{
-		LOGI("%s already close\n", __func__);
-		goto end;
-	}
-
-	bk_dvp_camera_deinit();
-
-	set_camera_state(CAMERA_STATE_DISABLED);
-
-	dvp_camera_reset_open_ind = false;
-
-#else
-	LOGW("%s NOT SUPPORT DVP_CAMERA\n", __func__);
-	goto end;
-#endif
-
-end:
-	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);
-
-	return ret;
+	return BK_FAIL;
 }
 
 static bk_err_t camera_compression_ratio_config_handle(media_mailbox_msg_t *msg)

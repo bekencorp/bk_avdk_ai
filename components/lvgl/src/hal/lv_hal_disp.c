@@ -703,49 +703,19 @@ static void set_px_true_color_alpha(lv_disp_drv_t * disp_drv, uint8_t * buf, lv_
     bg_color.full = buf_px[0];
     lv_color_mix_with_alpha(bg_color, bg_opa, color, opa, &res_color, &buf_px[2]);
     if(buf_px[1] <= LV_OPA_MIN) return;
-#if CONFIG_SOC_BK7256
-#if LV_SNAPSHOT_USE_PSRAM
-    bk_psram_byte_write(&buf_px[0], res_color.full);
-#else
     buf_px[0] = res_color.full;
-#endif
-#elif CONFIG_SOC_BK7258
-    buf_px[0] = res_color.full;
-#endif
 #elif LV_COLOR_DEPTH == 16
     bg_color.full = buf_px[0] + (buf_px[1] << 8);
     lv_color_mix_with_alpha(bg_color, bg_opa, color, opa, &res_color, &buf_px[2]);
     if(buf_px[2] <= LV_OPA_MIN) return;
-#if CONFIG_SOC_BK7256
-#if LV_SNAPSHOT_USE_PSRAM
-    bk_psram_byte_write(&buf_px[0], res_color.full & 0xff);
-    bk_psram_byte_write(&buf_px[1], res_color.full >> 8);
-#else
     buf_px[0] = res_color.full & 0xff;
     buf_px[1] = res_color.full >> 8;
-#endif
-#elif CONFIG_SOC_BK7258
-    buf_px[0] = res_color.full & 0xff;
-    buf_px[1] = res_color.full >> 8;
-#endif
 #elif LV_COLOR_DEPTH == 32
     bg_color = *((lv_color_t *)buf_px);
     lv_color_mix_with_alpha(bg_color, bg_opa, color, opa, &res_color, &buf_px[3]);
     if(buf_px[3] <= LV_OPA_MIN) return;
-#if CONFIG_SOC_BK7256
-#if LV_SNAPSHOT_USE_PSRAM
-    bk_psram_byte_write(&buf_px[0], res_color.ch.blue);
-    bk_psram_byte_write(&buf_px[1], res_color.ch.green);
-    bk_psram_byte_write(&buf_px[2], res_color.ch.red);
-#else
     buf_px[0] = res_color.ch.blue;
     buf_px[1] = res_color.ch.green;
     buf_px[2] = res_color.ch.red;
-#endif
-#elif CONFIG_SOC_BK7258
-    buf_px[0] = res_color.ch.blue;
-    buf_px[1] = res_color.ch.green;
-    buf_px[2] = res_color.ch.red;
-#endif
 #endif
 }

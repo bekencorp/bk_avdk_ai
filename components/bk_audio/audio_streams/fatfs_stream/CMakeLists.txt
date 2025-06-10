@@ -25,13 +25,7 @@ endif()
 
 set(priv_req bk_common audio_pipeline)
 
-if ("${ARMINO_SOC}" STREQUAL "bk7256" OR "${ARMINO_SOC}" STREQUAL "bk7256_cp1")
-list(APPEND priv_req media)
-endif()
-
-if ("${ARMINO_SOC}" STREQUAL "bk7258" OR "${ARMINO_SOC}" STREQUAL "bk7258_cp1")
 list(APPEND priv_req multimedia)
-endif()
 
 
 armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES "${priv_req}")

@@ -736,6 +736,7 @@ frame_buffer_t *lcd_driver_decoder_frame(frame_buffer_t *frame, media_decode_mod
 	lcd_info.decoder_frame->sequence = frame->sequence;
     if (lcd_info.jpg_fmt_check == false)
     {
+#if CONFIG_JPEGDEC_SW
 		lcd_info.jpg_fmt_check = true;
 		yuv_enc_fmt_t yuv_fmt = bk_get_original_jpeg_encode_data_format(frame->frame, frame->length);
 		if (yuv_fmt == YUV_422)
@@ -754,10 +755,13 @@ frame_buffer_t *lcd_driver_decoder_frame(frame_buffer_t *frame, media_decode_mod
 			goto out;
 		}
 		else
+#endif
 		{
 			LOGI("%s, FMT:YUV420, use SOFTWARE DECODE\r\n", __func__);
 			lcd_info.decode_mode = SOFTWARE_DECODING_MAJOR;
+#if CONFIG_JPEGDEC_SW
 			bk_jpeg_dec_sw_init(NULL, 0);
+#endif
 		}
 	}
 
@@ -780,7 +784,7 @@ frame_buffer_t *lcd_driver_decoder_frame(frame_buffer_t *frame, media_decode_mod
 	else
 	{
 		lcd_info.decoder_frame->fmt = PIXEL_FMT_YUYV;
-#if CONFIG_LCD_SW_DECODE
+#if (CONFIG_LCD_SW_DECODE && CONFIG_JPEGDEC_SW) 
 		if (lcd_info.decode_mode == SOFTWARE_DECODING_MAJOR)
 		{
 #if CONFIG_LCD_AUTO_FILL_FULL
@@ -1470,7 +1474,7 @@ bk_err_t lcd_open_handle(media_mailbox_msg_t *msg)
 	lcd_hw_decode_init();
 	LOGI("%s, hw decode init ok\r\n", __func__);
 #endif
-#if CONFIG_LCD_SW_DECODE
+#if (CONFIG_LCD_SW_DECODE && CONFIG_JPEGDEC_SW)
 	lcd_sw_decode_init(lcd_info.decode_mode);
 	LOGI("%s, lcd SW decode init ok\r\n", __func__);
 #endif
@@ -1640,7 +1644,7 @@ bk_err_t lcd_close_handle(media_mailbox_msg_t *msg)
 	lcd_hw_decode_deinit();
 	LOGW("%s lcd_hw_decode_deinit\n", __func__);
 #endif
-#if CONFIG_LCD_SW_DECODE
+#if (CONFIG_LCD_SW_DECODE && CONFIG_JPEGDEC_SW)
 	lcd_sw_decode_deinit(lcd_info.decode_mode);
 #endif
 #if CONFIG_LCD_ROTATE

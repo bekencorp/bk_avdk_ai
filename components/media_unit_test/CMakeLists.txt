@@ -3,7 +3,6 @@ set(srcs "")
 
 set(priv_req bk_common)
 
-if (("${ARMINO_SOC}" STREQUAL "bk7258"))
 
 if (CONFIG_MEDIA_UNIT_TEST)
 	list(APPEND srcs
@@ -19,8 +18,6 @@ endif()
 
 list(APPEND priv_req unity include multimedia media_utils)
 
-
-endif()
 
 
 armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES "${priv_req}")

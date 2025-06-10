@@ -34,7 +34,6 @@
 #include "storage_act.h"
 
 #include "media_mailbox_list_util.h"
-#include "camera_driver.h"
 
 #ifdef CONFIG_BT_REUSE_MEDIA_MEMORY
 #include "components/bluetooth/bk_ble.h"
@@ -305,75 +304,6 @@ bk_err_t media_app_set_compression_ratio(compress_ratio_t *ratio)
 	}
 
 	ret = media_send_msg_sync(EVENT_CAM_COMPRESS_IND, (uint32_t)ratio);
-
-	LOGI("%s complete\n", __func__);
-
-	return ret;
-}
-
-bk_err_t media_app_rtsp_open(video_config_t *config)
-{
-	int ret = BK_FAIL;
-
-	if (CAMERA_STATE_DISABLED != media_modules_state->cam_state)
-	{
-		LOGI("%s already opened\n", __func__);
-		return BK_OK;
-	}
-
-	LOGI("%s, %d-%d, mode:%d, type:%d\r\n", __func__, config->device->info.resolution.width, config->device->info.resolution.height,
-			config->device->mode, config->device->type);
-	dvp_camera_dma_config(config);
-
-	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_JPEG_EN, PM_POWER_MODULE_STATE_ON);
-
-	ret = media_send_msg_sync(EVENT_CAM_RTSP_OPEN_IND, (uint32_t)config->device);
-
-	switch (config->device->mode)
-	{
-		case JPEG_MODE:
-		case JPEG_YUV_MODE:
-			app_camera_type = APP_CAMERA_DVP_JPEG;
-			break;
-
-		case H264_MODE:
-		case H264_YUV_MODE:
-			app_camera_type = APP_CAMERA_DVP_H264_ENC_LCD;
-			break;
-
-		default:
-			break;
-	}
-
-	if (ret == BK_OK)
-	{
-		media_modules_state->cam_state = CAMERA_STATE_ENABLED;
-	}
-
-	LOGI("%s complete\n", __func__);
-
-	return ret;
-}
-
-bk_err_t media_app_rtsp_close()
-{
-	int ret = BK_FAIL;
-
-	if (CAMERA_STATE_ENABLED != media_modules_state->cam_state)
-	{
-		LOGI("%s already closed\n", __func__);
-		return BK_OK;
-	}
-	bk_dvp_dma_deinit();
-
-	ret = media_send_msg_sync(EVENT_CAM_RTSP_CLOSE_IND, 0);
-
-	bk_pm_module_vote_boot_cp1_ctrl(PM_BOOT_CP1_MODULE_NAME_VIDP_JPEG_EN, PM_POWER_MODULE_STATE_OFF);
-
-	if (ret == BK_OK)
-	{
-		media_modules_state->cam_state = CAMERA_STATE_DISABLED;
-	}
 
 	LOGI("%s complete\n", __func__);
 

@@ -538,41 +538,17 @@ static inline void LV_ATTRIBUTE_FAST_MEM lv_color_mix_with_alpha(lv_color_t bg_c
     /*Pick the foreground if it's fully opaque or the Background is fully transparent*/
     if(fg_opa >= LV_OPA_MAX || bg_opa <= LV_OPA_MIN) {
         res_color->full = fg_color.full;
-#if CONFIG_SOC_BK7256
-#if LV_SNAPSHOT_USE_PSRAM
-        bk_psram_byte_write(res_opa, fg_opa);
-#else
         *res_opa = fg_opa;
-#endif
-#elif CONFIG_SOC_BK7258
-        *res_opa = fg_opa;
-#endif
     }
     /*Transparent foreground: use the Background*/
     else if(fg_opa <= LV_OPA_MIN) {
         res_color->full = bg_color.full;
-#if CONFIG_SOC_BK7256
-#if LV_SNAPSHOT_USE_PSRAM
-        bk_psram_byte_write(res_opa, bg_opa);
-#else
         *res_opa = bg_opa;
-#endif
-#elif CONFIG_SOC_BK7258
-        *res_opa = bg_opa;
-#endif
     }
     /*Opaque background: use simple mix*/
     else if(bg_opa >= LV_OPA_MAX) {
         *res_color = lv_color_mix(fg_color, bg_color, fg_opa);
-#if CONFIG_SOC_BK7256
-#if LV_SNAPSHOT_USE_PSRAM
-        bk_psram_byte_write(res_opa, LV_OPA_COVER);
-#else
         *res_opa = LV_OPA_COVER;
-#endif
-#elif CONFIG_SOC_BK7258
-        *res_opa = LV_OPA_COVER;
-#endif
     }
     /*Both colors have alpha. Expensive calculation need to be applied*/
     else {
@@ -600,15 +576,7 @@ static inline void LV_ATTRIBUTE_FAST_MEM lv_color_mix_with_alpha(lv_color_t bg_c
         }
 
         res_color->full = res_color_saved.full;
-#if CONFIG_SOC_BK7256
-#if LV_SNAPSHOT_USE_PSRAM
-        bk_psram_byte_write(res_opa, res_opa_saved);
-#else
         *res_opa = res_opa_saved;
-#endif
-#elif CONFIG_SOC_BK7258
-        *res_opa = res_opa_saved;
-#endif
     }
 }
 

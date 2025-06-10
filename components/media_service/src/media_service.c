@@ -11,7 +11,7 @@
 #include "audio_osi_wrapper.h"
 #include "video_osi_wrapper.h"
 
-#if (CONFIG_SOC_BK7258 && CONFIG_SYS_CPU0)
+#if (CONFIG_SYS_CPU0)
 #include "media_unit_test.h"
 #endif
 
@@ -28,10 +28,7 @@ int media_service_init(void)
 	bk_err_t ret = BK_OK;
 
 #if (CONFIG_MEDIA)
-#if (CONFIG_SOC_BK7258 && CONFIG_SYS_CPU1)
-	bk_peripheral_init();
-#endif
-#if (CONFIG_SOC_BK7256 && CONFIG_SYS_CPU0)
+#if (CONFIG_SYS_CPU1)
 	bk_peripheral_init();
 #endif
 #endif
@@ -55,17 +52,7 @@ int media_service_init(void)
 	media_ipc_init();
 #endif
 
-#if (CONFIG_MEDIA && !CONFIG_SOC_BK7258)
-#if (CONFIG_SYS_CPU1)
-	media_minor_init();
-#else
-	media_major_init();
-	extern int media_cli_init(void);
-	media_cli_init();
-#endif
-#endif
-
-#if (CONFIG_MEDIA && CONFIG_SOC_BK7258)
+#if (CONFIG_MEDIA)
 #if (CONFIG_MEDIA_MAJOR)
 	media_major_mailbox_init();
 #elif (CONFIG_MEDIA_MINOR)
@@ -106,7 +93,7 @@ int media_service_init(void)
 	cli_aud_intf_init();
 #endif
 
-#if (CONFIG_SOC_BK7258 && CONFIG_SYS_CPU0)
+#if (CONFIG_SYS_CPU0)
 	media_unit_test_cli_init();
 #endif
 

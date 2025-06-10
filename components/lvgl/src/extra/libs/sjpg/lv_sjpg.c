@@ -297,15 +297,7 @@ static int img_data_cb(JDEC * jd, void * data, JRECT * rect)
 
     for(int y = rect->top; y <= rect->bottom; y++) {
         int row_offset = y * xres * INPUT_PIXEL_SIZE + rect->left * INPUT_PIXEL_SIZE;
-#if CONFIG_SOC_BK7256
-#if LV_SJPG_USE_PSRAM
-        bk_psram_word_memcpy((cache + row_offset), buf, row_size);
-#else
-        memcpy(cache + row_offset, buf, row_size);
-#endif
-#elif CONFIG_SOC_BK7258
 		memcpy(cache + row_offset, buf, row_size);
-#endif
         buf += row_size;
     }
 

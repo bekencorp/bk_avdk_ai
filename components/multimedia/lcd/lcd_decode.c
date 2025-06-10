@@ -30,9 +30,6 @@
 extern media_debug_t *media_debug;
 beken_semaphore_t dec_sem;
 
-#if CONFIG_SOC_BK7256XX
-uint8_t jpeg_dec_dma = 0;
-#endif
 
 static lcd_decode_t s_lcd_decode = {0};
 
@@ -168,7 +165,7 @@ bk_err_t lcd_hw_decode_start(frame_buffer_t *src_frame, frame_buffer_t *dst_fram
 	return ret;
 }
 
-
+#if (CONFIG_JPEGDEC_SW)
 
 bk_err_t lcd_sw_jpegdec_start(frame_buffer_t *frame, frame_buffer_t *dst_frame)
 {
@@ -281,60 +278,6 @@ out:
 	return ret;
 }
 
-bk_err_t lcd_hw_decode_init(void)
-{
-	bk_err_t ret = BK_OK;
-	media_debug->isr_decoder = 0;
-	media_debug->err_dec = 0;
-
-	ret = rtos_init_semaphore_ex(&s_lcd_decode.dec_sem, 1, 0);
-
-	if (ret != BK_OK)
-	{
-		LOGE("%s hw  dec_sem init failed: %d\n", __func__, ret);
-		return ret;
-	}
-
-		ret = bk_jpeg_dec_driver_init();
-		bk_jpeg_dec_isr_register(DEC_ERR, jpeg_dec_err_cb);
-#if(1)  //enable jpeg complete int isr
-			bk_jpeg_dec_isr_register(DEC_END_OF_FRAME, jpeg_dec_eof_cb);
-#else   //enable uvc ppi 640X480 jpeg 24 line decode complete int isr
-			bk_jpeg_dec_isr_register(DEC_END_OF_LINE_NUM, jpeg_dec_line_cb);
-#endif
-
-#if CONFIG_SOC_BK7256XX
-	jpeg_dec_dma = bk_dma_alloc(DMA_DEV_JPEG);
-	if ((jpeg_dec_dma < DMA_ID_0) || (jpeg_dec_dma >= DMA_ID_MAX))
-	{
-		LOGE("%s, jpeg dec malloc dma fail \r\n", __func__);
-		return BK_FAIL;
-	}
-
-#endif
-	return ret;
-}
-bk_err_t lcd_hw_decode_deinit(void)
-{
-	bk_err_t ret = BK_OK;
-
-	bk_jpeg_dec_driver_deinit();
-
-#if CONFIG_SOC_BK7256XX
-	bk_dma_stop(jpeg_dec_dma);
-	bk_dma_deinit(jpeg_dec_dma);
-	bk_dma_free(DMA_DEV_JPEG, jpeg_dec_dma);
-#endif
-
-	ret = rtos_deinit_semaphore(&s_lcd_decode.dec_sem);
-
-	if (ret != BK_OK)
-	{
-		LOGE("%s dec_sem deinit failed: %d\n", __func__, ret);
-		return ret;
-	}
-	return ret;
-}
 bk_err_t lcd_sw_decode_init(media_decode_mode_t sw_dec_mode)
 {
 	bk_err_t ret = BK_OK;
@@ -398,3 +341,39 @@ bk_err_t lcd_sw_decode_deinit(media_decode_mode_t sw_dec_mode)
 	return ret;
 }
 
+#endif
+
+bk_err_t lcd_hw_decode_init(void)
+{
+	bk_err_t ret = BK_OK;
+	media_debug->isr_decoder = 0;
+	media_debug->err_dec = 0;
+
+	ret = rtos_init_semaphore_ex(&s_lcd_decode.dec_sem, 1, 0);
+
+	if (ret != BK_OK)
+	{
+		LOGE("%s hw  dec_sem init failed: %d\n", __func__, ret);
+		return ret;
+	}
+
+		ret = bk_jpeg_dec_driver_init();
+		bk_jpeg_dec_isr_register(DEC_ERR, jpeg_dec_err_cb);
+
+	return ret;
+}
+bk_err_t lcd_hw_decode_deinit(void)
+{
+	bk_err_t ret = BK_OK;
+
+	bk_jpeg_dec_driver_deinit();
+
+	ret = rtos_deinit_semaphore(&s_lcd_decode.dec_sem);
+
+	if (ret != BK_OK)
+	{
+		LOGE("%s dec_sem deinit failed: %d\n", __func__, ret);
+		return ret;
+	}
+	return ret;
+}

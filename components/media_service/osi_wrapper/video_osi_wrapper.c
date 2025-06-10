@@ -99,7 +99,7 @@ static int f_open_wrapper(void **fp, const void *path, uint8_t mode)
 	else if(mode == (0x01 | 0x02))
 	{
 		flags = O_RDWR;
-	} else if (mode == (0x01 | 0x02 | 0x08))
+	} else if (mode == (0x01 | 0x02 | 0x08))
 	{
 		flags = O_CREAT | O_RDWR;
 	}

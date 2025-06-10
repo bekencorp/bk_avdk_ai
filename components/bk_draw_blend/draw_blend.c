@@ -304,7 +304,7 @@ bk_err_t lcd_driver_font_blend(lcd_font_config_t *lcd_font)
         pixel_bytes = 3;
     else
         pixel_bytes = 2;
-#if 0//CONFIG_SOC_BK7258
+#if 0//frame mode dma2d
 //	#if CONFIG_CACHE_ENABLE
 //	flush_dcache(lcd_font->pbg_addr, lcd_font->bg_height * lcd_font->bg_width * 2);
 //	#endif
@@ -335,7 +335,7 @@ bk_err_t lcd_driver_font_blend(lcd_font_config_t *lcd_font)
 	bk_dma2d_transfer_config(&dma2d_config, (uint32_t)lcd_font->pbg_addr, (uint32_t)p_yuv_dst, lcd_font->xsize, lcd_font->ysize);
 	bk_dma2d_start_transfer();
 	while (bk_dma2d_is_transfer_busy()) {}
-#else   //BK7256 psram can not use dma2d
+#else   //pipeline mode psram can not use dma2d
 	for(i = 0; i < lcd_font->ysize; i++)
 	{
 		os_memcpy((uint32_t *)p_yuv_dst, (uint32_t *)p_yuv_src, lcd_font->xsize * pixel_bytes);
@@ -457,7 +457,7 @@ bk_err_t lcd_driver_font_blend(lcd_font_config_t *lcd_font)
 	}
 		p_yuv_src = blend_addr1;
 		p_yuv_dst = lcd_font->pbg_addr;
-#if 0//CONFIG_SOC_BK7258
+#if 0//frame mode
 //		dma2d_memcpy_psram(p_yuv_src, lcd_font->pbg_addr, lcd_font->xsize, lcd_font->ysize, 0, lcd_font->bg_offline);
 
 		/*##-1- Configure the DMA2D Mode, Output Color Mode and output offset #############*/
@@ -483,7 +483,7 @@ bk_err_t lcd_driver_font_blend(lcd_font_config_t *lcd_font)
 		bk_dma2d_transfer_config(&dma2d_config, (uint32_t)p_yuv_src, (uint32_t)lcd_font->pbg_addr, lcd_font->xsize, lcd_font->ysize);
 		bk_dma2d_start_transfer();
 		while (bk_dma2d_is_transfer_busy()) {}
-#else
+#else //pepeline mode
 		for(i = 0; i < lcd_font->ysize; i++)
 		{
 			os_memcpy((uint32_t *)p_yuv_dst, (uint32_t *)p_yuv_src, lcd_font->xsize * pixel_bytes);
