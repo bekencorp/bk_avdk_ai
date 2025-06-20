@@ -29,6 +29,9 @@
 #include <modules/audio_process.h>
 #include "audio_debug.h"
 
+#if CONFIG_AUD_INTF_SUPPORT_MP3
+#include "modules/mp3dec.h"
+#endif
 
 #define AUD_INTF_TAG "aud_intf"
 
@@ -895,6 +898,39 @@ static void aud_rx_lost_count_dump(void *param)
 }
 #endif
 
+#if CONFIG_AUD_INTF_SUPPORT_MP3
+static uint16_t aud_mp3_dec_get_frame_sample_cnt(uint16_t dac_sample_rate, uint8_t ch_num)
+{
+    int dac_sample_cnt = MAX_NSAMP;
+    switch (dac_sample_rate) //only support layer3
+    {
+        case 8000://MPEG2.5,frame sample cnt:576,72ms
+        case 11025://MPEG2.5,frame sample cnt:576,52ms
+        case 12000://MPEG2.5,frame sample cnt:576,48ms
+        case 16000://MPEG2,frame sample cnt:576,36ms
+        case 22050://MPEG2,frame sample cnt:576,26ms
+        case 24000://MPEG2,frame sample cnt:576,24ms
+        {
+            break;
+        }
+        case 32000://MPEG1,frame sample cnt:1152,36ms
+        case 44100://MPEG1,frame sample cnt:1152,26ms
+        case 48000://MPEG1,frame sample cnt:1152,24ms
+        {
+            dac_sample_cnt = MAX_NSAMP*MAX_NGRAN;
+            break;
+        }
+        default:
+        {
+            LOGE("%s,%d unsupported dac sample rate:%d\n",__func__, __LINE__,dac_sample_rate);
+            break;
+        }
+    }
+
+    return (dac_sample_cnt*ch_num);
+}
+#endif
+
 void aud_codec_buf_len_cal(aud_codec_setup_input_t *para, aud_codec_setup_t *output)
 {
     output->enc_input_size_in_byte = para->adc_samp_rate*para->enc_frame_len_in_ms/1000*para->enc_data_depth_in_byte;
@@ -905,33 +941,57 @@ void aud_codec_buf_len_cal(aud_codec_setup_input_t *para, aud_codec_setup_t *out
         output->enc_output_size_in_byte = output->enc_output_size_in_byte*2;
     }
 
-    output->dec_input_size_in_byte = para->dec_bitrate*para->dec_frame_len_in_ms/1000/8;
-    output->dec_output_size_in_byte = para->dac_samp_rate*para->dec_frame_len_in_ms/1000*para->dec_data_depth_in_byte;
-
-    if(para->dec_vbr_en)
+    #if CONFIG_AUD_INTF_SUPPORT_MP3
+    if(AUD_INTF_VOC_DATA_TYPE_MP3 == output->decoder_type)
     {
-        output->dec_input_size_in_byte = output->dec_input_size_in_byte*2;
+        //only support mp3 decoder
+        output->dec_input_size_in_byte = MAINBUF_SIZE;
+        output->dec_output_size_in_byte = aud_mp3_dec_get_frame_sample_cnt(para->dac_samp_rate,1)*2;
+        LOGI("%s, %d, adc samp:%d,enc bitrate:%d,frame (ms):%d,data depth:%d,vbr:%d,dac samp:%d\n", __func__, __LINE__,
+            para->adc_samp_rate,
+            para->enc_bitrate,
+            para->enc_frame_len_in_ms,
+            para->enc_data_depth_in_byte,
+            para->enc_vbr_en,
+            para->dac_samp_rate);
+
+        LOGI("enc in s:%d,out s:%d,dec in s:%d,out s:%d\n",
+            output->enc_input_size_in_byte,
+            output->enc_output_size_in_byte,
+            output->dec_input_size_in_byte,
+            output->dec_output_size_in_byte);
     }
+    else
+    #endif
+    {
+        output->dec_input_size_in_byte = para->dec_bitrate*para->dec_frame_len_in_ms/1000/8;
+        output->dec_output_size_in_byte = para->dac_samp_rate*para->dec_frame_len_in_ms/1000*para->dec_data_depth_in_byte;
 
-    LOGI("%s, %d, adc samp:%d,enc bitrate:%d,frame (ms):%d,data depth:%d,vbr:%d\n", __func__, __LINE__,
-        para->adc_samp_rate,
-        para->enc_bitrate,
-        para->enc_frame_len_in_ms,
-        para->enc_data_depth_in_byte,
-        para->enc_vbr_en);
+        if(para->dec_vbr_en)
+        {
+            output->dec_input_size_in_byte = output->dec_input_size_in_byte*2;
+        }
 
-    LOGI("dac samp:%d,dec bitrate:%d,frame (ms):%d,data depth:%d,vbr:%d\n",
-        para->dac_samp_rate,
-        para->dec_bitrate,
-        para->dec_frame_len_in_ms,
-        para->dec_data_depth_in_byte,
-        para->dec_vbr_en);
+        LOGI("%s, %d, adc samp:%d,enc bitrate:%d,frame (ms):%d,data depth:%d,vbr:%d\n", __func__, __LINE__,
+            para->adc_samp_rate,
+            para->enc_bitrate,
+            para->enc_frame_len_in_ms,
+            para->enc_data_depth_in_byte,
+            para->enc_vbr_en);
 
-    LOGI("enc in s:%d,out s:%d,dec in s:%d,out s:%d\n",
-        output->enc_input_size_in_byte,
-        output->enc_output_size_in_byte,
-        output->dec_input_size_in_byte,
-        output->dec_output_size_in_byte);
+        LOGI("dac samp:%d,dec bitrate:%d,frame (ms):%d,data depth:%d,vbr:%d\n",
+            para->dac_samp_rate,
+            para->dec_bitrate,
+            para->dec_frame_len_in_ms,
+            para->dec_data_depth_in_byte,
+            para->dec_vbr_en);
+
+        LOGI("enc in s:%d,out s:%d,dec in s:%d,out s:%d\n",
+            output->enc_input_size_in_byte,
+            output->enc_output_size_in_byte,
+            output->dec_input_size_in_byte,
+            output->dec_output_size_in_byte);
+    }
 }
 
 void bk_aud_intf_aud_codec_init(aud_codec_setup_input_t *input)
@@ -1142,6 +1202,11 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 #endif
 #if CONFIG_AUD_INTF_SUPPORT_OPUS
 		case AUD_INTF_VOC_DATA_TYPE_OPUS:
+			aud_intf_info.voc_info.rx_info.frame_size = aud_intf_info.voc_info.aud_codec_setup.dec_input_size_in_byte;
+			break;
+#endif
+#if CONFIG_AUD_INTF_SUPPORT_MP3
+		case AUD_INTF_VOC_DATA_TYPE_MP3:
 			aud_intf_info.voc_info.rx_info.frame_size = aud_intf_info.voc_info.aud_codec_setup.dec_input_size_in_byte;
 			break;
 #endif  

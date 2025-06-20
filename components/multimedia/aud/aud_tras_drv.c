@@ -78,6 +78,10 @@
 #include "cache.h"
 #endif
 
+#if CONFIG_AUD_INTF_SUPPORT_MP3
+#include "modules/mp3dec.h"
+#endif
+
 #define AUD_TRAS_DRV_TAG "tras_drv"
 
 #define LOGI(...) BK_LOGI(AUD_TRAS_DRV_TAG, ##__VA_ARGS__)
@@ -247,6 +251,25 @@ uint8 enc_save_rd_idx = 0;
 #endif
 #endif
 
+#if CONFIG_AUD_INTF_SUPPORT_MP3
+typedef struct
+{
+    /* mp3 information */
+    HMP3Decoder handle;
+    MP3FrameInfo frame_info;
+
+    /* mp3 read session */
+    uint8_t *read_ptr;
+    uint32_t read_buf_size;
+    uint32_t bytes_left;
+
+    uint32_t dec_frame_num;
+    uint32_t idv3_skip_size;
+    bool skip_idtag;
+} mp3_decoder_context_t;
+
+static mp3_decoder_context_t mp3_dec_ctx;
+#endif
 
 #if CONFIG_AUD_SWEEP_TEST
 Sweep_Info sweep_info;
@@ -2488,10 +2511,250 @@ static bk_err_t aud_tras_voc_dac_debug(bool enable)
 }
 #endif
 
+#if CONFIG_AUD_INTF_SUPPORT_MP3
+static int32_t mp3_dec_fill_read_buffer(mp3_decoder_context_t *mp3_dec,  uint8_t *read_buf)
+{
+    uint32_t bytes_to_read;
+    uint32_t size = 0;
+    int32_t ret = BK_OK;
+
+    if(mp3_dec->bytes_left < aud_tras_drv_info.voc_info.aud_codec_setup.dec_input_size_in_byte)
+    {
+        if (mp3_dec->bytes_left > 0)
+        {
+            os_memmove(read_buf, mp3_dec->read_ptr, mp3_dec->bytes_left);
+        }
+
+        mp3_dec->read_ptr = read_buf;
+
+        bytes_to_read = (aud_tras_drv_info.voc_info.aud_codec_setup.dec_input_size_in_byte - mp3_dec->bytes_left);
+
+        size = ring_buffer_read(aud_tras_drv_info.voc_info.rx_info.decoder_rb,
+                               (uint8_t*)(read_buf + mp3_dec->bytes_left),
+                               bytes_to_read);
+        if (size != bytes_to_read)
+        {
+            LOGE("%s, %d, read decoder_ring_buff MP3 data fail \n", __func__, __LINE__);
+            mp3_dec->bytes_left = 0;//drop left data
+            ret = BK_FAIL;
+        }
+        else
+        {
+            mp3_dec->bytes_left = mp3_dec->bytes_left + size;
+        }
+    }
+
+    return ret;
+}
+
+/* skip id3 tag */
+static int codec_mp3_skip_idtag(mp3_decoder_context_t *mp3_dec)
+{
+    uint8_t *tag;
+    int ret = 0;
+    int size;
+    int chunk;
+
+    tag = mp3_dec->read_ptr;
+
+    if (tag[0] == 'I' &&
+        tag[1] == 'D' &&
+        tag[2] == '3')
+    {
+        size = ((tag[6] & 0x7F) << 21) | ((tag[7] & 0x7F) << 14) | ((tag[8] & 0x7F) << 7) | ((tag[9] & 0x7F));
+
+        mp3_dec->idv3_skip_size = (size + 10);
+    }
+
+    if(mp3_dec->idv3_skip_size)//found IDV3
+    {
+        if (mp3_dec->idv3_skip_size > mp3_dec->read_buf_size)
+        {
+            chunk = mp3_dec->read_buf_size;
+        }
+        else
+        {
+            chunk = mp3_dec->idv3_skip_size;
+        }
+
+        mp3_dec->bytes_left -= chunk;
+        mp3_dec->read_ptr += chunk;
+        mp3_dec->idv3_skip_size -= chunk;
+
+        if(!mp3_dec->idv3_skip_size)
+        {
+            ret = 1;//IDV3 skip finished
+        }
+    }
+
+    return ret;
+}
+
+static int check_mp3_sync_word(mp3_decoder_context_t *mp3_dec)
+{
+    int err;
+
+    os_memset(&mp3_dec->frame_info, 0, sizeof(MP3FrameInfo));
+
+    err = MP3GetNextFrameInfo(mp3_dec->handle, &mp3_dec->frame_info, mp3_dec->read_ptr);
+    if (err == ERR_MP3_INVALID_FRAMEHEADER)
+    {
+        LOGE("%s, ERR_MP3_INVALID_FRAMEHEADER, %d\n", __func__, __LINE__);
+        goto __err;
+    }
+    else if (err != ERR_MP3_NONE)
+    {
+        LOGE("%s, MP3GetNextFrameInfo fail, err=%d, %d\n", __func__, err, __LINE__);
+        goto __err;
+    }
+    else if (mp3_dec->frame_info.nChans != 1 && mp3_dec->frame_info.nChans != 2)
+    {
+        LOGE("%s, nChans is not 1 or 2, nChans=%d, %d\n", __func__, mp3_dec->frame_info.nChans, __LINE__);
+        goto __err;
+    }
+    else if (mp3_dec->frame_info.bitsPerSample != 16 && mp3_dec->frame_info.bitsPerSample != 8)
+    {
+        LOGE("%s, bitsPerSample is not 16 or 8, bitsPerSample=%d, %d\n", __func__, mp3_dec->frame_info.bitsPerSample, __LINE__);
+        goto __err;
+    }
+    else
+    {
+        //noting todo
+    }
+
+    return 0;
+
+__err:
+    return -1;
+}
+
+static int mp3_dec_process(mp3_decoder_context_t *mp3_dec, char *buffer, uint32_t len)
+{
+    int err;
+    int read_offset;
+    int outputSamps = 0;
+    bk_err_t ret = BK_OK;
+
+    if (mp3_dec->skip_idtag == false)
+    {
+        ret = codec_mp3_skip_idtag(mp3_dec);
+        if (1 == ret)
+        {
+            //mp3_dec->skip_idtag = true;
+            LOGI("%s, %d, codec_mp3_skip_idtag complete\n", __func__, __LINE__);
+        }
+    }
+
+    if (mp3_dec->bytes_left == 0)
+    {
+        LOGE("%s, %d, bytes_left = 0\n", __func__, __LINE__);
+        return 0;
+    }
+
+    read_offset = MP3FindSyncWord(mp3_dec->read_ptr, mp3_dec->bytes_left);
+    if (read_offset < 0)
+    {
+        /* discard this data */
+        LOGE("%s, %d, MP3FindSyncWord fail, outof sync, byte left: %d\n", __func__, __LINE__, mp3_dec->bytes_left);
+
+        mp3_dec->bytes_left = 0;
+        return 0;
+    }
+
+    if (read_offset > mp3_dec->bytes_left)
+    {
+        LOGE("%s, %d, find sync exception, read_offset:%d > bytes_left:%d, %d\n", __func__, __LINE__, read_offset, mp3_dec->bytes_left);
+        mp3_dec->read_ptr += mp3_dec->bytes_left;
+        mp3_dec->bytes_left = 0;
+    }
+    else
+    {
+        mp3_dec->read_ptr += read_offset;
+        mp3_dec->bytes_left -= read_offset;
+    }
+
+    if (check_mp3_sync_word(mp3_dec) == -1)
+    {
+        if (mp3_dec->bytes_left > 0)
+        {
+            mp3_dec->bytes_left --;
+            mp3_dec->read_ptr ++;
+        }
+
+        LOGE("check_mp3_sync_word fail\n");
+
+        return 0;
+    }
+
+    err = MP3Decode(mp3_dec->handle, &mp3_dec->read_ptr, (int *)&mp3_dec->bytes_left, (short *)buffer, 0);
+
+    if (err != ERR_MP3_NONE)
+    {
+        switch (err)
+        {
+            case ERR_MP3_INDATA_UNDERFLOW:
+                LOGE("ERR_MP3_INDATA_UNDERFLOW!\n");
+                break;
+            case ERR_MP3_MAINDATA_UNDERFLOW:
+                /* do nothing - next call to decode will provide more mainData */
+                LOGE("ERR_MP3_MAINDATA_UNDERFLOW!\n");
+                break;
+            default:
+                // skip this frame
+                if (mp3_dec->bytes_left > 0)
+                {
+                    mp3_dec->bytes_left --;
+                    mp3_dec->read_ptr ++;
+                    LOGE("ERR_MP3 unknow.skip this frame!\n");
+                }
+                else
+                {
+                    // TODO
+                    BK_ASSERT(0);
+                }
+                break;
+        }
+    }
+    else
+    {
+        /* no error */
+        MP3GetLastFrameInfo(mp3_dec->handle, &mp3_dec->frame_info);
+
+        LOGD("mp3dec fn:%d,bitr:%d,ch:%d,spr:%d,bitps:%d,o_s:%d,ly:%d,ver:%d\n",
+             mp3_dec->dec_frame_num++,
+             mp3_dec->frame_info.bitrate,
+             mp3_dec->frame_info.nChans,
+             mp3_dec->frame_info.samprate,
+             mp3_dec->frame_info.bitsPerSample,
+             mp3_dec->frame_info.outputSamps,
+             mp3_dec->frame_info.layer,
+             mp3_dec->frame_info.version);
+
+        /* write to sound device */
+        outputSamps = mp3_dec->frame_info.outputSamps;
+        if (outputSamps > 0)
+        {
+            /* check output pcm data length, for debug */
+            uint32_t out_pcm_len = outputSamps * sizeof(uint16_t);
+            if (out_pcm_len > (MAX_NSAMP*MAX_NGRAN*MAX_NCHAN*sizeof(uint16_t)))
+            {
+                BK_ASSERT(0);
+            }
+            return outputSamps * sizeof(uint16_t);
+        }
+    }
+
+    return 0;
+}
+#endif
+
 static bk_err_t aud_tras_dec(void)
 {
 	uint32_t size = 0;
 	uint32_t i = 0;
+#if CONFIG_AUD_INTF_SUPPORT_G722 || CONFIG_AUD_INTF_SUPPORT_OPUS || CONFIG_AUD_INTF_SUPPORT_MP3
+	int dec_size = 0;
+#endif
 
     bool fill_slience_flag = false;
 
@@ -2849,7 +3112,7 @@ static bk_err_t aud_tras_dec(void)
                             os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
                         } else {
                             /* G722 decoding g722 data to pcm data*/
-                            int dec_size = g722_decode(&g722_dec, aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.decoder_temp.law_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2);
+                            dec_size = g722_decode(&g722_dec, aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.decoder_temp.law_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2);
                             LOGD("%s, %d, len: %d, dec_size: %d \n", __func__, __LINE__, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2, dec_size * 2);
                         }
                         break;
@@ -2862,7 +3125,7 @@ static bk_err_t aud_tras_dec(void)
                     os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
                 } else {
                     /* G722 decoding g722 data to pcm data*/
-                    int dec_size = g722_decode(&g722_dec, aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.decoder_temp.law_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2);
+                    dec_size = g722_decode(&g722_dec, aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.decoder_temp.law_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2);
                     LOGD("%s, %d, len: %d, dec_size: %d \n", __func__, __LINE__, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2, dec_size * 2);
                 }
 #endif
@@ -2976,7 +3239,7 @@ static bk_err_t aud_tras_dec(void)
                         #if OPUS_ENC_DEC_LOOPBACK
                         {
                             /* OPUS decoding opus data to pcm data*/
-                            int dec_size = opus_decode(opus_decoder, 
+                            dec_size = opus_decode(opus_decoder, 
                                                        &enc_output_save[enc_save_rd_idx].output[0], 
                                                        enc_output_save[enc_save_rd_idx].len,
                                                        (int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data,
@@ -3000,7 +3263,7 @@ static bk_err_t aud_tras_dec(void)
                             os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
                         } else {
                             /* OPUS decoding opus data to pcm data*/
-                            int dec_size = opus_decode(opus_decoder, 
+                            dec_size = opus_decode(opus_decoder, 
                                                        aud_tras_drv_info.voc_info.decoder_temp.law_data, 
                                                        pkt_len, 
                                                        (int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 
@@ -3018,7 +3281,7 @@ static bk_err_t aud_tras_dec(void)
                 if (fill_slience_flag) {
                     os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
                 } else {
-                    int dec_size = opus_decode(opus_decoder, aud_tras_drv_info.voc_info.decoder_temp.law_data, pkt_len, (int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2, 0);
+                    dec_size = opus_decode(opus_decoder, aud_tras_drv_info.voc_info.decoder_temp.law_data, pkt_len, (int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2, 0);
                     LOGD("%s, %d, len: %d, dec_size: %d \n", __func__, __LINE__, pkt_len, dec_size * 2);
                 }
 #endif
@@ -3029,6 +3292,123 @@ static bk_err_t aud_tras_dec(void)
 
             break;
         } 
+#endif
+#if CONFIG_AUD_INTF_SUPPORT_MP3
+        case AUD_INTF_VOC_DATA_TYPE_MP3:
+        {
+            /* check the frame number in decoder_ring_buffer */
+            if (aud_tras_drv_info.voc_info.spk_type == AUD_INTF_SPK_TYPE_BOARD) {
+                if (ring_buffer_get_fill_size(aud_tras_drv_info.voc_info.rx_info.decoder_rb) >= aud_tras_drv_info.voc_info.aud_codec_setup.dec_input_size_in_byte) {
+                    if (BK_OK != mp3_dec_fill_read_buffer(&mp3_dec_ctx,aud_tras_drv_info.voc_info.decoder_temp.law_data)) {
+                        LOGE("%s, %d, fill mp3 read buf fail!\n", __func__, __LINE__);
+                        fill_slience_flag = true;
+                    }
+                } else {
+                    fill_slience_flag = true;
+                }
+
+#if CONFIG_AUD_INTF_SUPPORT_AI_DIALOG_FREE
+                /* force fill slience when dialog not running */
+                if (!gl_dialog_running) {
+                    fill_slience_flag = true;
+                }
+#endif
+                /* dump rx data */
+                if (aud_tras_drv_info.voc_info.aud_tras_dump_rx_cb) {
+                    aud_tras_drv_info.voc_info.aud_tras_dump_rx_cb(aud_tras_drv_info.voc_info.decoder_temp.law_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2);
+                }
+
+#if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
+                int r_size = 0;
+
+                switch (spk_source_type)
+                {
+                    case SPK_SOURCE_TYPE_PROMPT_TONE:
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+                        LOGD("%s, %d, read prompt tone data\n", __func__, __LINE__);
+
+                        r_size = aud_tras_drv_read_prompt_tone_data((char *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2, 0);
+                        if (r_size <= 0 && gl_prompt_tone_empty_notify) {
+                            /* prompt tone pool empty */
+                            gl_prompt_tone_empty_notify(gl_notify_user_data);
+                            os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                            /* send message to aud_tras_drv_main to stop prompt_tone play */
+                            if (aud_tras_drv_send_msg(AUD_TRAS_STOP_PROMPT_TONE, NULL) != BK_OK)
+                            {
+                                LOGE("%s, %d, send tras stop prompt tone fail\n", __func__, __LINE__);
+                            }
+                        } else {
+                            if (r_size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
+                                os_memset((uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
+                            }
+                        }
+                        dec_size = aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2;
+
+                        SPK_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2);
+#else
+                        LOGW("%s, SPK_SOURCE_TYPE_PROMPT_TONE not support, please enable CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE\n", __func__);
+#endif
+                        break;
+
+                    case SPK_SOURCE_TYPE_A2DP:
+#if CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP
+                        /* play a2dp music */
+                        //LOGI("%s, %d, read a2dp music data\n", __func__, __LINE__);
+                        r_size = aud_tras_drv_read_prompt_tone_data((char *)a2dp_read_buff, a2dp_frame_size, 0);
+                        if (r_size <= 0) {
+                            /* prompt tone pool empty */
+                            if (r_size != a2dp_frame_size) {
+                                os_memset(a2dp_read_buff, 0, a2dp_frame_size);
+                            }
+                        }
+                        SPK_DATA_DUMP_BY_UART_DATA(a2dp_read_buff, a2dp_frame_size);
+#else
+                        LOGW("%s, SPK_SOURCE_TYPE_A2DP not support, please enable CONFIG_AUD_INTF_SUPPORT_BLUETOOTH_A2DP\n", __func__);
+#endif
+                        break;
+
+                    case SPK_SOURCE_TYPE_VOICE:
+                        if (fill_slience_flag) {
+                            os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                            dec_size  = aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2;
+                        } else {
+                            /* MP3 decoding mp3 data to pcm data*/
+                            dec_size = mp3_dec_process(&mp3_dec_ctx,
+                                                       (char *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data,
+                                                       aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte);
+                            LOGD("%s, %d, len: %d, dec_size: %d \n",
+                                 __func__,
+                                 __LINE__,
+                                 aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte,
+                                 dec_size);
+                        }
+                        break;
+
+                    default:
+                        break;
+                }
+#else
+                if (fill_slience_flag) {
+                    os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+                    dec_size  = aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2;
+                } else {
+                    /* MP3 decoding mp3 data to pcm data*/
+                    dec_size = mp3_dec_process(&mp3_dec_ctx,
+                                               (char *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data,
+                                               aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte);
+                    LOGD("%s, %d, len: %d, dec_size: %d \n",
+                         __func__,
+                         __LINE__,
+                         aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte,
+                         dec_size);
+                }
+#endif
+            } else {
+                LOGE("%s, %d, not support uac, need TODO\n", __func__, __LINE__);
+                //TODO
+            }
+        }
+            break;
 #endif
 
 		default:
@@ -3108,7 +3488,7 @@ static bk_err_t aud_tras_dec(void)
 	} else
 #endif
 	{
-	/* save the data after G711A processed to encoder_ring_buffer */
+	    /* save the data after G711A processed to encoder_ring_buffer */
         if ((ring_buffer_get_free_size(&(aud_tras_drv_info.voc_info.speaker_rb)) == aud_tras_drv_info.voc_info.speaker_rb.capacity)) {
             LOGW("%s, %d, speaker rb is empty, fill data again\n", __func__, __LINE__);
             aud_tras_drv_send_msg(AUD_TRAS_DRV_DECODER, NULL);
@@ -4412,6 +4792,14 @@ static bk_err_t aud_tras_drv_voc_deinit(void)
         aud_tras_drv_info.asr_rsp_out_buff = NULL;
     }
 
+#if CONFIG_AUD_INTF_SUPPORT_MP3
+    mp3_dec_ctx.read_ptr = NULL;
+    mp3_dec_ctx.bytes_left = 0;
+    mp3_dec_ctx.skip_idtag = false;
+    mp3_dec_ctx.dec_frame_num = 0;
+    mp3_dec_ctx.idv3_skip_size = 0;
+#endif
+
     AEC_DATA_DUMP_BY_UART_CLOSE();
     SPK_DATA_DUMP_BY_UART_CLOSE();
 
@@ -4577,6 +4965,34 @@ static bk_err_t aud_tras_drv_codec_init(void)
             break;
         }
 #endif
+#if CONFIG_AUD_INTF_SUPPORT_MP3
+        case AUD_INTF_VOC_DATA_TYPE_MP3:
+        {      
+            mp3_dec_ctx.handle = MP3InitDecoder();
+            if (!mp3_dec_ctx.handle) 
+            {
+                ret = BK_ERR_AUD_INTF_MEMY;
+                goto aud_tras_drv_codec_init_exit;
+            }
+            
+            aud_tras_drv_info.voc_info.decoder_temp.law_data = (unsigned char *)audio_tras_drv_malloc(aud_tras_drv_info.voc_info.aud_codec_setup.dec_input_size_in_byte);
+            if (aud_tras_drv_info.voc_info.decoder_temp.law_data == NULL) 
+            {
+                LOGE("%s, %d, malloc law_data of MP3 decoder used fail \n", __func__, __LINE__);
+                ret = BK_ERR_AUD_INTF_MEMY;
+                goto aud_tras_drv_codec_init_exit;
+            }
+            mp3_dec_ctx.read_ptr = aud_tras_drv_info.voc_info.decoder_temp.law_data;
+            mp3_dec_ctx.read_buf_size = aud_tras_drv_info.voc_info.aud_codec_setup.dec_input_size_in_byte;
+            mp3_dec_ctx.bytes_left = 0;
+            mp3_dec_ctx.skip_idtag = false;
+            mp3_dec_ctx.dec_frame_num = 0;
+            mp3_dec_ctx.idv3_skip_size = 0;
+            LOGI("mp3 decoder init&dec law_data alloc done!\n");
+            break;
+        }
+#endif
+
         default:
             break;
     }
@@ -4722,9 +5138,26 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 	aud_tras_drv_info.voc_info.aud_codec_setup = voc_cfg->aud_codec_setup;
 	aud_tras_drv_info.voc_info.mic_samp_rate_points = aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate* \
 													aud_tras_drv_info.voc_info.aud_codec_setup.enc_frame_len_in_ms/1000;
-	aud_tras_drv_info.voc_info.speaker_samp_rate_points = aud_tras_drv_info.voc_info.aud_codec_setup.dac_samp_rate* \
-													aud_tras_drv_info.voc_info.aud_codec_setup.dec_frame_len_in_ms/1000;
-	LOGI("aud codec:mic_s: %d,spk_s:%d,adc s:%d,enc f:%d,dac s:%d,dec f:%d,enc:%d,dec:%d\n",
+
+	#if CONFIG_AUD_INTF_SUPPORT_MP3
+	if(AUD_INTF_VOC_DATA_TYPE_MP3 == aud_tras_drv_info.voc_info.aud_codec_setup.decoder_type)
+	{
+		aud_tras_drv_info.voc_info.speaker_samp_rate_points = aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte/2;
+		LOGI("aud_codec:mic_s: %d,spk_s:%d,adc s:%d,enc f:%d,dac s:%d,enc:%d,dec:%d\n",
+		aud_tras_drv_info.voc_info.mic_samp_rate_points,
+		aud_tras_drv_info.voc_info.speaker_samp_rate_points,
+		aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate,
+		aud_tras_drv_info.voc_info.aud_codec_setup.enc_frame_len_in_ms,
+		aud_tras_drv_info.voc_info.aud_codec_setup.dac_samp_rate,
+		aud_tras_drv_info.voc_info.aud_codec_setup.encoder_type,
+		aud_tras_drv_info.voc_info.aud_codec_setup.decoder_type);
+	}
+	else
+	#endif
+	{
+		aud_tras_drv_info.voc_info.speaker_samp_rate_points = aud_tras_drv_info.voc_info.aud_codec_setup.dac_samp_rate* \
+															aud_tras_drv_info.voc_info.aud_codec_setup.dec_frame_len_in_ms/1000;
+		LOGI("aud_codec:mic_s: %d,spk_s:%d,adc s:%d,enc f:%d,dac s:%d,dec f:%d,enc:%d,dec:%d\n",
 		aud_tras_drv_info.voc_info.mic_samp_rate_points,
 		aud_tras_drv_info.voc_info.speaker_samp_rate_points,
 		aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate,
@@ -4733,6 +5166,7 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 		aud_tras_drv_info.voc_info.aud_codec_setup.dec_frame_len_in_ms,
 		aud_tras_drv_info.voc_info.aud_codec_setup.encoder_type,
 		aud_tras_drv_info.voc_info.aud_codec_setup.decoder_type);
+	}
 
 	aud_tras_drv_info.voc_info.mic_frame_number = voc_cfg->aud_setup.mic_frame_number;
 	aud_tras_drv_info.voc_info.speaker_frame_number = voc_cfg->aud_setup.speaker_frame_number;

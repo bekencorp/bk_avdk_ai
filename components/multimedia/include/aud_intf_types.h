@@ -166,7 +166,8 @@ typedef enum {
 	AUD_INTF_VOC_DATA_TYPE_PCM,				/**< the data of voice transfer is PCM */
 	AUD_INTF_VOC_DATA_TYPE_G711U,			/**< the data of voice transfer encoded by G711U */
 	AUD_INTF_VOC_DATA_TYPE_G722,			/**< the data of voice transfer encoded by G722 */
-	AUD_INTF_VOC_DATA_TYPE_OPUS,            /**< the data of voice transfer encoded by G722 */
+	AUD_INTF_VOC_DATA_TYPE_OPUS,			/**< the data of voice transfer encoded by OPUS */
+	AUD_INTF_VOC_DATA_TYPE_MP3,				/**< the data of voice transfer encoded by MP3,only for audio Rx data*/
 	AUD_INTF_VOC_DATA_TYPE_MAX,
 } aud_intf_voc_data_type_t;
 

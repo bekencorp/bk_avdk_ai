@@ -320,4 +320,7 @@ menu "Media"
 	config IMAGE_DEBUG_DUMP
 		bool "Eable image dump sended to agent"
 		default n
+	config AUD_INTF_SUPPORT_MP3
+		bool "Enable Aud intf support MP3 data type,only for decodeing"
+		default n
 endmenu
