@@ -92,6 +92,7 @@
 #if CONFIG_DEBUG_DUMP
 #include "debug_dump.h"
 bool aec_all_data_flag = false;
+bool dec_data_flag = false;
 #endif//CONFIG_DEBUG_DUMP
 
 
@@ -237,18 +238,6 @@ static g722_decode_state_t g722_dec = {0};
 #if CONFIG_AUD_INTF_SUPPORT_OPUS
 static OpusEncoder *opus_encoder = NULL;
 static OpusDecoder *opus_decoder = NULL;
-#define OPUS_ENC_DEC_LOOPBACK 0
-#if OPUS_ENC_DEC_LOOPBACK
-typedef struct
-{
-    uint16 len;
-    uint16 reserved;
-    uint8 output[320];
-}enc_output_save_t;
-enc_output_save_t enc_output_save[4] = {0};
-uint8 enc_save_wr_idx = 0;
-uint8 enc_save_rd_idx = 0;
-#endif
 #endif
 
 #if CONFIG_AUD_INTF_SUPPORT_MP3
@@ -1646,32 +1635,12 @@ static bk_err_t aud_tras_aec(void)
 		aud_tras_drv_info.voc_info.aud_tras_dump_aec_cb((uint8_t *)aec_info_pr->mic_addr, aec_info_pr->samp_rate_points*2);
 		aud_tras_drv_info.voc_info.aud_tras_dump_aec_cb((uint8_t *)aec_info_pr->ref_addr, aec_info_pr->samp_rate_points*2);
 	}
+
     #if CONFIG_DEBUG_DUMP
     if(aec_all_data_flag)
     {
-	    #if !OPUS_ENC_DEC_LOOPBACK
-        #if 0
-        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_NUM(DUMP_TYPE_AEC_MIC_DATA,3);//mic/ref/aec out
-
-        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW(DUMP_TYPE_AEC_MIC_DATA,0,DUMP_FILE_TYPE_PCM,aec_info_pr->samp_rate_points*2);
-        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW(DUMP_TYPE_AEC_REF_DATA,1,DUMP_FILE_TYPE_PCM,aec_info_pr->samp_rate_points*2);
-        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW(DUMP_TYPE_AEC_OUT_DATA,2,DUMP_FILE_TYPE_PCM,aec_info_pr->samp_rate_points*2);
-        #else
-        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AEC_MIC_DATA,0,aec_info_pr->samp_rate_points*2);
-        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AEC_REF_DATA,1,aec_info_pr->samp_rate_points*2);
-        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AEC_OUT_DATA,2,aec_info_pr->samp_rate_points*2);
-        #endif
-
-        DEBUG_DATA_DUMP_UPDATE_HEADER_TIMESTAMP(DUMP_TYPE_AEC_MIC_DATA);
-        DEBUG_DATA_DUMP_BY_UART_HEADER(DUMP_TYPE_AEC_MIC_DATA);
-        //AEC_DATA_DUMP_BY_UART_DATA((void *)&dump_header,sizeof(dump_header));
-        DEBUG_DATA_DUMP_UPDATE_HEADER_SEQ_NUM(DUMP_TYPE_AEC_MIC_DATA);
-
-        //AEC_DATA_DUMP_BY_UART_DATA(aec_info_pr->mic_addr, aec_info_pr->samp_rate_points*2);
-        //AEC_DATA_DUMP_BY_UART_DATA(aec_info_pr->ref_addr, aec_info_pr->samp_rate_points*2);
-        DEBUG_DATA_DUMP_BY_UART_DATA(aec_info_pr->mic_addr, aec_info_pr->samp_rate_points*2);
-        DEBUG_DATA_DUMP_BY_UART_DATA(aec_info_pr->ref_addr, aec_info_pr->samp_rate_points*2);
-		#endif
+        os_memcpy(aud_tras_drv_info.aec_mic_data_save, aec_info_pr->mic_addr, aec_info_pr->samp_rate_points*2);
+        os_memcpy(aud_tras_drv_info.aec_ref_data_save, aec_info_pr->ref_addr, aec_info_pr->samp_rate_points*2);
     }
     #endif
 
@@ -1748,6 +1717,56 @@ if(aud_get_production_mode())
         {
             LOGE("%s:%d bk_aud_rsp_process_multi_instance fail\n", __func__, __LINE__);
         }
+        else
+        {
+            #if CONFIG_DEBUG_DUMP
+            if(aec_all_data_flag)
+            {
+                DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AEC_MIC_DATA,0,aec_info_pr->samp_rate_points*2);
+                DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AEC_REF_DATA,1,aec_info_pr->samp_rate_points*2);
+                DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AEC_OUT_DATA,2,rsp_out_len);
+                DEBUG_DATA_DUMP_UPDATE_HEADER_TIMESTAMP(DUMP_TYPE_AEC_MIC_DATA);
+                #if CONFIG_DEBUG_DUMP_DATA_TYPE_EXTENSION
+                DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_SAMP_RATE(DUMP_TYPE_DEC_OUT_DATA,0,aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate);
+                DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_FRAME_IN_MS(DUMP_TYPE_DEC_OUT_DATA,0,aud_tras_drv_info.voc_info.aud_codec_setup.enc_frame_len_in_ms);
+                DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_SAMP_RATE(DUMP_TYPE_DEC_OUT_DATA,1,aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate);
+                DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_FRAME_IN_MS(DUMP_TYPE_DEC_OUT_DATA,1,aud_tras_drv_info.voc_info.aud_codec_setup.enc_frame_len_in_ms);
+                DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_SAMP_RATE(DUMP_TYPE_DEC_OUT_DATA,2,ASR_SAMPLE_RATE);
+                DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_FRAME_IN_MS(DUMP_TYPE_DEC_OUT_DATA,2,aud_tras_drv_info.voc_info.aud_codec_setup.enc_frame_len_in_ms);
+                #endif
+                DEBUG_DATA_DUMP_BY_UART_HEADER(DUMP_TYPE_AEC_MIC_DATA);
+                DEBUG_DATA_DUMP_UPDATE_HEADER_SEQ_NUM(DUMP_TYPE_AEC_MIC_DATA);
+                DEBUG_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.aec_mic_data_save, aec_info_pr->samp_rate_points*2);
+                DEBUG_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.aec_ref_data_save, aec_info_pr->samp_rate_points*2);
+                DEBUG_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.asr_rsp_out_buff, rsp_out_len);
+            }
+            #endif
+        }
+    }
+    else
+    {
+        #if CONFIG_DEBUG_DUMP
+        if(aec_all_data_flag)
+        {
+            DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AEC_MIC_DATA,0,aec_info_pr->samp_rate_points*2);
+            DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AEC_REF_DATA,1,aec_info_pr->samp_rate_points*2);
+            DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AEC_OUT_DATA,2,aec_info_pr->samp_rate_points*2);
+            DEBUG_DATA_DUMP_UPDATE_HEADER_TIMESTAMP(DUMP_TYPE_AEC_MIC_DATA);
+            #if CONFIG_DEBUG_DUMP_DATA_TYPE_EXTENSION
+            DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_SAMP_RATE(DUMP_TYPE_AEC_MIC_DATA,0,aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate);
+            DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_FRAME_IN_MS(DUMP_TYPE_AEC_MIC_DATA,0,aud_tras_drv_info.voc_info.aud_codec_setup.enc_frame_len_in_ms);
+            DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_SAMP_RATE(DUMP_TYPE_AEC_REF_DATA,1,aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate);
+            DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_FRAME_IN_MS(DUMP_TYPE_AEC_REF_DATA,1,aud_tras_drv_info.voc_info.aud_codec_setup.enc_frame_len_in_ms);
+            DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_SAMP_RATE(DUMP_TYPE_AEC_OUT_DATA,2,aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate);
+            DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_FRAME_IN_MS(DUMP_TYPE_AEC_OUT_DATA,2,aud_tras_drv_info.voc_info.aud_codec_setup.enc_frame_len_in_ms);
+            #endif
+            DEBUG_DATA_DUMP_BY_UART_HEADER(DUMP_TYPE_AEC_MIC_DATA);
+            DEBUG_DATA_DUMP_UPDATE_HEADER_SEQ_NUM(DUMP_TYPE_AEC_MIC_DATA);
+            DEBUG_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.aec_mic_data_save, aec_info_pr->samp_rate_points*2);
+            DEBUG_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.aec_ref_data_save, aec_info_pr->samp_rate_points*2);
+            DEBUG_DATA_DUMP_BY_UART_DATA(aec_info_pr->out_addr, aec_info_pr->samp_rate_points*2);
+        }
+        #endif
     }
 
 #if CONFIG_AI_ASR_MODE_CPU2
@@ -1779,15 +1798,7 @@ if(aud_get_production_mode())
         }
     }
 #endif
-    #if CONFIG_DEBUG_DUMP
-    if(aec_all_data_flag)
-    {
-#if !OPUS_ENC_DEC_LOOPBACK
-        //AEC_DATA_DUMP_BY_UART_DATA(aec_info_pr->out_addr, aec_info_pr->samp_rate_points*2);
-        DEBUG_DATA_DUMP_BY_UART_DATA(aec_info_pr->out_addr, aec_info_pr->samp_rate_points*2);
-#endif
-    }
-    #endif
+
 
 #if CONFIG_AUD_TRAS_AEC_DUMP_DEBUG
 #if CONFIG_AUD_TRAS_AEC_DUMP_MODE_TF
@@ -2344,22 +2355,6 @@ static bk_err_t aud_tras_enc(void)
             if(0 < enc_size)
             {
                 os_memcpy(temp_tx_info.ping.buff_addr, aud_tras_drv_info.voc_info.encoder_temp.law_data, enc_size);
-                //#if CONFIG_DEBUG_DUMP
-                //extern bool tx_mic_data_flag;
-                //if(tx_mic_data_flag)
-                //{
-                //    DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_TX_MIC,0,enc_size);
-                //    DEBUG_DATA_DUMP_UPDATE_HEADER_TIMESTAMP(DUMP_TYPE_TX_MIC);
-                //    DEBUG_DATA_DUMP_BY_UART_HEADER(DUMP_TYPE_TX_MIC);
-                //    DEBUG_DATA_DUMP_UPDATE_HEADER_SEQ_NUM(DUMP_TYPE_TX_MIC);
-                //    DEBUG_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.encoder_temp.law_data, enc_size);
-                //}
-                //#endif
-                #if OPUS_ENC_DEC_LOOPBACK
-                enc_output_save[enc_save_wr_idx].len = enc_size;
-                os_memcpy(&enc_output_save[enc_save_wr_idx].output[0], aud_tras_drv_info.voc_info.encoder_temp.law_data, enc_size);
-                enc_save_wr_idx = (enc_save_wr_idx+1)&3;
-                #endif
             }
             break;
         }
@@ -2748,6 +2743,24 @@ static int mp3_dec_process(mp3_decoder_context_t *mp3_dec, char *buffer, uint32_
 }
 #endif
 
+static void aud_dump_dec_output(uint16_t len_in_byte)
+{
+#if CONFIG_DEBUG_DUMP
+    if(dec_data_flag)
+    {
+        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_DEC_OUT_DATA,0,len_in_byte);
+        DEBUG_DATA_DUMP_UPDATE_HEADER_TIMESTAMP(DUMP_TYPE_DEC_OUT_DATA);
+        #if CONFIG_DEBUG_DUMP_DATA_TYPE_EXTENSION
+        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_SAMP_RATE(DUMP_TYPE_DEC_OUT_DATA,0,aud_tras_drv_info.voc_info.aud_codec_setup.dac_samp_rate);
+        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_FRAME_IN_MS(DUMP_TYPE_DEC_OUT_DATA,0,aud_tras_drv_info.voc_info.aud_codec_setup.dec_frame_len_in_ms);
+        #endif
+        DEBUG_DATA_DUMP_BY_UART_HEADER(DUMP_TYPE_DEC_OUT_DATA);
+        DEBUG_DATA_DUMP_UPDATE_HEADER_SEQ_NUM(DUMP_TYPE_DEC_OUT_DATA);
+        DEBUG_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, len_in_byte);
+    }
+#endif
+}
+
 static bk_err_t aud_tras_dec(void)
 {
 	uint32_t size = 0;
@@ -2857,6 +2870,7 @@ static bk_err_t aud_tras_dec(void)
                                 }
                             }
                         }
+                        aud_dump_dec_output(aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte);
                         break;
 
                     default:
@@ -2878,6 +2892,7 @@ static bk_err_t aud_tras_dec(void)
                         }
                     }
                 }
+                aud_dump_dec_output(aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte);
 #endif  //CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
 			} else {
 			    /* uac not support prompt tone */
@@ -2998,6 +3013,7 @@ static bk_err_t aud_tras_dec(void)
                         if (fill_slience_flag) {
                             os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
                         }
+                        aud_dump_dec_output(aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte);
                         break;
 
                     default:
@@ -3008,6 +3024,7 @@ static bk_err_t aud_tras_dec(void)
                     if (fill_slience_flag) {
                         os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
                     }
+                    aud_dump_dec_output(aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte);
 #endif  //CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
 			} else {
 				if (ring_buffer_get_free_size(&aud_tras_drv_info.voc_info.speaker_rb) > aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
@@ -3115,6 +3132,7 @@ static bk_err_t aud_tras_dec(void)
                             dec_size = g722_decode(&g722_dec, aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.decoder_temp.law_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2);
                             LOGD("%s, %d, len: %d, dec_size: %d \n", __func__, __LINE__, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2, dec_size * 2);
                         }
+                        aud_dump_dec_output(aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte);
                         break;
 
                     default:
@@ -3128,6 +3146,7 @@ static bk_err_t aud_tras_dec(void)
                     dec_size = g722_decode(&g722_dec, aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.decoder_temp.law_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2);
                     LOGD("%s, %d, len: %d, dec_size: %d \n", __func__, __LINE__, aud_tras_drv_info.voc_info.speaker_samp_rate_points / 2, dec_size * 2);
                 }
+                aud_dump_dec_output(aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte);
 #endif
 			} else {
 			    LOGE("%s, %d, not support uac, need TODO\n", __func__, __LINE__);
@@ -3236,29 +3255,6 @@ static bk_err_t aud_tras_dec(void)
                         break;
 
                     case SPK_SOURCE_TYPE_VOICE:                        
-                        #if OPUS_ENC_DEC_LOOPBACK
-                        {
-                            /* OPUS decoding opus data to pcm data*/
-                            dec_size = opus_decode(opus_decoder, 
-                                                       &enc_output_save[enc_save_rd_idx].output[0], 
-                                                       enc_output_save[enc_save_rd_idx].len,
-                                                       (int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data,
-                                                       aud_tras_drv_info.voc_info.speaker_samp_rate_points*2,
-                                                       0);
-                            LOGD("%s, %d, len: %d, dec_size: %d \n", __func__, __LINE__, enc_output_save[enc_save_rd_idx].len, dec_size * 2);
-                            enc_save_rd_idx = (enc_save_rd_idx+1)&3;
-                            #if CONFIG_DEBUG_DUMP
-                            if(aec_all_data_flag)
-                            {
-                                DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_AEC_MIC_DATA,0,dec_size*2);
-                                DEBUG_DATA_DUMP_UPDATE_HEADER_TIMESTAMP(DUMP_TYPE_AEC_MIC_DATA);
-                                DEBUG_DATA_DUMP_BY_UART_HEADER(DUMP_TYPE_AEC_MIC_DATA);
-                                DEBUG_DATA_DUMP_UPDATE_HEADER_SEQ_NUM(DUMP_TYPE_AEC_MIC_DATA);
-                                DEBUG_DATA_DUMP_BY_UART_DATA(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, dec_size*2);
-                            }
-                            #endif
-                        }
-                        #else
                         if (fill_slience_flag) {
                             os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
                         } else {
@@ -3271,7 +3267,7 @@ static bk_err_t aud_tras_dec(void)
                                                        0);
                             LOGD("%s, %d, len: %d, dec_size: %d \n", __func__, __LINE__, pkt_len, dec_size * 2);
                         }
-                        #endif
+                        aud_dump_dec_output(aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte);
                         break;
 
                     default:
@@ -3284,6 +3280,7 @@ static bk_err_t aud_tras_dec(void)
                     dec_size = opus_decode(opus_decoder, aud_tras_drv_info.voc_info.decoder_temp.law_data, pkt_len, (int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points*2, 0);
                     LOGD("%s, %d, len: %d, dec_size: %d \n", __func__, __LINE__, pkt_len, dec_size * 2);
                 }
+                aud_dump_dec_output(aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte);
 #endif
             } else {
                 LOGE("%s, %d, not support uac, need TODO\n", __func__, __LINE__);
@@ -3382,6 +3379,7 @@ static bk_err_t aud_tras_dec(void)
                                  aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte,
                                  dec_size);
                         }
+                        aud_dump_dec_output(aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte);
                         break;
 
                     default:
@@ -3402,6 +3400,7 @@ static bk_err_t aud_tras_dec(void)
                          aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte,
                          dec_size);
                 }
+                aud_dump_dec_output(aud_tras_drv_info.voc_info.aud_codec_setup.dec_output_size_in_byte);
 #endif
             } else {
                 LOGE("%s, %d, not support uac, need TODO\n", __func__, __LINE__);
@@ -4800,6 +4799,19 @@ static bk_err_t aud_tras_drv_voc_deinit(void)
     mp3_dec_ctx.idv3_skip_size = 0;
 #endif
 
+#if CONFIG_DEBUG_DUMP
+    if (aud_tras_drv_info.aec_mic_data_save)
+    {
+        psram_free(aud_tras_drv_info.aec_mic_data_save);
+        aud_tras_drv_info.aec_mic_data_save = NULL;
+    }
+    if (aud_tras_drv_info.aec_ref_data_save)
+    {
+        psram_free(aud_tras_drv_info.aec_ref_data_save);
+        aud_tras_drv_info.aec_ref_data_save = NULL;
+    }
+#endif
+
     AEC_DATA_DUMP_BY_UART_CLOSE();
     SPK_DATA_DUMP_BY_UART_CLOSE();
 
@@ -5454,6 +5466,21 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
             aud_tras_drv_info.asr_rsp_cfg.complexity,
             aud_tras_drv_info.asr_rsp_out_buff);
     }
+
+    #if CONFIG_DEBUG_DUMP
+    aud_tras_drv_info.aec_mic_data_save = psram_malloc(aud_tras_drv_info.voc_info.aud_codec_setup.enc_input_size_in_byte);
+    if (!aud_tras_drv_info.aec_mic_data_save)
+    {
+        LOGE("%s, %d, malloc aec_mic_data_save buffer fail\n", __func__, __LINE__);
+        goto aud_tras_drv_voc_init_exit;
+    }
+    aud_tras_drv_info.aec_ref_data_save = psram_malloc(aud_tras_drv_info.voc_info.aud_codec_setup.enc_input_size_in_byte);
+    if (!aud_tras_drv_info.aec_ref_data_save)
+    {
+        LOGE("%s, %d, malloc aec_ref_data_save buffer fail\n", __func__, __LINE__);
+        goto aud_tras_drv_voc_init_exit;
+    }
+    #endif
 
     AEC_DATA_DUMP_BY_UART_OPEN();
     SPK_DATA_DUMP_BY_UART_OPEN();

@@ -17,6 +17,7 @@ typedef enum {
     DUMP_TYPE_AEC_MIC_DATA,
     DUMP_TYPE_AEC_REF_DATA,
     DUMP_TYPE_AEC_OUT_DATA,
+    DUMP_TYPE_DEC_OUT_DATA,
     DUMP_TYPE_MAX
 } debug_dump_type_t;
 
@@ -25,7 +26,11 @@ typedef enum {
 typedef enum {
     DUMP_FILE_TYPE_PCM = 0,
     DUMP_FILE_TYPE_G722,
-    DUMP_FILE_TYPE_INVALID,
+    DUMP_FILE_TYPE_OPUS,
+    DUMP_FILE_TYPE_G711A,
+    DUMP_FILE_TYPE_G711U,
+    DUMP_FILE_TYPE_MP3,
+    DUMP_FILE_TYPE_MAX,
 } debug_dump_file_type_t;
 
 typedef struct
@@ -33,6 +38,10 @@ typedef struct
     uint8_t  dump_type;
     uint8_t  dump_file_type;
     uint16_t len;
+#if CONFIG_DEBUG_DUMP_DATA_TYPE_EXTENSION
+    uint16_t sample_rate;
+    uint16_t frame_in_ms;
+#endif
 }data_flow_t;
 
 typedef struct
@@ -65,10 +74,16 @@ extern const uint8_t g_dump_type2header_array_idx[DUMP_TYPE_MAX];
                                                                                               dump_header[g_dump_type2header_array_idx[dump_type]].data_flow[data_flow_idx].dump_file_type = file_type;\
                                                                                               dump_header[g_dump_type2header_array_idx[dump_type]].data_flow[data_flow_idx].len = length;\
                                                                                           }while(0)
-#define DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(dump_type,data_flow_idx,length) dump_header[g_dump_type2header_array_idx[dump_type]].data_flow[data_flow_idx].len = length
+#define DEBUG_DATA_DUMP_UPDATE_HEADER_DUMP_FILE_TYPE(dump_type,data_flow_idx,file_type) dump_header[g_dump_type2header_array_idx[dump_type]].data_flow[data_flow_idx].dump_file_type = file_type
+#define DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(dump_type,data_flow_idx,length)     dump_header[g_dump_type2header_array_idx[dump_type]].data_flow[data_flow_idx].len = length
 #define DEBUG_DATA_DUMP_UPDATE_HEADER_TIMESTAMP(dump_type)            dump_header[g_dump_type2header_array_idx[dump_type]].timestamp = rtos_get_time()
 #define DEBUG_DATA_DUMP_UPDATE_HEADER_SEQ_NUM(dump_type)              dump_header[g_dump_type2header_array_idx[dump_type]].seq_no++
 #define DEBUG_DATA_DUMP_BY_UART_HEADER(dump_type)                     DEBUG_DATA_DUMP_BY_UART_DATA((void *)&dump_header[g_dump_type2header_array_idx[dump_type]], sizeof(debug_dump_data_header_t))
+
+#if CONFIG_DEBUG_DUMP_DATA_TYPE_EXTENSION
+#define DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_SAMP_RATE(type,data_flow_idx,samp_rate)    dump_header[g_dump_type2header_array_idx[type]].data_flow[data_flow_idx].sample_rate = samp_rate
+#define DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_FRAME_IN_MS(type,data_flow_idx,frame_ms)   dump_header[g_dump_type2header_array_idx[type]].data_flow[data_flow_idx].frame_in_ms = frame_ms
+#endif
 
 #else
 #define DEBUG_DATA_DUMP_BY_UART_OPEN()
@@ -77,12 +92,20 @@ extern const uint8_t g_dump_type2header_array_idx[DUMP_TYPE_MAX];
 
 #define DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_NUM(dump_type,data_flow_num)
 #define DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW(dump_type,data_flow_idx,dump_file_type,len)
+#define DEBUG_DATA_DUMP_UPDATE_HEADER_DUMP_FILE_TYPE(dump_type,data_flow_idx,file_type) 
 #define DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(dump_type,data_flow_idx,len)
 #define DEBUG_DATA_DUMP_UPDATE_HEADER_TIMESTAMP(dump_type)
 #define DEBUG_DATA_DUMP_UPDATE_HEADER_SEQ_NUM(dump_type)    
 #define DEBUG_DATA_DUMP_BY_UART_HEADER(dump_type)
 
+#if CONFIG_DEBUG_DUMP_DATA_TYPE_EXTENSION
+#define DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_SAMP_RATE(type,data_flow_idx,samp_rate)
+#define DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_FRAME_IN_MS(type,data_flow_idx,frame_ms)
+#endif
+
 #endif  //CONFIG_DEBUG_DUMP
+
+uint8_t dbg_dump_get_dump_file_type(uint8_t codec_type);
 
 #ifdef __cplusplus
 }

@@ -1036,6 +1036,11 @@ uint32_t bk_aud_get_enc_frame_len_in_ms(void)
     return aud_intf_info.voc_info.aud_codec_setup.enc_frame_len_in_ms;
 }
 
+uint32_t bk_aud_get_dec_frame_len_in_ms(void)
+{
+    return aud_intf_info.voc_info.aud_codec_setup.dec_frame_len_in_ms;
+}
+
 uint32_t bk_aud_get_encoder_type(void)
 {
     return aud_intf_info.voc_info.aud_codec_setup.encoder_type;
@@ -1046,6 +1051,15 @@ uint32_t bk_aud_get_decoder_type(void)
     return aud_intf_info.voc_info.aud_codec_setup.decoder_type;
 }
 
+uint32_t bk_aud_get_adc_sample_rate(void)
+{
+    return aud_intf_info.voc_info.aud_codec_setup.adc_samp_rate;
+}
+
+uint32_t bk_aud_get_dac_sample_rate(void)
+{
+    return aud_intf_info.voc_info.aud_codec_setup.dac_samp_rate;
+}
 
 bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 {

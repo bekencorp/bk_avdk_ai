@@ -258,6 +258,11 @@ menu "Media"
         bool "dump debug data"
         default n
 
+    config DEBUG_DUMP_DATA_TYPE_EXTENSION
+        depends on DEBUG_DUMP
+        bool "extend debug data type"
+        default n
+
     config AI_ASR_MODE_CPU2
         depends on AUD_INTF_SUPPORT_AI_DIALOG_FREE
         bool "Enable AI ASR run in cpu2"

@@ -667,8 +667,11 @@ uint32_t bk_aud_get_dec_output_size_in_byte(void);
 uint32_t bk_aud_get_enc_input_size_in_byte(void);
 uint32_t bk_aud_get_enc_output_size_in_byte(void);
 uint32_t bk_aud_get_enc_frame_len_in_ms(void);
+uint32_t bk_aud_get_dec_frame_len_in_ms(void);
 uint32_t bk_aud_get_encoder_type(void);
 uint32_t bk_aud_get_decoder_type(void);
+uint32_t bk_aud_get_adc_sample_rate(void);
+uint32_t bk_aud_get_dac_sample_rate(void);
 
 /**
  * @}

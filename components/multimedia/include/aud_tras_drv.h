@@ -362,6 +362,10 @@ typedef struct {
     aud_rsp_cfg_t asr_rsp_cfg;
     uint16_t *asr_rsp_out_buff;
     void *asr_rsp_handler;
+    #if CONFIG_DEBUG_DUMP
+    int16_t *aec_ref_data_save;
+    int16_t *aec_mic_data_save;
+    #endif
 } aud_tras_drv_info_t;
 
 #define DEFAULT_AUD_TRAS_DRV_INFO() {                                              \
