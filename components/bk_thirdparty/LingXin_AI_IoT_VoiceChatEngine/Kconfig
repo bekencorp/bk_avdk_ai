@@ -1,0 +1,10 @@
+#TODO remove all kconfigs which are defined in armino libs
+
+menu "LingXin_AI_IoT_VoiceChatEngine"
+
+	config LINGXIN_AI_EN
+		bool "Enable LingXin AI"
+		default n
+		help
+			Enable LingXin AI
+endmenu
