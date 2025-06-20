@@ -1029,6 +1029,8 @@ static bk_err_t aud_tras_drv_aec_cfg(void)
 		aec_init(temp_aec_info->aec, temp_aec_info->samp_rate);
 	}
 
+    temp_aec_info->aec->max_mic_delay = (delay_buff_size/2);
+
 	/* 获取处理帧长，16000采样率320点(640字节)，8000采样率160点(320字节)  (对应20毫秒数据) */
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_GET_FRAME_SAMPLE, (uint32_t)(&(temp_aec_info->samp_rate_points)));
 
@@ -1051,6 +1053,7 @@ static bk_err_t aud_tras_drv_aec_cfg(void)
 	temp_aec_info->aec_config->ns_level = aud_para.aec_config_voice.ns_level;//0x2
 	temp_aec_info->aec_config->ns_para = aud_para.aec_config_voice.ns_para;//0x1
 	temp_aec_info->aec_config->drc = aud_para.aec_config_voice.drc_gain;//0xf
+
 
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_MIC_DELAY, temp_aec_info->aec_config->mic_delay);						//设置参考信号延迟(采样点数，需要dump数据观察)
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_EC_DEPTH, temp_aec_info->aec_config->ec_depth);							//建议取值范围1~50; 后面几个参数建议先用aec_init内的默认值，具体需要根据实际情况调试; 总得来说回声越大需要调的越大
