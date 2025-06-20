@@ -2845,7 +2845,7 @@ static bk_err_t aud_tras_dec(void)
                         if (fill_slience_flag) {
                             os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
                         } else {
-                            if (aud_tras_drv_info.voc_info.data_type == AUD_INTF_VOC_DATA_TYPE_G711U) {
+                            if (aud_tras_drv_info.voc_info.aud_codec_setup.decoder_type == AUD_INTF_VOC_DATA_TYPE_G711U) {
                                 /* G711U decoding u-law data to pcm data*/
                                 for (i=0; i<aud_tras_drv_info.voc_info.speaker_samp_rate_points; i++) {
                                     aud_tras_drv_info.voc_info.decoder_temp.pcm_data[i] = ulaw2linear(aud_tras_drv_info.voc_info.decoder_temp.law_data[i]);
@@ -2866,7 +2866,7 @@ static bk_err_t aud_tras_dec(void)
                 if (fill_slience_flag) {
                     os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0x00, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
                 } else {
-                    if (aud_tras_drv_info.voc_info.data_type == AUD_INTF_VOC_DATA_TYPE_G711U) {
+                    if (aud_tras_drv_info.voc_info.aud_codec_setup.decoder_type == AUD_INTF_VOC_DATA_TYPE_G711U) {
                         /* G711U decoding u-law data to pcm data*/
                         for (i=0; i<aud_tras_drv_info.voc_info.speaker_samp_rate_points; i++) {
                             aud_tras_drv_info.voc_info.decoder_temp.pcm_data[i] = ulaw2linear(aud_tras_drv_info.voc_info.decoder_temp.law_data[i]);
