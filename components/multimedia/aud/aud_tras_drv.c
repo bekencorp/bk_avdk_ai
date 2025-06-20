@@ -1039,6 +1039,8 @@ static bk_err_t aud_tras_drv_aec_cfg(void)
 
 	dump_aec_config_voice();
 	/* 以下是参数调节示例,aec_init中都已经有默认值,可以直接先用默认值 */
+
+	temp_aec_info->aec_config->init_flags = aud_para.aec_config_voice.init_flags;
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_FLAGS, temp_aec_info->aec_config->init_flags);							//库内各模块开关; aec_init内默认赋值0x1f;
 
 	/* 回声消除相关 */
@@ -1049,7 +1051,6 @@ static bk_err_t aud_tras_drv_aec_cfg(void)
 	temp_aec_info->aec_config->ns_level = aud_para.aec_config_voice.ns_level;//0x2
 	temp_aec_info->aec_config->ns_para = aud_para.aec_config_voice.ns_para;//0x1
 	temp_aec_info->aec_config->drc = aud_para.aec_config_voice.drc_gain;//0xf
-	temp_aec_info->aec_config->init_flags = aud_para.aec_config_voice.init_flags;
 
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_MIC_DELAY, temp_aec_info->aec_config->mic_delay);						//设置参考信号延迟(采样点数，需要dump数据观察)
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_EC_DEPTH, temp_aec_info->aec_config->ec_depth);							//建议取值范围1~50; 后面几个参数建议先用aec_init内的默认值，具体需要根据实际情况调试; 总得来说回声越大需要调的越大
@@ -1065,7 +1066,7 @@ static bk_err_t aud_tras_drv_aec_cfg(void)
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_EC_FILTER, aud_para.aec_config_voice.ec_filter);//0x01	 0x03	0x07
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_DELAY_BUFF, (uint32_t)temp_aec_info->aec->refbuff);
 #if CONFIG_AEC_VERSION_V3
-if(aud_para.aec_config_voice.ai_ns_enable)
+if(aud_para.aec_config_voice.ns_type == NS_AI)
 {
     #if CONFIG_AUD_AI_NS_SUPPORT
 			ex_size = 93380;

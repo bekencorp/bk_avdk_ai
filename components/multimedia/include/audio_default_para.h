@@ -144,13 +144,14 @@ extern "C" {
     .ns_level = 0x5,                                                          \
     .ns_para = 0x2,                                                            \
     .ns_filter = 0x3,                                                          \
-    .ai_ns_enable = 0,                                                             \
+    .ns_type = NS_CLOSE,                                                             \
     .vad_enable = 0,                                                             \
     .vad_start_threshold = 480,                                               \
     .vad_stop_threshold = 960,                                                  \
     .vad_silence_threshold = 320,                                             \
     .vad_eng_threshold =2000,                                                  \
     .dual_mic_enable = 0,                                                         \
+    .dual_mic_distance = 21,                                                       \
 }
 #else
 #define DEFAULT_AEC_CONFIG_VOICE()                                              \
@@ -166,13 +167,14 @@ extern "C" {
     .ns_level = 0x5,                                                          \
     .ns_para = 0x2,                                                            \
     .ns_filter = 0x3,                                                          \
-    .ai_ns_enable = 0,                                                             \
+    .ns_type = NS_CLOSE,                                                             \
     .vad_enable = 0,                                                             \
     .vad_start_threshold = 480,                                               \
     .vad_stop_threshold = 960,                                                  \
     .vad_silence_threshold = 320,                                             \
     .vad_eng_threshold =2000,                                                  \
     .dual_mic_enable = 0,                                                         \
+    .dual_mic_distance = 21,                                                       \
 }
 #endif
 
@@ -185,8 +187,10 @@ extern "C" {
     .speaker_chan0_digital_gain = 0x1E,                                     \
     .speaker_chan0_analog_gain = 0xF,                                     \
     .main_mic_select = 0,                                                      \
-    .dual_mic_enable = 0,                                                      \
     .dmic_enable = 0,                                                          \
+    .mic_mode = 0,                                                             \
+    .spk_mode = 0,                                                             \
+    .mic_vbias = 0,                                                            \
 }
 #ifdef __cplusplus
 }

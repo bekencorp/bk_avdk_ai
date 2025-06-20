@@ -50,12 +50,12 @@ void dump_aud_sys_config_voice()
 void dump_aec_config_voice()
 {
     AUD_DBG_TOOL_PRT("\r\n dump aec_config_voice:\r\n aec_en:0x%x\r\n init_flags:0x%x\r\n ec_filter:0x%x\r\n ns_filter:0x%x\r\n ref_scale:0x%x\r\n \
-ec_depth:0x%x\r\n mic_delay:%d\r\n drc_gain:%d\r\n voice_vol:%d\r\n ns_level:%d\r\n ns_para:%d\r\n ai_ns_enable0x%x\r\n \
+ec_depth:0x%x\r\n mic_delay:%d\r\n drc_gain:%d\r\n voice_vol:%d\r\n ns_level:%d\r\n ns_para:%d\r\n ns_type0x%x\r\n \
 vad_en:0x%x\r\n vad_start_thr:%d\r\n vad_stop_thr:%d\r\n vad_silence_thr:%d\r\n vad_eng_threshold:%d\r\n",\
                 aud_para.aec_config_voice.aec_enable,aud_para.aec_config_voice.init_flags,aud_para.aec_config_voice.ec_filter,\
                 aud_para.aec_config_voice.ns_filter,aud_para.aec_config_voice.ref_scale,aud_para.aec_config_voice.ec_depth,\
                 aud_para.aec_config_voice.mic_delay,aud_para.aec_config_voice.drc_gain,aud_para.aec_config_voice.voice_vol,\
-                aud_para.aec_config_voice.ns_level,aud_para.aec_config_voice.ns_para,aud_para.aec_config_voice.ai_ns_enable,\
+                aud_para.aec_config_voice.ns_level,aud_para.aec_config_voice.ns_para,aud_para.aec_config_voice.ns_type,\
                 aud_para.aec_config_voice.vad_enable,aud_para.aec_config_voice.vad_start_threshold,\
                 aud_para.aec_config_voice.vad_stop_threshold,aud_para.aec_config_voice.vad_silence_threshold,\
                 aud_para.aec_config_voice.vad_eng_threshold);
