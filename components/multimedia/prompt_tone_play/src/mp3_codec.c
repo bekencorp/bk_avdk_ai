@@ -200,6 +200,10 @@ static int codec_mp3_skip_idtag(mp3_codec_priv_t *mp3_codec)
 
         return offset;
     }
+    else
+    {
+        return 0;
+    }
 
 __exit:
 
@@ -490,7 +494,7 @@ static void mp3_codec_task_main(beken_thread_arg_t param_data)
             if (mp3_codec->skip_idtag == false)
             {
                 ret = codec_mp3_skip_idtag(mp3_codec);
-                if (ret > 0)
+                if (ret >= 0)
                 {
                     mp3_codec->skip_idtag = true;
                     LOGI("%s, %d, codec_mp3_skip_idtag complete\n", __func__, __LINE__);
