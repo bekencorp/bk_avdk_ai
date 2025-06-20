@@ -239,6 +239,11 @@ menu "Media"
 		bool "Select Prompt Tone stored in vfs file system"
 	endchoice
 
+	config PROMPT_TONE_SOURCE_VFS_MOUNT_ENABLE
+		depends on PROMPT_TONE_SOURCE_VFS
+		bool "Enable Source VFS of prompt tone automatic mount and unmount"
+		default y
+
 	choice PROMPT_TONE_CODEC_TYPE
 		depends on AUD_INTF_SUPPORT_PROMPT_TONE
 		prompt "Select Prompt Tone Codec Type"

@@ -32,7 +32,6 @@
 #define LOGD(...) BK_LOGD(VFS_SOURCE_TAG, ##__VA_ARGS__)
 
 
-#define MOUNT_ENABLE
 #define UNMOUNT_VFS_TIMER_INTERVAL      (3000)
 
 #define VFS_SOURCE_CHECK_NULL(ptr) do {\
@@ -67,13 +66,15 @@ typedef struct vfs_source_priv_s
     beken_semaphore_t sem;
     bool running;
 
+#if CONFIG_PROMPT_TONE_SOURCE_VFS_MOUNT_ENABLE
     bool mount_state;
     beken2_timer_t unmount_timer;
+#endif
 
     audio_source_cfg_t config;
 } vfs_source_priv_t;
 
-#ifdef MOUNT_ENABLE
+#if CONFIG_PROMPT_TONE_SOURCE_VFS_MOUNT_ENABLE
 int vfs_source_mount(vfs_source_priv_t *vfs_source)
 {
     int ret = BK_FAIL;
@@ -233,7 +234,7 @@ static void vfs_data_read_task_main(beken_thread_arg_t param_data)
                     {
                         close(vfs_source_priv->fd);
                         vfs_source_priv->fd = -1;
-#ifdef MOUNT_ENABLE
+#if CONFIG_PROMPT_TONE_SOURCE_VFS_MOUNT_ENABLE
                         /* unmount vfs system after close file to avoid high power consumption */
                         vfs_source_unmount(vfs_source_priv);
 #endif
@@ -247,7 +248,7 @@ static void vfs_data_read_task_main(beken_thread_arg_t param_data)
 
                 case VFS_DATA_READ_START:
                     LOGD("%s, %d, VFS_DATA_READ_START\n", __func__, __LINE__);
-#ifdef MOUNT_ENABLE
+#if CONFIG_PROMPT_TONE_SOURCE_VFS_MOUNT_ENABLE
                     /* mount vfs system before open file to avoid high power consumption */
                     /* mount file */
                     ret = vfs_source_mount(vfs_source_priv);
@@ -264,7 +265,7 @@ static void vfs_data_read_task_main(beken_thread_arg_t param_data)
                         if (vfs_source_priv->fd < 0)
                         {
                             LOGE("%s, %d, open :%s fail, fd: %d\n", __func__, __LINE__, vfs_source_priv->config.url, vfs_source_priv->fd);
-#ifdef MOUNT_ENABLE
+#if CONFIG_PROMPT_TONE_SOURCE_VFS_MOUNT_ENABLE
                             vfs_source_unmount(vfs_source_priv);
 #endif
                             /* notify app prompt tone is not exist. */
@@ -493,7 +494,7 @@ static int vfs_source_open(audio_source_t *source, audio_source_cfg_t *config)
     temp_vfs_source->read_buff_size = config->frame_size;
     os_memcpy(&temp_vfs_source->config, config, sizeof(audio_source_cfg_t));
 
-#ifdef MOUNT_ENABLE
+#if CONFIG_PROMPT_TONE_SOURCE_VFS_MOUNT_ENABLE
     ret = rtos_init_oneshot_timer(&temp_vfs_source->unmount_timer, UNMOUNT_VFS_TIMER_INTERVAL, vfs_unmount_timer_callback, source->source_ctx, NULL);
     if (ret != BK_OK)
     {
@@ -521,7 +522,7 @@ fail:
         source->source_ctx = NULL;
     }
 
-#ifdef MOUNT_ENABLE
+#if CONFIG_PROMPT_TONE_SOURCE_VFS_MOUNT_ENABLE
     if (temp_vfs_source && temp_vfs_source->unmount_timer.handle)
     {
         ret = rtos_deinit_oneshot_timer(&temp_vfs_source->unmount_timer);
@@ -551,7 +552,7 @@ static int vfs_source_close(audio_source_t *source)
 
     vfs_data_read_task_deinit(vfs_source);
 
-#ifdef MOUNT_ENABLE
+#if CONFIG_PROMPT_TONE_SOURCE_VFS_MOUNT_ENABLE
     rtos_stop_oneshot_timer(&vfs_source->unmount_timer);
 
     if (vfs_source->mount_state)
