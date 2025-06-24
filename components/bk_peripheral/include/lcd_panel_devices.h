@@ -111,6 +111,10 @@ extern const lcd_device_t lcd_device_gc9c01;
 extern const lcd_device_t lcd_device_jd9855;
 #endif
 
+#if CONFIG_LCD_QSPI_JD9855_K18XJ15
+extern const lcd_device_t lcd_device_jd9855_k18xj15;
+#endif
+
 #if CONFIG_LCD_QSPI_ST77916
 extern const lcd_device_t lcd_device_st77916;
 #endif

@@ -40,6 +40,11 @@ menu "QSPI LCD"
 		bool "Enable LCD_QSPI_JD9855 API"
 		default n
 
+	config LCD_QSPI_JD9855_K18XJ15
+		depends on LCD_QSPI
+		bool "Enable LCD_QSPI_JD9855_K18XJ15 API"
+		default n
+
 	config LCD_QSPI_ST77916
 		depends on LCD_QSPI
 		bool "Enable LCD_QSPI_ST77916 API"
