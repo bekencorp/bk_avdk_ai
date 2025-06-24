@@ -58,5 +58,3 @@ const lcd_device_t lcd_device_st7796u =
     .init = NULL,
     .lcd_off = NULL,
 };
-
-
