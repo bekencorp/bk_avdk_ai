@@ -215,6 +215,14 @@ static void aud_intf_main(beken_thread_arg_t param_data)
 					}
 					break;
 
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+				case AUD_INTF_EVENT_SPK_PLAY_FINISH:
+					if (aud_intf_info.voc_info.spk_play_finish_notify) {
+						aud_intf_info.voc_info.spk_play_finish_notify(aud_intf_info.voc_info.usr_data);
+					}
+					break;
+#endif
+
 				case AUD_INTF_EVENT_EXIT:
 					goto aud_intf_exit;
 					break;
@@ -1117,6 +1125,11 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 	aud_intf_info.voc_info.mic_type = setup.mic_type;
 	aud_intf_info.voc_info.spk_type = setup.spk_type;
 
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+    aud_intf_info.voc_info.spk_play_finish_notify = setup.spk_play_finish_notify;
+    aud_intf_info.voc_info.usr_data = setup.usr_data;
+#endif
+
 	/* aec config */
 	if (aud_intf_info.voc_info.aec_enable) {
 		aud_intf_info.voc_info.aec_setup = audio_intf_malloc(sizeof(aec_config_t));
@@ -1798,6 +1811,17 @@ bk_err_t bk_aud_intf_voc_stop_prompt_tone(void)
 
 	CHECK_AUD_INTF_BUSY_STA();
 	return mailbox_media_aud_send_msg(EVENT_AUD_VOC_STOP_PROMPT_TONE_REQ, NULL);
+}
+#endif
+
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+bk_err_t bk_aud_intf_voc_write_spk_data_ctrl(bool en)
+{
+	if (aud_intf_info.voc_status == AUD_INTF_VOC_STA_NULL)
+		return BK_ERR_AUD_INTF_STA;
+
+	CHECK_AUD_INTF_BUSY_STA();
+	return mailbox_media_aud_send_msg(EVENT_AUD_VOC_SET_WRITE_SPK_DATA_STATE_REQ, (void *)en);
 }
 #endif
 

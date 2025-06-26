@@ -598,6 +598,12 @@ static void media_app_mailbox_msg_handle(media_mailbox_msg_t *msg)
 				aud_intf_send_msg(AUD_INTF_EVENT_UAC_STATE, msg->param, 0);
 				break;
 
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+			case EVENT_AUD_SPK_PLAY_FINISH_NOTIFY:
+				aud_intf_send_msg(AUD_INTF_EVENT_SPK_PLAY_FINISH, 0, 0);
+				break;
+#endif
+
 			case EVENT_UVC_DEVICE_INFO_NOTIFY:
 				media_msg.event = msg->event;
 				media_msg.param = msg->param;

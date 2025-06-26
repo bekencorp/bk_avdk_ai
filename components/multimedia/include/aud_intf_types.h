@@ -290,6 +290,10 @@ typedef struct {
 	uint8_t fifo_frame_num;					/**< the number of frames in rx buffer before start voice transfer, the time of one frame is 20ms */
 	RingBufferContext *aud_tx_rb;
 	aud_codec_setup_input_t aud_codec_setup_input;
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+	int (*spk_play_finish_notify)(void *params);		/**< the api is called when all speaker data has been play completely */
+	void *usr_data;                             /*!< the parameter of pool_empty_notify_cb callback */
+#endif
 } aud_intf_voc_setup_t;
 
 #define DEFAULT_AUD_INTF_VOC_SETUP_CONFIG() {                                                   \

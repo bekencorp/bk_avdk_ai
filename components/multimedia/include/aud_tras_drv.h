@@ -81,6 +81,11 @@ typedef enum {
 	AUD_TRAS_DRV_VOC_TX_DEBUG,			/**< dump tx data */
 	AUD_TRAS_DRV_VOC_RX_DEBUG,			/**< dump rx data */
 	AUD_TRAS_DRV_VOC_AEC_DEBUG,			/**< dump aec data */
+
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+    AUD_TRAS_DRV_VOC_SET_WRITE_SPK_DATA_STATE,
+#endif
+
 	/* voc int op */
 	AUD_TRAS_DRV_AEC,			/**< aec process mic data */
 	AUD_TRAS_DRV_ENCODER,		/**< encoder mic data processed by aec */
@@ -252,6 +257,15 @@ typedef struct {
 	aud_intf_dump_data_callback aud_tras_dump_tx_cb;		//dump audio tx data callback
 	aud_intf_dump_data_callback aud_tras_dump_rx_cb;		//dump audio rx data callback
 	aud_intf_dump_data_callback aud_tras_dump_aec_cb;		//dump audio aec mic, ref and out data callback
+
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+    /* notify app that speaker data play finish */
+    int (*spk_play_finish_notify)(void *params);        /**< the api is called when all speaker data has been play completely */
+    void *usr_data;                                     /**< the parameter of spk_play_finish_notify callback */
+    bool spk_notify_complete;
+    bool write_spk_data_state;
+    beken2_timer_t spk_notify_timer;
+#endif
 } aud_tras_drv_voc_info_t;
 
 /******************************** mic info ****************************************/

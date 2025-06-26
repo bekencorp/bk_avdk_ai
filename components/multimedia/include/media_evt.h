@@ -136,6 +136,8 @@ typedef enum
 	EVENT_AUD_VOC_RX_DEBUG_REQ,			/**< dump rx data */
 	EVENT_AUD_VOC_AEC_DEBUG_REQ, 		/**< dump aec data */
 
+	EVENT_AUD_VOC_SET_WRITE_SPK_DATA_STATE_REQ,		/**< update dl eq parameter */
+
     /* AI Agent */
 	EVENT_AUD_AI_INIT_REQ,			/**< init audio ai data tx and rx */
     EVENT_AUD_AI_START_REQ,
@@ -280,6 +282,8 @@ typedef enum
 	EVENT_ASR_DATA_NOTIFY,
 	EVENT_AUD_CP2_READY_NOTIFY,
 	EVENT_ASR_RESULT_NOTIFY,
+
+    EVENT_AUD_SPK_PLAY_FINISH_NOTIFY,
 
 	EVENT_BT_AUDIO_INIT_REQ = (BT_EVENT << MEDIA_EVT_BIT),
 	EVENT_BT_AUDIO_DEINIT_REQ,

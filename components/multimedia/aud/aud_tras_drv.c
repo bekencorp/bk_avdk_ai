@@ -209,6 +209,10 @@ static uint8_t spk_play_flag = 0;
 
 media_mailbox_msg_t uac_connect_state_msg = {0};
 
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+media_mailbox_msg_t spk_play_finish_msg = {0};
+#endif
+
 media_mailbox_msg_t mic_to_media_app_msg = {0};
 media_mailbox_msg_t spk_to_media_app_msg = {0};
 media_mailbox_msg_t vad_to_media_app_msg = {0};
@@ -2765,6 +2769,22 @@ static void aud_dump_dec_output(uint16_t len_in_byte)
 #endif
 }
 
+static int spk_play_finish_handler(void)
+{
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+
+    if (aud_tras_drv_info.voc_info.spk_play_finish_notify && !aud_tras_drv_info.voc_info.write_spk_data_state && !aud_tras_drv_info.voc_info.spk_notify_complete)
+    {
+        if (BK_OK != rtos_start_oneshot_timer(&aud_tras_drv_info.voc_info.spk_notify_timer))
+        {
+            LOGE("%s, %d, start spk_notify timer fail \n", __func__, __LINE__);
+        }
+    }
+#endif
+
+    return BK_OK;
+}
+
 static bk_err_t aud_tras_dec(void)
 {
 	uint32_t size = 0;
@@ -2797,6 +2817,7 @@ static bk_err_t aud_tras_dec(void)
 						fill_slience_flag = true;
 					}
 				} else {
+                    spk_play_finish_handler();
 					fill_slience_flag = true;
 				}
 
@@ -2953,6 +2974,7 @@ static bk_err_t aud_tras_dec(void)
                         fill_slience_flag = true;
 					}
 				} else {
+                    spk_play_finish_handler();
 				    fill_slience_flag = true;
 				}
 
@@ -3067,6 +3089,8 @@ static bk_err_t aud_tras_dec(void)
                         fill_slience_flag = true;
 					}
 				} else {
+                    spk_play_finish_handler();
+
 				    fill_slience_flag = true;
 				}
 
@@ -3197,6 +3221,8 @@ static bk_err_t aud_tras_dec(void)
                 }
                 else
                 {
+                    spk_play_finish_handler();
+
                     fill_slience_flag = true;
                 }
 
@@ -3305,6 +3331,8 @@ static bk_err_t aud_tras_dec(void)
                         fill_slience_flag = true;
                     }
                 } else {
+                    spk_play_finish_handler();
+
                     fill_slience_flag = true;
                 }
 
@@ -4816,6 +4844,15 @@ static bk_err_t aud_tras_drv_voc_deinit(void)
     }
 #endif
 
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+    if (aud_tras_drv_info.voc_info.spk_notify_timer.handle)
+    {
+        rtos_stop_oneshot_timer(&aud_tras_drv_info.voc_info.spk_notify_timer);
+        rtos_deinit_oneshot_timer(&aud_tras_drv_info.voc_info.spk_notify_timer);
+        aud_tras_drv_info.voc_info.spk_notify_timer.handle = NULL;
+    }
+#endif
+
     AEC_DATA_DUMP_BY_UART_CLOSE();
     SPK_DATA_DUMP_BY_UART_CLOSE();
 
@@ -5020,6 +5057,24 @@ aud_tras_drv_codec_init_exit:
 
 }
 
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+static void spk_notify_timer_callback(void *param, void *param1)
+{
+    if (!aud_tras_drv_info.voc_info.spk_play_finish_notify)
+    {
+        return;
+    }
+
+    LOGI("%s\n", __func__);
+
+    aud_tras_drv_info.voc_info.spk_notify_complete = true;
+
+    spk_play_finish_msg.event = EVENT_AUD_SPK_PLAY_FINISH_NOTIFY;
+    spk_play_finish_msg.param = 0;
+    msg_send_notify_to_media_major_mailbox(&spk_play_finish_msg, APP_MODULE);
+}
+#endif
+
 /* audio transfer driver voice mode init */
 static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 {
@@ -5091,6 +5146,13 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 	aud_tras_drv_info.voc_info.spk_en = voc_cfg->spk_en;
 	aud_tras_drv_info.voc_info.mic_type = voc_cfg->mic_type;
 	aud_tras_drv_info.voc_info.spk_type = voc_cfg->spk_type;
+
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+    aud_tras_drv_info.voc_info.spk_play_finish_notify = voc_cfg->spk_play_finish_notify;
+    aud_tras_drv_info.voc_info.usr_data = voc_cfg->usr_data;
+    aud_tras_drv_info.voc_info.spk_notify_complete = false;
+    aud_tras_drv_info.voc_info.write_spk_data_state = true;
+#endif
 
 	if (aud_tras_drv_info.voc_info.mic_type == AUD_INTF_MIC_TYPE_BOARD) {
 		/* get audio adc config */
@@ -5485,6 +5547,18 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
         goto aud_tras_drv_voc_init_exit;
     }
     #endif
+
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+    if (aud_tras_drv_info.voc_info.spk_play_finish_notify)
+    {
+        ret = rtos_init_oneshot_timer(&aud_tras_drv_info.voc_info.spk_notify_timer, aud_tras_drv_info.voc_info.aud_codec_setup.dec_frame_len_in_ms, spk_notify_timer_callback, NULL, NULL);
+        if (ret != BK_OK)
+        {
+            LOGE("%s, %d, init speaker notify timer fail \n", __func__, __LINE__);
+            goto aud_tras_drv_voc_init_exit;
+        }
+    }
+#endif
 
     AEC_DATA_DUMP_BY_UART_OPEN();
     SPK_DATA_DUMP_BY_UART_OPEN();
@@ -6458,6 +6532,28 @@ static bk_err_t aud_tras_drv_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_
 }
 #endif
 
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+static bk_err_t aud_tras_drv_set_write_spk_data_state(bool en)
+{
+    LOGI("%s, %d, en: %d\n", __func__, __LINE__, en);
+
+    if (aud_tras_drv_info.voc_info.write_spk_data_state == en)
+    {
+        return BK_OK;
+    }
+
+    if (aud_tras_drv_info.voc_info.write_spk_data_state && aud_tras_drv_info.voc_info.spk_notify_timer.handle)
+    {
+        rtos_stop_oneshot_timer(&aud_tras_drv_info.voc_info.spk_notify_timer);
+        aud_tras_drv_info.voc_info.spk_notify_complete = false;
+    }
+
+    aud_tras_drv_info.voc_info.write_spk_data_state = en;
+
+    return BK_OK;
+}
+#endif
+
 void aud_tras_update_sys_config_para(app_aud_sys_config_t *sys_config_para_ptr)
 {
 	app_aud_sys_config_t *config_para_ptr = &aud_para.sys_config_voice;
@@ -6825,6 +6921,15 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
                     aud_tras_drv_set_spk_source_type((spk_source_type_t)msg.param);
                     break;
 #endif
+
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+                case AUD_TRAS_DRV_VOC_SET_WRITE_SPK_DATA_STATE:
+                    mailbox_msg = (media_mailbox_msg_t *)msg.param;
+                    ret = aud_tras_drv_set_write_spk_data_state((bool)mailbox_msg->param);
+                    msg_send_rsp_to_media_major_mailbox(mailbox_msg, ret, APP_MODULE);
+                    break;
+#endif
+
                 case AUD_TRAS_DRV_VOC_SET_VAD_ENABLE:
                     mailbox_msg = (media_mailbox_msg_t *)msg.param;
                     #if CONFIG_AEC_VERSION_V3
@@ -7642,6 +7747,12 @@ bk_err_t audio_event_handle(media_mailbox_msg_t * msg)
 
         case EVENT_AUD_VOC_STOP_PROMPT_TONE_REQ:
             aud_tras_drv_send_msg(AUD_TRAS_STOP_PROMPT_TONE_REQ, (void *)msg);
+            break;
+#endif
+
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+        case EVENT_AUD_VOC_SET_WRITE_SPK_DATA_STATE_REQ:
+            aud_tras_drv_send_msg(AUD_TRAS_DRV_VOC_SET_WRITE_SPK_DATA_STATE, (void *)msg);
             break;
 #endif
 

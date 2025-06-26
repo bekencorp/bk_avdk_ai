@@ -652,6 +652,10 @@ bk_err_t bk_aud_intf_voc_play_prompt_tone(aud_intf_voc_prompt_tone_t prompt_tone
 bk_err_t bk_aud_intf_voc_stop_prompt_tone(void);
 #endif
 
+#if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+bk_err_t bk_aud_intf_voc_write_spk_data_ctrl(bool en);
+#endif
+
 uint8_t bk_aud_intf_get_aec_vad_flag(void);
 void bk_aud_intf_clear_aec_vad_flag(void);
 void bk_aud_intf_clear_aec_slience_flag(void);

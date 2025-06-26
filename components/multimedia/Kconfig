@@ -333,4 +333,8 @@ menu "Media"
 	config AUD_INTF_SUPPORT_MP3
 		bool "Enable Aud intf support MP3 data type,only for decodeing"
 		default n
+
+	config AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
+		bool "Enable Aud intf support speaker data play finish notify"
+		default n
 endmenu
