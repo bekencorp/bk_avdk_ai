@@ -8,7 +8,7 @@ set(EXTRA_COMPONENTS_DIRS
     $ENV{ARMINO_PATH}/../components/audio_codec/opus_demo
     $ENV{ARMINO_PATH}/../components/codec/
     $ENV{ARMINO_PATH}/../components/include/avdk
-    $ENV{ARMINO_PATH}/../components/bk_thirdparty
+    #$ENV{ARMINO_PATH}/../components/bk_thirdparty
     $ENV{ARMINO_PATH}/../components/multimedia
 	$ENV{ARMINO_PATH}/../components/avdk_utils
     $ENV{ARMINO_PATH}/../properties/modules

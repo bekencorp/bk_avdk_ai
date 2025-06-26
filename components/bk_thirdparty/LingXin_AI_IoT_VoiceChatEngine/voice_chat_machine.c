@@ -1,4 +1,11 @@
 #include "voice_chat_machine.h"
+#include "components/log.h"
+
+#define TAG "chat_mach"
+#define LOGI(...) BK_LOGI(TAG, ##__VA_ARGS__)
+#define LOGE(...) BK_LOGE(TAG, ##__VA_ARGS__)
+#define LOGW(...) BK_LOGW(TAG, ##__VA_ARGS__)
+#define LOGD(...) BK_LOGD(TAG, ##__VA_ARGS__)
 
 typedef enum
 {
@@ -19,7 +26,7 @@ static ChatState chat_last_state = State_Idle;
 // 开始对话逻辑
 static void wanson_voiceChatContinueCallback()
 {
-    printf("0.0.6 dlu:2-1 wanson_voiceChatContinueCallback\n");
+    LOGI("0.0.6 dlu:2-1 wanson_voiceChatContinueCallback\n");
 
     state_machine_run_event(State_Event_VoiceChat_StartEnd);
 }
@@ -48,7 +55,7 @@ static const inline char *get_chat_state_description(ChatState state)
     case State_BufferPlay_EndTask:
         return "State_BufferPlay_EndTask 结束一轮对话";
     default:
-        printf("%s 未知状态 %d", __func__, state);
+        LOGI("%s 未知状态 %d", __func__, state);
         return "未知状态";
     }
 }
@@ -88,7 +95,7 @@ static const inline char *get_wakeup_event_description(StateEvent event)
     case State_Event_Record_TerminateEnd:
         return "State_Event_Record_TerminateEnd 录音模块打断事件";
     default:
-        printf("%s 未知事件 %d", __func__, event);
+        LOGI("%s 未知事件 %d\r\n", __func__, event);
         return "未知事件";
     }
 }
@@ -114,7 +121,7 @@ static void updateChatState(ChatState state, StateEvent event)
     chat_last_state = chat_current_state;
 
     chat_current_state = state;
-    printf("%s 从 %s 更新到 %s, 触发事件: %s", __func__, get_chat_state_description(chat_last_state), get_chat_state_description(chat_current_state), get_wakeup_event_description(event));
+    LOGI("%s 从 %s 更新到 %s, 触发事件: %s\r\n", __func__, get_chat_state_description(chat_last_state), get_chat_state_description(chat_current_state), get_wakeup_event_description(event));
 }
 
 static void startTerminate(StateEvent event)
@@ -134,7 +141,7 @@ static void startTerminate(StateEvent event)
     }
     else
     {
-        printf("打断事件未执行完, isTerminate:%d ,isSdkTerminate:%d ,isRecordTerminate:%d ,isAudioBufferTerminate:%d ,", isTerminate, isSdkTerminate, isRecordTerminate, isAudioBufferTerminate);
+        LOGI("打断事件未执行完, isTerminate:%d ,isSdkTerminate:%d ,isRecordTerminate:%d ,isAudioBufferTerminate:%d ,\r\n", isTerminate, isSdkTerminate, isRecordTerminate, isAudioBufferTerminate);
     }
 }
 
@@ -144,7 +151,7 @@ static void startTerminate(StateEvent event)
 // 事件流转
 void state_machine_run_event(StateEvent event)
 {
-    printf("%s 接受到事件 %s", __func__, get_wakeup_event_description(event));
+    LOGI("%s 接受到事件 %s\r\n", __func__, get_wakeup_event_description(event));
     switch (event)
     {
     case State_Event_Wakeup_Detected:
@@ -153,7 +160,7 @@ void state_machine_run_event(StateEvent event)
         if (chat_current_state == State_Idle)
         {
             // 首次唤醒
-            printf("首次唤醒 %s", get_wakeup_event_description(event));
+            LOGI("首次唤醒 %s\r\n", get_wakeup_event_description(event));
 
             // 唤醒态 更新到 Start
             updateChatState(State_Start, event);
@@ -166,7 +173,7 @@ void state_machine_run_event(StateEvent event)
         }
         else
         {
-            printf("打断唤醒 %s", get_wakeup_event_description(event));
+            LOGI("打断唤醒 %s\r\n", get_wakeup_event_description(event));
             // 打断唤醒 群发消息
             isTerminate = true;
 
@@ -187,7 +194,7 @@ void state_machine_run_event(StateEvent event)
         updateChatState(State_Started, event);
 
         // 播放叮咚
-        printf("%s 调用 playDingDongAudio", __func__);
+        LOGI("%s 调用 playDingDongAudio\r\n", __func__);
         playDingDongAudio();
 
         // 更新主控权
@@ -326,7 +333,7 @@ void state_machine_run_event(StateEvent event)
         {
 
             // 完整的停止逻辑
-            printf("播放退出唤醒语音，对话结束");
+            LOGI("播放退出唤醒语音，对话结束\r\n");
             updateChatState(State_Idle, event);
 
             return;
@@ -355,7 +362,7 @@ void state_machine_run_event(StateEvent event)
             return;
         }
 
-        printf("VoiceChat打断结束");
+        LOGI("VoiceChat打断结束\r\n");
         isSdkTerminate = true;
 
         startTerminate(event);
@@ -388,7 +395,7 @@ void state_machine_run_event(StateEvent event)
     }
     default:
     {
-        printf("%s 事件 %s", __func__, get_wakeup_event_description(event));
+        LOGI("%s 事件 %s\r\n", __func__, get_wakeup_event_description(event));
         break;
     }
     }
@@ -402,17 +409,17 @@ void state_machine_receive_mp3_data(void *buf, int rlen)
         return;
     }
 
-    printf("%s 状态值不对，当前状态是 %s", __func__, get_chat_state_description(chat_current_state));
+    LOGI("%s 状态值不对，当前状态是 %s\r\n", __func__, get_chat_state_description(chat_current_state));
 }
 
-void state_machine_post_record_data(void *buf, int rlen)
+int state_machine_post_record_data(void *buf, int rlen)
 {
     if (chat_current_state != State_Binary_Transfe)
     {
-        printf("%s 状态值不对，当前状态是 %s", __func__, get_chat_state_description(chat_current_state));
-        return;
+        LOGE("%s 状态值不对，当前状态是 %s\r\n", __func__, get_chat_state_description(chat_current_state));
+        return -1;
     }
-    voiceChatSendAudio(buf, (int)rlen);
+    return voiceChatSendAudio(buf, (int)rlen);
 }
 
 /**

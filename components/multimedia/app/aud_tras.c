@@ -463,7 +463,11 @@ bk_err_t aud_tras_init(aud_tras_setup_t *setup_cfg)
 								 4,
 								 "aud_tras",
 								 (beken_thread_function_t)aud_tras_main,
+#if CONFIG_LINGXIN_AI_EN
+								 1024 * 4,
+#else
 								 1024 * 2,
+#endif
 								 (beken_thread_arg_t)&aud_trs_setup_bk);
 		if (ret != kNoErr)
 		{

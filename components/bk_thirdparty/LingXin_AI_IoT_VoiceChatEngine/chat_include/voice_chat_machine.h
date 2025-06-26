@@ -51,7 +51,7 @@ typedef enum {
 void state_machine_run_event(StateEvent event);
 
 // 录音数据转发
-void state_machine_post_record_data(void *buf, int rlen);
+int state_machine_post_record_data(void *buf, int rlen);
 
 // 接受SDK的数据
 void state_machine_receive_mp3_data(void *buf, int rlen);

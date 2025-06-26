@@ -14,7 +14,7 @@ void extract_filename_core(const char *path, char *result, size_t result_size);
 bool voiceChatContinueCheck(ContinueCheckCallback callback, ErrorCallback errorCallback);
 bool voiceChatTerminateCheck(TerminateCheckCallback callback, ErrorCallback errorCallback);
 
-void voiceChatSendAudio(void *buf, int rlen);
+int voiceChatSendAudio(void *buf, int rlen);
 void voiceChatStopSendAudio();
 bool isVoiceChatResponding();
 bool isVoiceChatInited();

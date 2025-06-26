@@ -17,10 +17,10 @@ list(APPEND srcs
 			#chat_jieli_module/record/audio_recorder.c
 			#chat_jieli_module/sdk_module/voice_chat_engine.c
 			voice_chat_machine.c
+			voice_chat_engine.c
 )
 endif()
-
-armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES bk_common lwip_intf_v2_1 bk_vfs mbedtls psa_mbedtls)
+armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES bk_common lwip_intf_v2_1 bk_vfs mbedtls psa_mbedtls audio_engine multimedia)
 
 if (CONFIG_LINGXIN_AI_EN)
 get_filename_component(lib_name ${CMAKE_CURRENT_SOURCE_DIR}/chat_base_sdk/lib/libAI_IOT_SDK.a NAME)

@@ -1,10 +1,15 @@
 #include "sdk_websocket.h"
 #include "bk_websocket_client.h"
-
+#include "components/log.h"
 #include <locale.h>
 
 #define BK_SEND_TIMEOUT 10 * 1000
-#define logOut bk_printf
+#define TAG "ws_cust"
+#define LOGI(...) BK_LOGI(TAG, ##__VA_ARGS__)
+#define LOGE(...) BK_LOGE(TAG, ##__VA_ARGS__)
+#define LOGW(...) BK_LOGW(TAG, ##__VA_ARGS__)
+#define LOGD(...) BK_LOGD(TAG, ##__VA_ARGS__)
+
 extern  char *snprintfWithMalloc(const char *format, ...);
 
 typedef struct
@@ -19,12 +24,12 @@ static WebsocketClientHandler *getClientHandler(WebsocketClient *client)
 {
   if (!client)
   {
-    logOut("getClientHandler client  null");
+    LOGE("getClientHandler client  null\r\n");
     return NULL;
   }
   if (!client->clientHandler)
   {
-    logOut("getClientHandler clientHandler null");
+    LOGE("getClientHandler clientHandler null\r\n");
     return NULL;
   }
   return (WebsocketClientHandler *)client->clientHandler;
@@ -34,36 +39,36 @@ static void freeWebsocketClient(WebsocketClient *client)
 {
   if (!client)
   {
-    logOut("freeWebsocketClient client null");
+    LOGE("freeWebsocketClient client null");
     return;
   }
-  logOut("free clientHandler");
+  LOGI("free clientHandler\r\n");
   if (client->clientHandler)
   {
     free(client->clientHandler);
     client->clientHandler = NULL;
   }
-  logOut("free client");
+  LOGD("free client\r\n");
   free(client);
   //client = NULL;
-  logOut("after free client");
+  LOGD("after free client\r\n");
 }
 
 static WebSocketEventListener getWebSocketEventListener(WebsocketClient *client)
 {
   if (!client)
   {
-    logOut("getListener client null");
+    LOGE("getListener client null\r\n");
     return NULL;
   }
   if (!client->config)
   {
-    logOut("getListener client config null");
+    LOGE("getListener client config null\r\n");
     return NULL;
   }
   if (!client->config->listener)
   {
-    logOut("getListener client config listener null");
+    LOGE("getListener client config listener null\r\n");
     return NULL;
   }
   return client->config->listener;
@@ -76,27 +81,27 @@ void websocket_event_handler(void *event_handler_arg, char *event_base, int32_t 
 
   if (client)
   {
-    logOut("data->user_contex not null, %0x", client);
+    LOGD("data->user_contex not null, %0x\r\n", client);
   }
   else
   {
-    logOut("data->user_contex  null");
+    LOGD("data->user_contex  null\r\n");
   }
   WebsocketClient *client1 = ((transport)event_handler_arg)->config->user_context;
   if (client1)
   {
-    logOut("client->user_contex not null, %0x", client1);
+    LOGD("client->user_contex not null, %0x\r\n", client1);
   }
   else
   {
-    logOut("client->user_contex  null");
+    LOGD("client->user_contex  null\r\n");
   }
 
   switch (event_id)
   {
   case WEBSOCKET_EVENT_CONNECTED:
   {
-    logOut("Connected to WebSocket server");
+    LOGI("Connected to WebSocket server\r\n");
     WebSocketEventListener listener = getWebSocketEventListener(globalClient);
     if (listener)
     {
@@ -141,7 +146,7 @@ void websocket_event_handler(void *event_handler_arg, char *event_base, int32_t 
 
   case WEBSOCKET_EVENT_DATA:
   {
-    logOut("data from WebSocket server, len:%d op:%d", data->data_len, data->op_code);
+    LOGD("data from WebSocket server, len:%d op:%d\r\n", data->data_len, data->op_code);
     WebSocketEventListener listener = getWebSocketEventListener(globalClient);
     if (listener)
     {
@@ -158,7 +163,7 @@ void websocket_event_handler(void *event_handler_arg, char *event_base, int32_t 
   }
 
   case WEBSOCKET_EVENT_CLOSED:
-    logOut("WEBSOCKET_EVENT_CLOSED");
+    LOGI("WEBSOCKET_EVENT_CLOSED\r\n");
     break;
   default:
     break;
@@ -170,7 +175,7 @@ WebsocketClient *initWebsocket(WebsocketConfig *config)
   globalClient = (WebsocketClient *)malloc(sizeof(WebsocketClient));
   if (!globalClient)
   {
-    logOut("Failed to allocate memory for WebSocket client");
+    LOGE("Failed to allocate memory for WebSocket client\r\n");
     return NULL;
   }
 
@@ -178,7 +183,7 @@ WebsocketClient *initWebsocket(WebsocketConfig *config)
       (WebsocketClientHandler *)malloc(sizeof(WebsocketClientHandler));
   if (!handler)
   { // 添加空指针检查
-    logOut("Failed to allocate memory for WebSocket client handler");
+    LOGE("Failed to allocate memory for WebSocket client handler\r\n");
     free(globalClient);
     return NULL;
   }
@@ -203,7 +208,7 @@ WebsocketClient *initWebsocket(WebsocketConfig *config)
   handler->wsiDestroyFromClose = false;
   handler->bk_rtc_client = websocket_client_init(&websocket_cfg);
 
-  logOut("success connect to %s:%d/%s", config->host, config->port, config->path);
+  LOGI("success connect to %s:%d/%s\r\n", config->host, config->port, config->path);
   return globalClient;
 }
 
@@ -212,12 +217,12 @@ void startWebsocket(WebsocketClient *client)
   WebsocketClientHandler *clientHandler = getClientHandler(client);
   if (!clientHandler)
   {
-    logOut("startWebsocket, clientHandler or context null");
+    LOGE("startWebsocket, clientHandler or context null\r\n");
     return;
   }
 
   int result = websocket_client_start(clientHandler->bk_rtc_client);
-  logOut("startWebsocket, result: %d", result);
+  LOGD("startWebsocket, result: %d\r\n", result);
 }
 
 bool websocketSendText(WebsocketClient *client, const char *message)
@@ -226,66 +231,66 @@ bool websocketSendText(WebsocketClient *client, const char *message)
 
   if (!clientHandler || !clientHandler->bk_rtc_client)
   {
-    logOut("websocketSendText, clientHandler or bk_rtc_client null");
+    LOGE("websocketSendText, clientHandler or bk_rtc_client null\r\n");
     return false;
   }
   if (client->isWebsocketDestroyed)
   {
-    logOut("WebsocketClient has been destroyed");
+    LOGE("WebsocketClient has been destroyed\r\n");
     return false;
   }
-  logOut("websocketSendText begin: %s", message);
+  LOGD("websocketSendText begin: %s\r\n", message);
   size_t message_len = strlen(message);
   int result = websocket_client_send_text(clientHandler->bk_rtc_client, message, message_len, BK_SEND_TIMEOUT);
 
-  logOut("websocketSendText finish, result: %d", result);
+  LOGD("websocketSendText finish, result: %d\r\n", result);
   return result > 0;
 }
 
 void closeWebsocket(WebsocketClient *client)
 {
-  logOut("closeWebsocket before");
+  LOGD("closeWebsocket before\r\n");
 
   WebsocketClientHandler *clientHandler = getClientHandler(client);
   if (!clientHandler)
   {
-    logOut("closeWebsocket params null");
+    LOGE("closeWebsocket params null\r\n");
     return;
   }
   if (client->isWebsocketDestroyed)
   {
-    logOut("client has been destroyed");
+    LOGE("client has been destroyed\r\n");
     return;
   }
   clientHandler->wsiDestroyFromClose = true;
   client->isWebsocketDestroyed = true;
   websocket_client_destroy(clientHandler->bk_rtc_client);
-  logOut("closeWebsocket after websocket_client_destroy");
+  LOGD("closeWebsocket after websocket_client_destroy\r\n");
 }
 
 int websocketSendBinary(WebsocketClient *client, const char *audioData, size_t dataSize)
 {
   if (!audioData || !dataSize)
   {
-    logOut("websocketSendBinary Invalid parameters");
+    LOGE("websocketSendBinary Invalid parameters\r\n");
     return 0;
   }
 
   WebsocketClientHandler *clientHandler = getClientHandler(client);
   if (!clientHandler || !clientHandler->bk_rtc_client)
   {
-    logOut("websocketSendBinary Invalid clientHandler");
+    LOGE("websocketSendBinary Invalid clientHandler\r\n");
     return 0;
   }
   if (client->isWebsocketDestroyed)
   {
-    logOut("websocketSendBinary has been destroyed");
+    LOGE("websocketSendBinary has been destroyed\r\n");
     return 0;
   }
   int bytesWritten = websocket_client_send_binary(clientHandler->bk_rtc_client, audioData, dataSize, BK_SEND_TIMEOUT);
   if (bytesWritten < 0)
   {
-    logOut("Failed to send binary data， %d", bytesWritten);
+    LOGE("Failed to send binary data， %d\r\n", bytesWritten);
     return 0;
   }
   return (int)dataSize;

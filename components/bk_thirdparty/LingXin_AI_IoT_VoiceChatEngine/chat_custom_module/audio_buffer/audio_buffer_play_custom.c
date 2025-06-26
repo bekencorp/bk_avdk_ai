@@ -1,35 +1,346 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <components/system.h>
+#include <os/os.h>
+#include <os/mem.h>
+#include <os/str.h>
+#include <common/bk_err.h>
 #include "../../chat_include/chat_module_config.h"
 #include "../../chat_include/audio_buffer_play.h"
+#include "../../chat_include/voice_chat_machine.h"
+#include <aud_intf.h>
+#include "audio_engine.h"
+
+#define TAG "lx_play"
+#define LOGI(...) BK_LOGI(TAG, ##__VA_ARGS__)
+#define LOGE(...) BK_LOGE(TAG, ##__VA_ARGS__)
+#define LOGW(...) BK_LOGW(TAG, ##__VA_ARGS__)
+#define LOGD(...) BK_LOGD(TAG, ##__VA_ARGS__)
 
 #ifdef CONFIG_AUDIO_BUFFER_CUSTOM_ENABLE
 
+typedef struct {
+    uint8_t *buffer;
+    size_t size;
+    size_t read_index;
+    size_t write_index;
+    size_t *length_buffer;
+    size_t length_read_index;
+    size_t length_write_index;
+    size_t buffer_count;
+} data_buffer_t;
+
+typedef struct {
+    data_buffer_t *ring_buffer;
+    beken_timer_t data_read_tmr;
+    audio_info_t info;
+    uint8_t running_state; //1:playing / 0:terminate
+    beken_mutex_t lock; //TODO if needed
+} play_config_t;
+
+play_config_t *play_info = NULL;
+#define WSS_AUDIO_BUFFER_SIZE (980*1024)
+
 // 实现自定义的逻辑
+data_buffer_t *play_data_buffer_init (size_t buffer_size, size_t length_buffer_size) {
+#if CONFIG_PSRAM_AS_SYS_MEMORY
+    data_buffer_t *rb = (data_buffer_t *)psram_malloc(sizeof(data_buffer_t));
+#else
+    data_buffer_t *rb = (data_buffer_t *)os_malloc(sizeof(data_buffer_t));
+#endif
+    if (rb == NULL)
+    {
+        LOGE("malloc rb fail\n");
+        return NULL;
+    }
+    memset(rb, 0, sizeof(data_buffer_t));
+#if CONFIG_PSRAM_AS_SYS_MEMORY
+    rb->buffer = (uint8_t*) psram_malloc (buffer_size);
+#else
+    rb->buffer = (uint8_t*) os_malloc (buffer_size);
+#endif
+    if (rb->buffer == NULL)
+    {
+        LOGE("malloc buffer_size fail\n");
+        os_free(rb);
+        return NULL;
+    }
+
+    memset(rb->buffer, 0, buffer_size);
+    rb->size = buffer_size;
+    rb->read_index = 0;
+    rb->write_index = 0;
+#if CONFIG_PSRAM_AS_SYS_MEMORY
+    rb->length_buffer = (size_t*) psram_malloc (length_buffer_size * sizeof (size_t));
+#else
+    rb->length_buffer = (size_t*) os_malloc (length_buffer_size * sizeof (size_t));
+#endif
+    if (rb->length_buffer == NULL)
+    {
+        LOGE("malloc length_buffer fail\n");
+        os_free(rb);
+        os_free(rb->buffer);
+        return NULL;
+    }
+    memset((size_t*)rb->length_buffer, 0, length_buffer_size * sizeof (size_t));
+    rb->length_read_index = 0;
+    rb->length_write_index = 0;
+    rb->buffer_count = length_buffer_size;
+    LOGE("ringbuffer size:%d ringbuffer max count:%d\n", buffer_size, length_buffer_size);
+    return rb;
+}
+
+void play_data_buffer_deinit(data_buffer_t *rb) {
+
+    if (rb == NULL)
+    {
+        LOGE("buffer deinit already\n");
+        return;
+    }
+
+    if (rb->buffer)
+    {
+        os_free(rb->buffer);
+    }
+
+    if (rb->length_buffer)
+    {
+        os_free (rb->length_buffer);
+    }
+
+    memset(rb, 0, sizeof(data_buffer_t));
+    if (rb)
+    {
+        os_free(rb);
+    }
+}
+
+void play_data_buffer_write (data_buffer_t* rb, const uint8_t *data, size_t data_len) {
+
+    size_t remaining = rb->size - rb->write_index;
+    if ((rb->length_write_index + 1) % rb->buffer_count == rb->length_read_index) {
+        LOGE("%s, write buffer fail length_write_index:%d write_index:%d read_index:%d data_len:%d\r\n",
+            __func__, rb->length_write_index, rb->write_index, rb->read_index, data_len);
+        return;
+    }
+
+    if (data_len <= remaining) {
+        memcpy (&rb->buffer [rb->write_index], data, data_len);
+        rb->write_index += data_len;
+    } else {
+        size_t first_part = remaining;
+        memcpy (&rb->buffer [rb->write_index], data, first_part);
+        size_t second_part = data_len - first_part;
+        memcpy (rb->buffer, &data [first_part], second_part);
+        rb->write_index = second_part;
+    }
+    rb->length_buffer [rb->length_write_index] = data_len;
+    rb->length_write_index = (rb->length_write_index + 1) % rb->buffer_count;
+}
+
+size_t play_data_buffer_read(data_buffer_t *rb, uint8_t *output) {
+
+    if ((rb->length_read_index == rb->length_write_index) && (rb->read_index == rb->write_index)) {
+        return 0;
+    }
+    size_t data_len = rb->length_buffer [rb->length_read_index];
+    size_t available = (rb->write_index >= rb->read_index)? (rb->write_index - rb->read_index) : (rb->size - rb->read_index + rb->write_index);
+    if (available < data_len) {
+        return 0;
+    }
+    if (rb->write_index >= rb->read_index) {
+        memcpy (output, &rb->buffer [rb->read_index], data_len);
+        rb->read_index += data_len;
+    } else {
+        size_t first_part = rb->size - rb->read_index;
+        if (first_part >= data_len) {
+            memcpy (output, &rb->buffer [rb->read_index], data_len);
+            rb->read_index += data_len;
+        } else {
+            memcpy (output, &rb->buffer [rb->read_index], first_part);
+            size_t second_part = data_len - first_part;
+            memcpy (&output [first_part], rb->buffer, second_part);
+            rb->read_index = second_part;
+        }
+    }
+    rb->length_read_index = (rb->length_read_index + 1) % rb->buffer_count;
+    LOGD("%s length_read_index:%d length_write_index:%d write_index:%d read_index:%d available:%d data_len:%d\r\n",
+        __func__, rb->length_read_index, rb->length_write_index, rb->write_index, rb->read_index, available, data_len);
+    return data_len;
+}
+
+void play_data_check(void *param)
+{
+    play_config_t *play = (play_config_t *) param;
+    if(play == NULL) {
+        LOGE("play config null...\n");
+        return;
+    }
+    uint8_t *packet = NULL;
+    packet = os_zalloc(play->info.dec_node_size);
+    int size = 0;
+    if (packet != NULL)
+    {
+        //rtos_lock_mutex(&lock);
+        if (play->ring_buffer && (size = play_data_buffer_read(play->ring_buffer, packet))) {
+            if (play->running_state)
+                bk_aud_intf_write_spk_data(packet, size);
+            LOGD("data coming...\n");
+        } else {
+            LOGD("Buffer empty, waiting for data...\n");
+        }
+        //rtos_unlock_mutex(&lock);
+    }
+    os_free(packet);
+}
+
+int play_data_start_timeout_check(uint32_t timeout, void *param)
+{
+    bk_err_t err = kNoErr;
+    play_config_t *play = (play_config_t *) param;
+    if(play == NULL) {
+        LOGE("play config null...\n");
+        return BK_FAIL;
+    }
+
+    LOGI("ring_data status timer start!!! dectype:%s\n", play->info.decoding_type);
+    err = rtos_init_timer(&(play->data_read_tmr), timeout, (timer_handler_t)play_data_check, param);
+
+    BK_ASSERT(kNoErr == err);
+    err = rtos_start_timer(&(play->data_read_tmr));
+    BK_ASSERT(kNoErr == err);
+    LOGI("ring_data status timer:%d\n", timeout);
+
+    return BK_OK;
+}
+
+void play_data_stop_timeout_check(beken_timer_t *data_read_tmr)
+{
+    if(!data_read_tmr->handle) {
+        LOGE("data_read_tmr deinit already...\n");
+        return;
+    }
+
+    if (rtos_is_timer_init(data_read_tmr)) {
+        if (rtos_is_timer_running(data_read_tmr))
+        {
+            rtos_stop_timer(data_read_tmr);
+        }
+    rtos_deinit_timer(data_read_tmr);
+    }
+}
+
+int play_data_end(void *param)
+{
+    LOGI("%s\r\n", __func__);
+    state_machine_run_event(State_Event_BufferPlay_PlayEnd);
+    return BK_OK;
+}
+
+play_config_t *Play_audioInit()
+{
+    int max_count;
+    play_config_t *play = os_zalloc(sizeof(play_config_t));
+    if (play == NULL) {
+        LOGI("malloc play_config_t fail\r\n");
+        return NULL;
+    }
+    os_memcpy(&play->info, &general_audio, sizeof(audio_info_t));
+    if (play->info.dec_node_size) {
+        play->info.dec_node_size = play->info.dec_node_size * 2.5;  //TODO, not ready, org is 1940
+        max_count = WSS_AUDIO_BUFFER_SIZE / (play->info.dec_node_size);
+        LOGI("module_bufferPlay_audioInit. enctype:%s dectype:%s adc_rate:%d dac_rate:%d enc:%d dec:%d encsize:%d decsize:%d max_count:%d\n",
+            play->info.encoding_type, play->info.decoding_type, play->info.adc_samp_rate, play->info.dac_samp_rate,
+            play->info.enc_samp_interval, play->info.dec_samp_interval, play->info.enc_node_size, play->info.dec_node_size, max_count);
+    } else {
+        LOGE("audio info error\n");
+        goto exit;
+    }
+    audio_register_play_finish_func(play_data_end);
+
+    if (play->info.decoding_type) {
+        play->ring_buffer = play_data_buffer_init(((play->info.dec_node_size) * max_count), max_count);
+        if (play->ring_buffer == NULL)
+        {
+            LOGE("%s, %d, data_buffer_init fail\n", __func__, __LINE__);
+            goto exit;
+        }
+    }
+    if (play_data_start_timeout_check(play->info.dec_samp_interval, (void *)play))
+    {
+        LOGE("%s, %d, data_start_timeout_check fail\n", __func__, __LINE__);
+        goto exit;
+    }
+    return play;
+
+exit:
+    if (play->ring_buffer)
+        play_data_buffer_deinit(play->ring_buffer);
+    if (play)
+        os_free(play);
+    return NULL;
+}
+
+void Play_audioDeinit(play_config_t *play)
+{
+    if(play == NULL) {
+        LOGE("play_config_t aleady null\r\n");
+        return;
+    }
+    play_data_stop_timeout_check(&play->data_read_tmr);
+    play_data_buffer_deinit(play->ring_buffer);
+    play->ring_buffer = NULL;
+    if (play) {
+        os_free(play);
+    }
+}
 
 // 功能：在方法里面实现模块的初始化逻辑。并且Chat套件内核会多次回调这个方法，如果当前模块已经初始化成功，可直接回调初始化成功的回调事件。
 // 调用时机：由chat套件内核发起调用，客户实现
 void module_bufferPlay_audioInit()
 {
-
+     LOGI("module_bufferPlay_audioInit\n");
+     if (play_info == NULL) {
+        play_info = Play_audioInit();
+     }
+     play_info->running_state = 1;
+     bk_aud_intf_voc_write_spk_data_ctrl(1);
+     state_machine_run_event(State_Event_BufferPlay_AudioInitEnd);
 }
 
 // buf为mp3数据 rlen为当前数据长度
 void module_bufferPlay_data(void *buf, int rlen)
 {
-
+    if (rlen > (play_info->info.dec_node_size)) {
+        LOGE("data too large, dropping packet!!!!! len:%d limit:%d\n", rlen, general_audio.dec_node_size);
+        return;
+    }
+    LOGD("%s rlen:%d\n", __func__, rlen);
+    if (play_info->ring_buffer) {
+        play_data_buffer_write(play_info->ring_buffer, buf, rlen);
+    }
 }
 
 // 功能：指Chat套件内核调用流式播放模块告诉他已经没有流式播放数据了，并非要立刻停止播放。
 // 调用时机：由chat套件内核发起调用，客户实现
 void module_bufferPlay_audioEnd()
 {
-
+    LOGI("module_bufferPlay_audioEnd\n");
+    bk_aud_intf_voc_write_spk_data_ctrl(0);
 }
 
 // 功能：停止当前的播放逻辑
 // 调用时机：由chat套件内核发起调用，客户实现
 void module_bufferPlay_terminate()
 {
-    
+    //Play_audioDeinit(play_info);
+    //play_info = NULL;
+    LOGI("module_bufferPlay_terminate\n");
+    if (play_info)
+        play_info->running_state = 0;
+    state_machine_run_event(State_Event_BufferPlay_TerminateEnd);
 }
 
 #endif

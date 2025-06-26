@@ -2708,7 +2708,7 @@ static int mp3_dec_process(mp3_decoder_context_t *mp3_dec, char *buffer, uint32_
                 {
                     mp3_dec->bytes_left --;
                     mp3_dec->read_ptr ++;
-                    LOGE("ERR_MP3 unknow.skip this frame!\n");
+                    LOGE("ERR_MP3 unknow.skip this frame! %d\n",err);
                 }
                 else
                 {
