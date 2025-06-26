@@ -24,6 +24,7 @@
 #endif //CONFIG_AUD_TRAS_AEC_DUMP_MODE_TF
 #endif //CONFIG_AUD_TRAS_AEC_DUMP_DEBUG
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -367,6 +367,14 @@ typedef struct {
                                                  },                                             \
                         }
 
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
+typedef struct
+{
+    char *url;
+    uint32_t total_len;
+} prompt_tone_url_info_t;
+#endif
+
 #ifdef __cplusplus
 }
 #endif
