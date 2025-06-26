@@ -209,6 +209,12 @@ endif()#CONFIG_MEDIA_MINOR
 endif()#(CONFIG_CPU_CNT GREATER 1)
 
 if (CONFIG_MEDIA_MAJOR)
+if (CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE)
+	list(APPEND srcs
+		aud/audio_act.c
+	)
+endif()
+
 if (CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE)
 	list(APPEND incs prompt_tone_play/include)
 

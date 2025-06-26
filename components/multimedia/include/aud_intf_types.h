@@ -79,7 +79,7 @@ typedef struct {
 	int (*aud_intf_tx_mic_data)(unsigned char *data, unsigned int size);		/**< the api is called when collecting a frame mic packet data is complete */
 	bk_err_t (*aud_intf_rx_spk_data)(unsigned int size);						/**< the api is called when playing a frame speaker packet data is complete */
 	bk_err_t (*aud_intf_update_vad_flag)(unsigned char flag);						
-	} aud_intf_drv_setup_t;
+} aud_intf_drv_setup_t;
 
 #define DEFAULT_AUD_INTF_DRV_SETUP_CONFIG() {          \
         .work_mode = AUD_INTF_WORK_MODE_NULL,          \
@@ -253,6 +253,33 @@ typedef enum {
 	AUD_INTF_VOC_SPK_MAX,
 } aud_intf_voc_spk_ctrl_t;
 
+typedef struct
+{
+    uint8_t *data;
+    uint32_t data_len;
+    uint32_t sampl_rate;
+    uint8_t channel_num;
+    uint32_t wait_time;
+} audio_write_multiple_spk_data_req_t;
+
+typedef enum {
+    SPK_SOURCE_TYPE_VOICE = 0,
+    SPK_SOURCE_TYPE_PROMPT_TONE,
+    SPK_SOURCE_TYPE_MUSIC,
+    SPK_SOURCE_TYPE_MAX,
+} spk_source_type_t;
+
+typedef struct {
+    int channel_number;
+    int sample_rate;
+    int sample_bits;
+} aud_info_t;
+
+typedef struct {
+    spk_source_type_t type;
+    aud_info_t spk_info;
+} aud_spk_source_info_t;
+
 typedef struct {
     uint32_t adc_samp_rate;
     uint32_t enc_bitrate;
@@ -339,7 +366,6 @@ typedef struct {
                                                    .decoder_type = AUD_INTF_VOC_DATA_TYPE_G722  \
                                                  },                                             \
                         }
-
 
 #ifdef __cplusplus
 }

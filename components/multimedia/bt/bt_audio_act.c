@@ -94,6 +94,7 @@ static beken_semaphore_t s_bt_audio_sema = NULL;
 static uint8_t s_bt_audio_task_run;
 static aud_rsp_cfg_t s_rsp_cfg_final;
 static beken_queue_t s_bt_audio_msg_que = NULL;
+static aud_spk_source_info_t s_a2dp_music_spk_src_info = {0};
 
 static void bt_audio_task(void *arg)
 {
@@ -154,7 +155,8 @@ static void bt_audio_task(void *arg)
                 if (!final)
                 {
                     write_count = 0;
-                    ret = aud_tras_drv_voc_set_spk_source_type(SPK_SOURCE_TYPE_VOICE);
+                    s_a2dp_music_spk_src_info.type = SPK_SOURCE_TYPE_VOICE;
+                    ret = aud_tras_drv_voc_set_spk_source_type(&s_a2dp_music_spk_src_info);
                     tone_status = TONE_STATUS_IDLE;
                 }
 
@@ -210,7 +212,11 @@ static void bt_audio_task(void *arg)
                 if (write_count >= 2 && tone_status == TONE_STATUS_WAIT_ENABLE)
                 {
                     LOGI("try aud_tras_drv_control_prompt_tone_play");
-                    ret = aud_tras_drv_voc_set_spk_source_type(SPK_SOURCE_TYPE_A2DP);
+                    s_a2dp_music_spk_src_info.type = SPK_SOURCE_TYPE_MUSIC;
+                    s_a2dp_music_spk_src_info.spk_info.channel_number = 1;
+                    s_a2dp_music_spk_src_info.spk_info.sample_bits = 16;
+                    s_a2dp_music_spk_src_info.spk_info.sample_rate = req->sampl_rate;
+                    ret = aud_tras_drv_voc_set_spk_source_type(&s_a2dp_music_spk_src_info);
                     if (ret)
                     {
                         LOGE("aud_tras_drv_control_prompt_tone_play enable err %d !!!", ret);

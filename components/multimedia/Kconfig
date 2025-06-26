@@ -214,17 +214,17 @@ menu "Media"
 
     config AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
         depends on AUD_INTF_SUPPORT_AI_DIALOG_FREE
-        bool "Enable supoort multiple speaker sources, for example prompt tone, a2dp music"
+        bool "Enable support multiple speaker sources, for example prompt tone, a2dp music"
         default n
 
-    config AUD_INTF_SUPPORT_BLUETOOTH_A2DP
+    config AUD_INTF_SUPPORT_MUSIC_SPK_SOURCE
         depends on AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
-        bool "Enable supoort bluetooth a2dp music"
+        bool "Enable support music speaker source include bluetooth a2dp music and url mp3 music"
         default n
 
     config AUD_INTF_SUPPORT_PROMPT_TONE
 		depends on AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
-        bool "Enable supoort prompt tone"
+        bool "Enable support prompt tone"
         default n
 
 	choice PROMPT_TONE_SOURCE

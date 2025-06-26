@@ -146,8 +146,14 @@ typedef enum
     /* ASR */
     EVENT_ASR_INIT_REQ,
     EVENT_ASR_DEINIT_REQ,
-	EVENT_AUD_VOC_PLAY_PROMPT_TONE_REQ,
-	EVENT_AUD_VOC_STOP_PROMPT_TONE_REQ,
+    /* multiple speaker sources */
+    EVENT_AUDIO_ACT_INIT_REQ,
+    EVENT_AUDIO_ACT_DEINIT_REQ,
+    EVENT_AUD_VOC_PLAY_PROMPT_TONE_REQ,
+    EVENT_AUD_VOC_STOP_PROMPT_TONE_REQ,
+    EVENT_AUD_VOC_SET_SPK_SOURCE_REQ,
+    EVENT_AUD_VOC_GET_SPK_SOURCE_REQ,
+    EVENT_AUD_VOC_WRITE_MULTIPLE_SPK_SOURCE_DATA_REQ,   /**< CPU0 write pcm speaker data to multiple speaker sources ringbuffer pool */
 
 	/* UAC op */
 	EVENT_AUD_UAC_REGIS_CONT_STATE_CB_REQ,		/**< register uac mic and speaker connect state callback */

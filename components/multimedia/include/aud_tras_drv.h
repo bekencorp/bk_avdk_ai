@@ -120,6 +120,7 @@ typedef enum {
 
 #if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
     AUD_TRAS_SET_SPK_SOURCE_TYPE,
+    AUD_TRAS_WRITE_MULTIPLE_SPK_DATA,
 #endif
 
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
@@ -578,14 +579,7 @@ bk_err_t aud_tras_drv_set_dialog_run_state_by_asr_result(uint32_t asr_result);
 #endif
 
 #if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
-typedef enum {
-	SPK_SOURCE_TYPE_VOICE = 0,
-	SPK_SOURCE_TYPE_PROMPT_TONE,
-	SPK_SOURCE_TYPE_A2DP,
-	SPK_SOURCE_TYPE_MAX,
-} spk_source_type_t;
-
-bk_err_t aud_tras_drv_voc_set_spk_source_type(spk_source_type_t type);
+bk_err_t aud_tras_drv_voc_set_spk_source_type(aud_spk_source_info_t *source_info);
 spk_source_type_t aud_tras_drv_get_spk_source_type(void);
 #endif
 
@@ -606,6 +600,8 @@ void aud_cp2_ready_notify(void);
 uint8_t * aud_tras_drv_get_rsp_output_buff(void);
 uint32_t aud_tras_drv_get_dac_samp_rate(void);
 #endif
+
+bk_err_t audio_event_handle(media_mailbox_msg_t * msg);
 
 #ifdef __cplusplus
 }

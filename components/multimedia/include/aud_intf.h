@@ -1,6 +1,7 @@
 #pragma once
 
 #include "aud_intf_types.h"
+#include "aud_intf_private.h"
 #include <modules/audio_process.h>
 
 #ifdef __cplusplus
@@ -654,6 +655,13 @@ bk_err_t bk_aud_intf_voc_stop_prompt_tone(void);
 
 #if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
 bk_err_t bk_aud_intf_voc_write_spk_data_ctrl(bool en);
+#endif
+#if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
+bk_err_t bk_aud_intf_voc_init_audio_act(void);
+bk_err_t bk_aud_intf_voc_deinit_audio_act(void);
+bk_err_t bk_aud_intf_voc_set_spk_source_type(aud_spk_source_info_t *source_info);
+bk_err_t bk_aud_intf_voc_get_spk_source_type(spk_source_type_t *source_type);
+bk_err_t bk_aud_intf_voc_write_multiple_spk_data(audio_write_multiple_spk_data_req_t *write_req);
 #endif
 
 uint8_t bk_aud_intf_get_aec_vad_flag(void);

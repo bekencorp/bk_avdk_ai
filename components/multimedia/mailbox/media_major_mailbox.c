@@ -42,6 +42,7 @@
 #if (CONFIG_CACHE_ENABLE)
 #include "cache.h"
 #endif
+#include "audio_act.h"
 
 #define TAG "media_major_mailbox"
 
@@ -482,7 +483,23 @@ void media_major_mailbox_msg_handle(media_mailbox_msg_t *msg)
 					extern bk_err_t audio_control_event_handle(media_mailbox_msg_t * msg);
                     audio_control_event_handle(msg);
 #else
-					audio_event_handle(msg);
+#if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
+                    if (msg->event == EVENT_AUDIO_ACT_INIT_REQ
+                        || msg->event == EVENT_AUDIO_ACT_DEINIT_REQ
+                        || msg->event == EVENT_AUD_VOC_SET_SPK_SOURCE_REQ
+                        || msg->event == EVENT_AUD_VOC_GET_SPK_SOURCE_REQ
+                        || msg->event == EVENT_AUD_VOC_WRITE_MULTIPLE_SPK_SOURCE_DATA_REQ)
+                    {
+                        audio_act_event_handle(msg);
+                    }
+                    else
+                    {
+					    audio_event_handle(msg);
+                    }
+#else
+                    audio_event_handle(msg);
+#endif
+
 #endif
 					break;
                     }

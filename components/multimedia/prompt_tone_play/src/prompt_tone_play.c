@@ -33,6 +33,8 @@
 #define CHUNK_SIZE      (640)
 #endif
 
+static aud_spk_source_info_t gl_prompt_tone_source_info = {0};
+
 static int source_out_data_handle_cb(char *buffer, uint32_t len, void *params)
 {
     prompt_tone_play_handle_t handle = (prompt_tone_play_handle_t)params;
@@ -92,7 +94,7 @@ static int codec_out_data_handle_cb(audio_frame_info_t *frame_info, char *buffer
     uint8_t *rsp_out_addr = aud_tras_drv_get_rsp_output_buff();
     uint32_t dest_samp_cnt_20ms = (aud_tras_drv_get_dac_samp_rate()*20/1000*2);
     #endif
-    
+
     while (w_len < len)
     {
         /* if prompt tone data pool has been write data, change speaker source type to prompt tone */
@@ -104,7 +106,8 @@ static int codec_out_data_handle_cb(audio_frame_info_t *frame_info, char *buffer
         {
             if (SPK_SOURCE_TYPE_PROMPT_TONE != aud_tras_drv_get_spk_source_type())
             {
-                aud_tras_drv_voc_set_spk_source_type(SPK_SOURCE_TYPE_PROMPT_TONE);
+                gl_prompt_tone_source_info.type = SPK_SOURCE_TYPE_PROMPT_TONE;
+                aud_tras_drv_voc_set_spk_source_type(&gl_prompt_tone_source_info);
             }
         }
 
@@ -165,7 +168,8 @@ static int codec_out_data_handle_cb(audio_frame_info_t *frame_info, char *buffer
         /* start prompt tone play after write frame data to prompt tone ringbuffer pool to avoid read prompt tone fail */
         if (SPK_SOURCE_TYPE_PROMPT_TONE != aud_tras_drv_get_spk_source_type())
         {
-            aud_tras_drv_voc_set_spk_source_type(SPK_SOURCE_TYPE_PROMPT_TONE);
+            gl_prompt_tone_source_info.type = SPK_SOURCE_TYPE_PROMPT_TONE;
+            aud_tras_drv_voc_set_spk_source_type(&gl_prompt_tone_source_info);
         }
     }
 
@@ -182,8 +186,8 @@ static int prompt_tone_pool_empty_notify_cb(void *params)
     {
         rtos_set_semaphore(&handle->play_finish_sem);
     }
-
-    aud_tras_drv_voc_set_spk_source_type(SPK_SOURCE_TYPE_VOICE);
+    gl_prompt_tone_source_info.type = SPK_SOURCE_TYPE_VOICE;
+    aud_tras_drv_voc_set_spk_source_type(&gl_prompt_tone_source_info);
 
     audio_codec_ctrl(handle->codec, AUDIO_CODEC_CTRL_STOP, NULL);
 
@@ -555,7 +559,8 @@ bk_err_t prompt_tone_play_stop(prompt_tone_play_handle_t handle)
     LOGI("%s\n", __func__);
 
     /* reset speaker source type to voice */
-    aud_tras_drv_voc_set_spk_source_type(SPK_SOURCE_TYPE_VOICE);
+    gl_prompt_tone_source_info.type = SPK_SOURCE_TYPE_VOICE;
+    aud_tras_drv_voc_set_spk_source_type(&gl_prompt_tone_source_info);
 
     if (handle->source)
     {

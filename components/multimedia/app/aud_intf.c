@@ -1825,8 +1825,44 @@ bk_err_t bk_aud_intf_voc_write_spk_data_ctrl(bool en)
 }
 #endif
 
+#if CONFIG_AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
+bk_err_t bk_aud_intf_voc_init_audio_act(void)
+{
+    return msg_send_req_to_media_app_mailbox_sync(EVENT_AUDIO_ACT_INIT_REQ, 0, NULL);
+}
+
+bk_err_t bk_aud_intf_voc_deinit_audio_act(void)
+{
+    return msg_send_req_to_media_app_mailbox_sync(EVENT_AUDIO_ACT_DEINIT_REQ, 0, NULL);
+}
+
+bk_err_t bk_aud_intf_voc_write_multiple_spk_data(audio_write_multiple_spk_data_req_t *write_req)
+{
+    uint32_t write_len = 0;
+    bk_err_t ret = BK_OK;
+
+    ret = msg_send_req_to_media_app_mailbox_sync(EVENT_AUD_VOC_WRITE_MULTIPLE_SPK_SOURCE_DATA_REQ, (uint32_t)write_req, &write_len);
+    if (ret != 0)
+    {
+        write_len = -1;
+    }
+
+    return write_len;
+}
+
+bk_err_t bk_aud_intf_voc_set_spk_source_type(aud_spk_source_info_t *source_info)
+{
+    return msg_send_req_to_media_app_mailbox_sync(EVENT_AUD_VOC_SET_SPK_SOURCE_REQ, (uint32_t)source_info, NULL);
+}
+
+bk_err_t bk_aud_intf_voc_get_spk_source_type(spk_source_type_t *source_type)
+{
+    return msg_send_req_to_media_app_mailbox_sync(EVENT_AUD_VOC_GET_SPK_SOURCE_REQ, 0, (uint32_t *)source_type);
+}
+#endif
+
 static void aec_vad_status_set(int val)
-{    
+{
     if(val == 1)
     {
         LOGI("------------vad start----------\r\n");
