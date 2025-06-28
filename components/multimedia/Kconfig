@@ -342,4 +342,14 @@ menu "Media"
 	config AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
 		bool "Enable Aud intf support speaker data play finish notify"
 		default n
+
+	config JPEG_SW_DECODE_SUPPORT_BY_FRAME
+		bool "Enable JPEG software decode by frame"
+		default y
+
+	config JPEG_SW_DECODE_SUPPORT_BY_CPU2
+		depends on JPEG_SW_DECODE_SUPPORT_BY_FRAME
+		bool "Enable JPEG software decode use cpu2"
+		default y
+
 endmenu

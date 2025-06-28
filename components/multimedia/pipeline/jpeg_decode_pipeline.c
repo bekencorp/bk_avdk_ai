@@ -440,6 +440,9 @@ void jpeg_decode_set_rotate_angle(media_rotate_t rotate_angle)
 	{
 		if (jdec_config->rotate_angle != rotate_angle)
 		{
+#if CONFIG_JPEG_SW_DECODE_SUPPORT_BY_FRAME
+
+#if CONFIG_JPEG_SW_DECODE_SUPPORT_BY_CPU2
 			if (jdec_config->sw_dec_init)
 			{
 				jdec_config->rotate_angle = rotate_angle;
@@ -447,6 +450,8 @@ void jpeg_decode_set_rotate_angle(media_rotate_t rotate_angle)
 
 				msg_send_req_to_media_major_mailbox_sync(EVENT_JPEG_DEC_SET_ROTATE_ANGLE_NOTIFY, MINOR_MODULE, jdec_config->rotate_angle, NULL);
 			}
+#endif
+#endif
 		}
 	}
 	else
@@ -457,6 +462,9 @@ void jpeg_decode_set_rotate_angle(media_rotate_t rotate_angle)
 
 static void jpeg_decode_software_decode_start_handle(frame_module_t module)
 {
+#if CONFIG_JPEG_SW_DECODE_SUPPORT_BY_FRAME
+
+#if CONFIG_JPEG_SW_DECODE_SUPPORT_BY_CPU2
 	if (!jdec_config->mux_buf[1].state[PIPELINE_MOD_SW_DEC])
 	{
 		if (module == MODULE_DECODER)
@@ -503,6 +511,16 @@ static void jpeg_decode_software_decode_start_handle(frame_module_t module)
 			jpeg_get_task_send_msg(JPEGDEC_START, MODULE_DECODER);
 		}
 	}
+#else
+	if (jdec_config->mux_buf[1].state[PIPELINE_MOD_SW_DEC] == MUX_BUFFER_IDLE)
+	{
+		if (module == MODULE_DECODER)
+		{
+				frame_buffer_fb_free(jdec_config->jpeg_frame, MODULE_DECODER);
+				jdec_config->jpeg_frame = NULL;
+		}
+	}
+#endif
 
 	if (!jdec_config->mux_buf[0].state[PIPELINE_MOD_SW_DEC])
 	{
@@ -546,6 +564,7 @@ static void jpeg_decode_software_decode_start_handle(frame_module_t module)
 
 		software_decode_task_send_msg(JPEGDEC_START, (uint32_t)&jdec_config->sw_dec_info[0]);
 	}
+#endif
 	jpeg_decode_get_next_frame();
 }
 
@@ -653,10 +672,10 @@ static void jpeg_decode_start_handle(frame_buffer_t *jpeg_frame, frame_module_t 
 		else if (yuv_fmt == YUV_ERR)
 		{
 			LOGI("%s, FMT:ERR\r\n", __func__);
-			frame_buffer_fb_free(jdec_config->jpeg_frame, MODULE_DECODER);
+			frame_buffer_fb_free(jdec_config->jpeg_frame, module);
 			jdec_config->jpeg_frame = NULL;
 			jdec_config->jdec_init = false;
-			jpeg_get_task_send_msg(JPEGDEC_START, MODULE_DECODER);
+			jpeg_get_task_send_msg(JPEGDEC_START, module);
 			return;
 		}
 		else
@@ -674,8 +693,10 @@ static void jpeg_decode_start_handle(frame_buffer_t *jpeg_frame, frame_module_t 
             }
 			LOGI("%s, FMT: YUV420, PPI: %dX%d, use SOFTWARE DECODE\r\n",
 				__func__, jdec_config->jpeg_frame->width, jdec_config->jpeg_frame->height);
+#if CONFIG_JPEG_SW_DECODE_SUPPORT_BY_FRAME
 			jdec_config->jdec_mode = JPEGDEC_SW_MODE;
 			jdec_config->jdec_type = JPEGDEC_BY_FRAME;
+#if CONFIG_JPEG_SW_DECODE_SUPPORT_BY_CPU2
 			if(CPU2_USER_JPEG_SW_DEC == vote_start_cpu2_core(CPU2_USER_JPEG_SW_DEC))	//first owner start CPU2, so needs to wait sem
 			{
 				rtos_get_semaphore(&jdec_config->jdec_cp2_init_sem, BEKEN_WAIT_FOREVER);
@@ -688,10 +709,21 @@ static void jpeg_decode_start_handle(frame_buffer_t *jpeg_frame, frame_module_t 
 #endif
 			if (jdec_config->rotate_angle != ROTATE_NONE)
 			{
-				software_decode_task_send_msg(JPEGDEC_SET_ROTATE_ANGLE, jdec_config->rotate_angle);
-
 				msg_send_req_to_media_major_mailbox_sync(EVENT_JPEG_DEC_SET_ROTATE_ANGLE_NOTIFY, MINOR_MODULE, jdec_config->rotate_angle, NULL);
 			}
+#endif
+			if (jdec_config->rotate_angle != ROTATE_NONE)
+			{
+				msg_send_req_to_media_major_mailbox_sync(EVENT_JPEG_DEC_SET_ROTATE_ANGLE_NOTIFY, MINOR_MODULE, jdec_config->rotate_angle, NULL);
+			}
+#else
+			LOGE("%s %d do not support software decode\n", __func__, __LINE__);
+			frame_buffer_fb_free(jdec_config->jpeg_frame, module);
+			jdec_config->jpeg_frame = NULL;
+			jdec_config->jdec_init = false;
+			jpeg_get_task_send_msg(JPEGDEC_START, module);
+			return;
+#endif
 		}
 	}
 
@@ -998,10 +1030,12 @@ static void jpeg_decode_task_deinit(void)
 {
 	LOGI("%s\r\n", __func__);
 	jpeg_get_task_close();
+#if CONFIG_JPEG_SW_DECODE_SUPPORT_BY_FRAME
 	if(check_software_decode_task_is_open())
 	{
 		software_decode_task_close();
 	}
+#endif
 	if (jdec_config)
 	{
 		/* // maybe do not judge jpeg decode mode
@@ -1505,10 +1539,12 @@ static void jpeg_decode_main(beken_thread_arg_t data)
 							break;
 						}
 					}
+#if CONFIG_JPEG_SW_DECODE_SUPPORT_BY_CPU2
 					if (jdec_config->sw_dec_init == 1)
 					{
 						msg_send_req_to_media_major_mailbox_sync(EVENT_JPEG_DEC_DEINIT_NOTIFY, MINOR_MODULE, 0, NULL);
 					}
+#endif
 					if (rtos_is_oneshot_timer_running(&jdec_config->decoder_timer))
 					{
 						rtos_stop_oneshot_timer(&jdec_config->decoder_timer);
@@ -1683,12 +1719,14 @@ bk_err_t jpeg_decode_task_open(media_decode_mode_t jdec_mode, media_decode_type_
 	frame_buffer_fb_register(MODULE_DECODER, FB_INDEX_JPEG);
 
 	INIT_LIST_HEAD(&jdec_config->jpeg_decode_queue);
+#if CONFIG_JPEG_SW_DECODE_SUPPORT
 	ret = software_decode_task_open();
 	if (ret != BK_OK)
 	{
 		LOGE("%s, software_decode_task_open failed\r\n", __func__);
 		goto error;
 	}
+#endif
 
 	ret = rtos_init_queue(&jdec_config->jdec_queue,
 							"jdec_que",
@@ -1752,20 +1790,24 @@ bk_err_t jpeg_decode_task_close()
 
 	jpeg_get_task_close();
 
+#if CONFIG_JPEG_SW_DECODE_SUPPORT_BY_FRAME
 	if(check_software_decode_task_is_open())
 	{
 		software_decode_task_close();
 	}
+#endif
 
 	rtos_unlock_mutex(&jdec_info->lock);
 
 	jpeg_decode_task_send_msg(JPEGDEC_STOP, 0);
 	rtos_get_semaphore(&jdec_config->jdec_sem, BEKEN_NEVER_TIMEOUT);
 
+#if CONFIG_JPEG_SW_DECODE_SUPPORT_BY_CPU2
 	if (jdec_config->sw_dec_init == 1)
 	{
 		vote_stop_cpu2_core(CPU2_USER_JPEG_SW_DEC);
 	}
+#endif
 
 	rtos_lock_mutex(&jdec_info->lock);
 	jpeg_decode_task_deinit();

@@ -152,7 +152,6 @@ endif()
 if (CONFIG_MEDIA_PIPELINE)
 	list(APPEND srcs
 		pipeline/jpeg_decode_pipeline.c
-        pipeline/software_decode_pipeline.c
 		pipeline/lcd_scale_pipeline.c
 		pipeline/yuv_rotate_pipeline.c
 		pipeline/uvc_pipeline_act.c
@@ -160,6 +159,11 @@ if (CONFIG_MEDIA_PIPELINE)
 		pipeline/jpeg_get_pipeline.c
 		pipeline/h264_encode_pipeline.c
 	)
+	if (CONFIG_JPEG_SW_DECODE_SUPPORT_BY_FRAME)
+		list(APPEND srcs
+			pipeline/software_decode_pipeline.c
+		)
+	endif()#CONFIG_JPEG_SW_DECODE_SUPPORT_BY_FRAME
 endif()
 
 if (CONFIG_MEDIA_MAJOR)
@@ -202,8 +206,13 @@ endif()#CONFIG_MEDIA_MAJOR
 if (CONFIG_MEDIA_MINOR)
 	list(APPEND srcs
 		mailbox/media_minor_mailbox.c
-		pipeline/jpeg_decode_pipeline_cp2.c
 	)
+	if(CONFIG_JPEG_SW_DECODE_SUPPORT_BY_FRAME)
+		list(APPEND srcs
+			pipeline/jpeg_decode_pipeline_cp2.c
+		)
+	endif()#CONFIG_JPEG_SW_DECODE_SUPPORT_BY_FRAME
+
 endif()#CONFIG_MEDIA_MINOR
 
 endif()#(CONFIG_CPU_CNT GREATER 1)

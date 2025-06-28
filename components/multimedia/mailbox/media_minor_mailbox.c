@@ -333,6 +333,7 @@ void media_minor_mailbox_msg_handle(media_mailbox_msg_t *msg)
 		{
 			switch (msg->event)
 			{
+#if CONFIG_JPEG_SW_DECODE_SUPPORT_BY_FRAME
 				case EVENT_JPEG_DEC_DEINIT_NOTIFY:
 				{
 					ret = jpeg_dec_task_close();
@@ -356,6 +357,7 @@ void media_minor_mailbox_msg_handle(media_mailbox_msg_t *msg)
 					}
 				}
 				break;
+#endif
 
 #if CONFIG_AI_ASR_MODE_CPU2
 				case EVENT_ASR_INIT_REQ:
@@ -389,11 +391,13 @@ void media_minor_mailbox_msg_handle(media_mailbox_msg_t *msg)
 		{
 			switch (msg->event)
 			{
+#if CONFIG_JPEG_SW_DECODE_SUPPORT_BY_FRAME
 				case EVENT_JPEG_DEC_START_NOTIFY:
 				{
 					jpeg_dec_task_send_msg(msg->event, (uint32_t)msg);
 				}
 				break;
+#endif
 
 #if CONFIG_AI_ASR_MODE_CPU2
 				case EVENT_ASR_DATA_NOTIFY:
