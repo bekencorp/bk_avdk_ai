@@ -227,6 +227,11 @@ menu "Media"
         bool "Enable support prompt tone"
         default n
 
+    config AUD_INTF_SUPPORT_PROMPT_TONE_PLAY_FINISH_NOTIFY
+		depends on AUD_INTF_SUPPORT_PROMPT_TONE
+        bool "Enable prompt tone playback finish notify, notify app when prompt tone playback finish"
+        default n
+
 	choice PROMPT_TONE_SOURCE
 		depends on AUD_INTF_SUPPORT_PROMPT_TONE
 		prompt "Select Prompt Tone Source"

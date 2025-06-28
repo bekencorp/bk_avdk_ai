@@ -281,7 +281,11 @@ static ringbuf_handle_t gl_prompt_tone_rb = NULL;
 static prompt_tone_pool_empty_notify gl_prompt_tone_empty_notify = NULL;
 static void *gl_notify_user_data = NULL;
 static prompt_tone_play_handle_t gl_prompt_tone_play_handle = NULL;
+
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE_PLAY_FINISH_NOTIFY
+static media_mailbox_msg_t gl_prompt_tone_play_finish_msg = {0};
 #endif
+#endif  //CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
 
 #if CONFIG_AI_ASR_MODE_CPU2
 typedef struct {
@@ -2732,14 +2736,26 @@ static void read_prompt_tone_data(void)
 
     /* Check whether play prompt tone */
     r_size = aud_tras_drv_read_prompt_tone_data((char *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2, 0);
-    if (r_size <= 0 && gl_prompt_tone_empty_notify) {
-        /* prompt tone pool empty */
-        gl_prompt_tone_empty_notify(gl_notify_user_data);
-        os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
-        /* send message to aud_tras_drv_main to stop prompt_tone play */
-        if (aud_tras_drv_send_msg(AUD_TRAS_STOP_PROMPT_TONE, NULL) != BK_OK)
+    if (r_size <= 0) {
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE_PLAY_FINISH_NOTIFY
+        if (aud_tras_drv_info.voc_info.prompt_tone_play_finish_notify)
         {
-            LOGE("%s, %d, send tras stop prompt tone fail\n", __func__, __LINE__);
+            gl_prompt_tone_play_finish_msg.event = EVENT_AUD_PROMPT_TONE_PLAY_FINISH_NOTIFY;
+            gl_prompt_tone_play_finish_msg.param = 0;
+            msg_send_notify_to_media_major_mailbox(&gl_prompt_tone_play_finish_msg, APP_MODULE);
+        }
+#endif
+
+        if (gl_prompt_tone_empty_notify) {
+            /* prompt tone pool empty */
+            gl_prompt_tone_empty_notify(gl_notify_user_data);
+
+            os_memset(aud_tras_drv_info.voc_info.decoder_temp.pcm_data, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2);
+            /* send message to aud_tras_drv_main to stop prompt_tone play */
+            if (aud_tras_drv_send_msg(AUD_TRAS_STOP_PROMPT_TONE, NULL) != BK_OK)
+            {
+                LOGE("%s, %d, send tras stop prompt tone fail\n", __func__, __LINE__);
+            }
         }
     } else {
         if (r_size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
@@ -4663,6 +4679,11 @@ static bk_err_t aud_tras_drv_voc_deinit(void)
     }
 #endif
 
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE_PLAY_FINISH_NOTIFY
+    aud_tras_drv_info.voc_info.prompt_tone_play_finish_notify = NULL;
+    aud_tras_drv_info.voc_info.prompt_tone_play_finish_usr_data = NULL;
+#endif
+
     AEC_DATA_DUMP_BY_UART_CLOSE();
     SPK_DATA_DUMP_BY_UART_CLOSE();
 
@@ -4959,9 +4980,14 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 
 #if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
     aud_tras_drv_info.voc_info.spk_play_finish_notify = voc_cfg->spk_play_finish_notify;
-    aud_tras_drv_info.voc_info.usr_data = voc_cfg->usr_data;
+    aud_tras_drv_info.voc_info.spk_play_finish_usr_data = voc_cfg->spk_play_finish_usr_data;
     aud_tras_drv_info.voc_info.spk_notify_complete = false;
     aud_tras_drv_info.voc_info.write_spk_data_state = true;
+#endif
+
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE_PLAY_FINISH_NOTIFY
+        aud_tras_drv_info.voc_info.prompt_tone_play_finish_notify = voc_cfg->prompt_tone_play_finish_notify;
+        aud_tras_drv_info.voc_info.prompt_tone_play_finish_usr_data = voc_cfg->prompt_tone_play_finish_usr_data;
 #endif
 
 	if (aud_tras_drv_info.voc_info.mic_type == AUD_INTF_MIC_TYPE_BOARD) {

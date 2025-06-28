@@ -262,10 +262,16 @@ typedef struct {
 #if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
     /* notify app that speaker data play finish */
     int (*spk_play_finish_notify)(void *params);        /**< the api is called when all speaker data has been play completely */
-    void *usr_data;                                     /**< the parameter of spk_play_finish_notify callback */
+    void *spk_play_finish_usr_data;                     /**< the parameter of spk_play_finish_notify callback */
     bool spk_notify_complete;
     bool write_spk_data_state;
     beken2_timer_t spk_notify_timer;
+#endif
+
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE_PLAY_FINISH_NOTIFY
+    /* notify app that prompt tone data play finish */
+    int (*prompt_tone_play_finish_notify)(void *params);    /**< the api is called when all prompt tone data has been play completely */
+    void *prompt_tone_play_finish_usr_data;                 /**< the parameter of prompt_tone_play_finish_notify callback */
 #endif
 } aud_tras_drv_voc_info_t;
 

@@ -319,7 +319,11 @@ typedef struct {
 	aud_codec_setup_input_t aud_codec_setup_input;
 #if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
 	int (*spk_play_finish_notify)(void *params);		/**< the api is called when all speaker data has been play completely */
-	void *usr_data;                             /*!< the parameter of pool_empty_notify_cb callback */
+	void *spk_play_finish_usr_data;                     /*!< the parameter of pool_empty_notify_cb callback */
+#endif
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE_PLAY_FINISH_NOTIFY
+    int (*prompt_tone_play_finish_notify)(void *params);    /**< the api is called when all prompt tone data has been play completely */
+    void *prompt_tone_play_finish_usr_data;                 /**< the parameter of prompt_tone_play_finish_notify callback */
 #endif
 } aud_intf_voc_setup_t;
 

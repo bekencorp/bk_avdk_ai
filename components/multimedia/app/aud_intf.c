@@ -218,7 +218,15 @@ static void aud_intf_main(beken_thread_arg_t param_data)
 #if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
 				case AUD_INTF_EVENT_SPK_PLAY_FINISH:
 					if (aud_intf_info.voc_info.spk_play_finish_notify) {
-						aud_intf_info.voc_info.spk_play_finish_notify(aud_intf_info.voc_info.usr_data);
+						aud_intf_info.voc_info.spk_play_finish_notify(aud_intf_info.voc_info.spk_play_finish_usr_data);
+					}
+					break;
+#endif
+
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE_PLAY_FINISH_NOTIFY
+				case AUD_INTF_EVENT_PROMPT_TONE_PLAY_FINISH:
+					if (aud_intf_info.voc_info.prompt_tone_play_finish_notify) {
+						aud_intf_info.voc_info.prompt_tone_play_finish_notify(aud_intf_info.voc_info.prompt_tone_play_finish_usr_data);
 					}
 					break;
 #endif
@@ -1127,7 +1135,12 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 
 #if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
     aud_intf_info.voc_info.spk_play_finish_notify = setup.spk_play_finish_notify;
-    aud_intf_info.voc_info.usr_data = setup.usr_data;
+    aud_intf_info.voc_info.spk_play_finish_usr_data = setup.spk_play_finish_usr_data;
+#endif
+
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE_PLAY_FINISH_NOTIFY
+    aud_intf_info.voc_info.prompt_tone_play_finish_notify = setup.prompt_tone_play_finish_notify;
+    aud_intf_info.voc_info.prompt_tone_play_finish_usr_data = setup.prompt_tone_play_finish_usr_data;
 #endif
 
 	/* aec config */

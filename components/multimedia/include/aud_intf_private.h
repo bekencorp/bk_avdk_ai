@@ -271,8 +271,14 @@ typedef struct {
 
 #if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
     int (*spk_play_finish_notify)(void *params);        /**< the api is called when all speaker data has been play completely */
-    void *usr_data;                                     /**< the parameter of spk_play_finish_notify callback */
+    void *spk_play_finish_usr_data;                     /**< the parameter of spk_play_finish_notify callback */
 #endif
+
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE_PLAY_FINISH_NOTIFY
+    int (*prompt_tone_play_finish_notify)(void *params);    /**< the api is called when all prompt tone data has been play completely */
+    void *prompt_tone_play_finish_usr_data;                 /**< the parameter of prompt_tone_play_finish_notify callback */
+#endif
+
 //	void (*aud_tras_drv_voc_event_cb)(aud_tras_drv_voc_event_t event, bk_err_t result);
 } aud_intf_voc_config_t;
 
@@ -431,6 +437,10 @@ typedef enum {
 #if CONFIG_AUD_INTF_SUPPORT_SPK_PLAY_FINISH_NOTIFY
 	AUD_INTF_EVENT_SPK_PLAY_FINISH,
 #endif
+#if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE_PLAY_FINISH_NOTIFY
+	AUD_INTF_EVENT_PROMPT_TONE_PLAY_FINISH,
+#endif
+
 	AUD_INTF_EVENT_MAX,
 } aud_intf_event_t;
 
