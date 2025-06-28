@@ -118,6 +118,10 @@ const lcd_device_t *lcd_devices[] =
 	&lcd_device_st77916,
 #endif
 
+#if CONFIG_LCD_QSPI_JD9853A
+	&lcd_device_jd9853a,
+#endif
+
 #if CONFIG_LCD_SPI_ST7796U
 	&lcd_device_st7796u,
 #endif
