@@ -38,7 +38,8 @@ typedef enum
 {
     ARRAY_DATA_READ_IDLE = 0,
     ARRAY_DATA_READ_START,
-    ARRAY_DATA_READ_EXIT
+    ARRAY_DATA_READ_EXIT,
+    ARRAY_DATA_SET_URL,
 } array_data_read_op_t;
 
 typedef struct
@@ -121,6 +122,15 @@ static void array_data_read_task_main(beken_thread_arg_t param_data)
                     LOGD("%s, %d, ARRAY_DATA_READ_START\n", __func__, __LINE__);
                     array_source_priv->running = true;
                     wait_time = 0;
+                    break;
+
+                case ARRAY_DATA_SET_URL:
+                    LOGD("%s, %d, ARRAY_DATA_SET_URL\n", __func__, __LINE__);
+                    url_info_t *url_info = (url_info_t *)msg.param;
+                    array_source_priv->config.url = url_info->url;
+                    array_source_priv->config.total_size = url_info->total_len;
+                    array_source_priv->array_total_len = array_source_priv->config.total_size;
+                    array_source_priv->array_read_offset = 0;
                     break;
 
                 default:
@@ -436,11 +446,14 @@ static int array_source_set_url(audio_source_t *source, url_info_t *url_info)
     array_source_priv_t *array_source = (array_source_priv_t *)source->source_ctx;
     ARRAY_SOURCE_CHECK_NULL(array_source);
 
-    LOGI("%s, url: %s \n", __func__, url_info->url);
+    LOGI("%s, array ptr: %p, len: %d\n", __func__, url_info->url, url_info->total_len);
 
     /* update new url */
-    array_source->config.url = url_info->url;
-    array_source->config.total_size = url_info->total_len;
+    if (BK_OK != array_data_read_send_msg(array_source->array_data_read_msg_que, ARRAY_DATA_SET_URL, (void *)url_info))
+    {
+        LOGE("%s, %d, send message: ARRAY_DATA_SET_URL fail\n", __func__, __LINE__);
+        return BK_FAIL;
+    }
 
     return BK_OK;
 }
