@@ -917,7 +917,7 @@ static void aud_rx_lost_count_dump(void *param)
 #if CONFIG_AUD_INTF_SUPPORT_MP3
 static uint16_t aud_mp3_dec_get_frame_sample_cnt(uint16_t dac_sample_rate, uint8_t ch_num)
 {
-    int dac_sample_cnt = MAX_NSAMP;
+    uint16_t dac_sample_cnt = MAX_NSAMP;
     switch (dac_sample_rate) //only support layer3
     {
         case 8000://MPEG2.5,frame sample cnt:576,72ms
@@ -945,6 +945,73 @@ static uint16_t aud_mp3_dec_get_frame_sample_cnt(uint16_t dac_sample_rate, uint8
 
     return (dac_sample_cnt*ch_num);
 }
+static uint16_t aud_mp3_dec_get_max_input_size_in_byte(uint16_t dac_sample_rate, uint8_t ch_num)
+{
+    uint16_t max_input_samp_cnt = 0;
+    switch (dac_sample_rate) //only support layer3
+    {
+        case 8000://MPEG2.5,frame sample cnt:576,72ms,max bitrate:160k
+        {
+            max_input_samp_cnt = 1440;
+            break;
+        }
+        case 11025://MPEG2.5,frame sample cnt:576,52ms,max bitrate:160k
+        {
+            max_input_samp_cnt = 1044;
+            break;
+        }
+        case 12000://MPEG2.5,frame sample cnt:576,48ms,max bitrate:160k
+        {
+            max_input_samp_cnt = 960;
+            break;
+        }
+        case 16000://MPEG2,frame sample cnt:576,36ms,max bitrate:160k
+        {
+            max_input_samp_cnt = 720;
+            break;
+        }
+        case 22050://MPEG2,frame sample cnt:576,26ms,max bitrate:160k
+        {
+            max_input_samp_cnt = 522;
+            break;
+        }
+        case 24000://MPEG2,frame sample cnt:576,24ms,max bitrate:160k
+        {
+            max_input_samp_cnt = 480;
+            break;
+        }
+        case 32000://MPEG1,frame sample cnt:1152,36ms,max bitrate:320k
+        {
+            max_input_samp_cnt = 1440;
+            break;
+        }
+        case 44100://MPEG1,frame sample cnt:1152,26ms,max bitrate:320k
+        {
+            max_input_samp_cnt = 1044;
+            break;
+        }
+        case 48000://MPEG1,frame sample cnt:1152,24ms,max bitrate:320k
+        {
+            max_input_samp_cnt = 960;
+            break;
+        }
+        default:
+        {
+            LOGE("%s,%d unsupported dac sample rate:%d\n",__func__, __LINE__,dac_sample_rate);
+            break;
+        }
+    }
+
+    max_input_samp_cnt += 511;
+
+    if(max_input_samp_cnt%4)
+    {
+        max_input_samp_cnt += (4 - (max_input_samp_cnt%4));
+    }
+
+    return (max_input_samp_cnt*ch_num);
+}
+
 #endif
 
 void aud_codec_buf_len_cal(aud_codec_setup_input_t *para, aud_codec_setup_t *output)
@@ -961,15 +1028,21 @@ void aud_codec_buf_len_cal(aud_codec_setup_input_t *para, aud_codec_setup_t *out
     if(AUD_INTF_VOC_DATA_TYPE_MP3 == output->decoder_type)
     {
         //only support mp3 decoder
-        output->dec_input_size_in_byte = MAINBUF_SIZE;
-        output->dec_output_size_in_byte = aud_mp3_dec_get_frame_sample_cnt(para->dac_samp_rate,1)*2;
-        LOGI("%s, %d, adc samp:%d,enc bitrate:%d,frame (ms):%d,data depth:%d,vbr:%d,dac samp:%d\n", __func__, __LINE__,
-            para->adc_samp_rate,
-            para->enc_bitrate,
-            para->enc_frame_len_in_ms,
-            para->enc_data_depth_in_byte,
-            para->enc_vbr_en,
-            para->dac_samp_rate);
+        output->dec_input_size_in_byte = aud_mp3_dec_get_max_input_size_in_byte(para->dac_samp_rate,1);
+        output->dec_output_size_in_byte = aud_mp3_dec_get_frame_sample_cnt(para->dac_samp_rate,1)*para->dec_data_depth_in_byte;
+        output->dec_frame_len_in_ms = aud_mp3_dec_get_frame_sample_cnt(para->dac_samp_rate,1)*1000/para->dac_samp_rate;
+        para->dec_frame_len_in_ms = output->dec_frame_len_in_ms;
+        LOGI("%s, %d, adc samp:%d,enc bitrate:%d,frame (ms):%d,data depth:%d,vbr:%d\n", __func__, __LINE__,
+            output->adc_samp_rate,
+            output->enc_bitrate,
+            output->enc_frame_len_in_ms,
+            output->enc_data_depth_in_byte,
+            output->enc_vbr_en);
+
+        LOGI("dac samp:%d,frame (ms):%d,data depth:%d\n",
+            output->dac_samp_rate,
+            output->dec_frame_len_in_ms,
+            output->dec_data_depth_in_byte);
 
         LOGI("enc in s:%d,out s:%d,dec in s:%d,out s:%d\n",
             output->enc_input_size_in_byte,
@@ -989,18 +1062,18 @@ void aud_codec_buf_len_cal(aud_codec_setup_input_t *para, aud_codec_setup_t *out
         }
 
         LOGI("%s, %d, adc samp:%d,enc bitrate:%d,frame (ms):%d,data depth:%d,vbr:%d\n", __func__, __LINE__,
-            para->adc_samp_rate,
-            para->enc_bitrate,
-            para->enc_frame_len_in_ms,
-            para->enc_data_depth_in_byte,
-            para->enc_vbr_en);
+            output->adc_samp_rate,
+            output->enc_bitrate,
+            output->enc_frame_len_in_ms,
+            output->enc_data_depth_in_byte,
+            output->enc_vbr_en);
 
         LOGI("dac samp:%d,dec bitrate:%d,frame (ms):%d,data depth:%d,vbr:%d\n",
-            para->dac_samp_rate,
-            para->dec_bitrate,
-            para->dec_frame_len_in_ms,
-            para->dec_data_depth_in_byte,
-            para->dec_vbr_en);
+            output->dac_samp_rate,
+            output->dec_bitrate,
+            output->dec_frame_len_in_ms,
+            output->dec_data_depth_in_byte,
+            output->dec_vbr_en);
 
         LOGI("enc in s:%d,out s:%d,dec in s:%d,out s:%d\n",
             output->enc_input_size_in_byte,
@@ -2003,3 +2076,9 @@ void audio_intf_debug_init()
 	bk_aud_debug_register_update_sys_config_cb(bk_aud_intf_update_sys_config_para);
 #endif
 }
+
+uint32_t bk_aud_intf_get_dec_rb_free_size(void)
+{
+    return ring_buffer_get_free_size(aud_intf_info.voc_info.rx_info.decoder_rb);
+}
+

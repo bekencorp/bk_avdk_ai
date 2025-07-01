@@ -684,6 +684,7 @@ uint32_t bk_aud_get_encoder_type(void);
 uint32_t bk_aud_get_decoder_type(void);
 uint32_t bk_aud_get_adc_sample_rate(void);
 uint32_t bk_aud_get_dac_sample_rate(void);
+uint32_t bk_aud_intf_get_dec_rb_free_size(void);
 
 /**
  * @}
