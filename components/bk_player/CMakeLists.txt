@@ -53,5 +53,5 @@ endif()
 
 armino_component_register(SRCS "${srcs}"
 		INCLUDE_DIRS "${incs}"
-		PRIV_REQUIRES bk_common bk_cli avdk_libs bk_vfs webclient lwip_intf_v2_1 avdk psa_mbedtls multimedia
+		PRIV_REQUIRES bk_common bk_cli avdk_libs bk_vfs webclient lwip_intf_v2_1 psa_mbedtls multimedia
 		)
