@@ -44,13 +44,6 @@ static bool isAudioSending = false;
 static bool isVadExit = false;
 static bool waitTerminateOrEndSuccess = false;
 
-int playDingDongAudio()
-{
-	LOGI("%s State_Event_Play_DingDong\r\n", __func__);
-	state_machine_run_event(State_Event_Play_DingDong);
-	return 1;
-}
-
 static void onVoiceChatEvent(VoiceChatEventType event, const char *data, const size_t len, VoiceChatExtraInfo *extraInfo)
 {
   LOGD("------------onVoiceChatEvent--------------taskId: %s. requestId: %s\n", extraInfo->taskId, extraInfo->requestId);
@@ -131,7 +124,7 @@ static void onVoiceChatEvent(VoiceChatEventType event, const char *data, const s
     break;
   case VOICECHAT_EVENT_ON_ERROR:
     LOGI("0.0.6 -----VOICECHAT_EVENT_ON_ERROR-----\n");
-    isAIResponseding = false;
+    // isAIResponseding = false;
 
     LOGI("0.0.6 %zu\n", len);
     if (data)
@@ -153,7 +146,7 @@ static void onVoiceChatEvent(VoiceChatEventType event, const char *data, const s
     isAudioSending = false;
     isAIResponseding = false;
     // TODO: sdk断网等错误，就会释放实例
-    //printf("0.0.6 %s 销毁globalHandler");
+    LOGI("0.0.6 销毁globalHandler\n");
     globalHandler = NULL;
 
     break;
@@ -178,7 +171,7 @@ bool voiceChatTerminateCheck(TerminateCheckCallback callback,
   }
   else
   {
-    LOGI("0.0.6 %s 方法中设置成功 %s", __func__, errorCallback_tem);
+    LOGI("0.0.6 %s 方法中设置成功 %s\n", __func__, errorCallback_tem);
   }
   if (!isAIResponseding)
   {
@@ -253,6 +246,10 @@ bool voiceChatContinueCheck(ContinueCheckCallback callback,
   {
     LOGI("0.0.6 %s 重新初始化 SDK\r\n", __func__);
     doCreate();
+
+    isFirstContinueAfterCreate = false;
+
+    isAIResponseding = true;
   }
   else
   {

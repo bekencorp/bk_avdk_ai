@@ -33,17 +33,190 @@ typedef struct {
 } data_buffer_t;
 
 typedef struct {
+    uint8_t *buffer;
+    size_t head;
+    size_t tail;
+    size_t size;
+} data_buffer_fixed_t;
+
+typedef struct {
     data_buffer_t *ring_buffer;
+    data_buffer_fixed_t *ring_buffer_fix;
     beken_timer_t data_read_tmr;
     audio_info_t info;
-    uint8_t running_state; //1:playing / 0:terminate
     beken_mutex_t lock; //TODO if needed
 } play_config_t;
 
+#if CONFIG_DEBUG_DUMP
+#include "debug_dump.h"
+extern bool rx_spk_data_flag;
+#endif
 play_config_t *play_info = NULL;
 #define WSS_AUDIO_BUFFER_SIZE (980*1024)
 
 // 实现自定义的逻辑
+int play_user_audio_rx_data_handle(unsigned char *data, unsigned int size)
+{
+    bk_err_t ret = BK_OK;
+
+    #if CONFIG_DEBUG_DUMP
+    if(rx_spk_data_flag)
+    {
+        uint32_t decoder_type = bk_aud_get_decoder_type();
+        uint8_t dump_file_type = dbg_dump_get_dump_file_type((uint8_t)decoder_type);
+        DEBUG_DATA_DUMP_UPDATE_HEADER_DUMP_FILE_TYPE(DUMP_TYPE_RX_SPK,0,dump_file_type);
+        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_LEN(DUMP_TYPE_RX_SPK,0,size);
+        DEBUG_DATA_DUMP_UPDATE_HEADER_TIMESTAMP(DUMP_TYPE_RX_SPK);
+        #if CONFIG_DEBUG_DUMP_DATA_TYPE_EXTENSION
+        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_SAMP_RATE(DUMP_TYPE_RX_SPK,0,bk_aud_get_dac_sample_rate());
+        DEBUG_DATA_DUMP_UPDATE_HEADER_DATA_FLOW_FRAME_IN_MS(DUMP_TYPE_RX_SPK,0,bk_aud_get_dec_frame_len_in_ms());
+        #endif
+        DEBUG_DATA_DUMP_BY_UART_HEADER(DUMP_TYPE_RX_SPK);
+        DEBUG_DATA_DUMP_UPDATE_HEADER_SEQ_NUM(DUMP_TYPE_RX_SPK);
+        DEBUG_DATA_DUMP_BY_UART_DATA(data, size);
+    }
+    #endif//CONFIG_DEBUG_DUMP
+    ret = bk_aud_intf_write_spk_data((uint8_t *)data, (uint32_t)size);
+    if (ret != BK_OK)
+    {
+        LOGE("write spk data fail \r\n");
+    }
+
+    return ret;
+}
+
+data_buffer_fixed_t *play_fixed_data_buffer_init(size_t buffer_size) {
+#if CONFIG_PSRAM_AS_SYS_MEMORY
+    data_buffer_fixed_t *ab = (data_buffer_fixed_t *)psram_malloc(sizeof(data_buffer_fixed_t));
+#else
+    data_buffer_fixed_t *ab = (data_buffer_fixed_t *)os_malloc(sizeof(data_buffer_fixed_t));
+#endif
+    if (ab == NULL)
+    {
+        LOGE("malloc ab fail\n");
+        return NULL;
+    }
+    memset(ab, 0, sizeof(data_buffer_fixed_t));
+#if CONFIG_PSRAM_AS_SYS_MEMORY
+    ab->buffer = psram_malloc(buffer_size);
+#else
+    ab->buffer = os_malloc(buffer_size);
+#endif
+    if (ab->buffer == NULL)
+    {
+        LOGE("malloc data buffer fail\n");
+        return NULL;
+    }
+    memset(ab->buffer, 0, buffer_size);
+    ab->head = 0;
+    ab->tail = 0;
+    ab->size = buffer_size;
+
+    return ab;
+}
+
+void play_fixed_data_buffer_deinit(data_buffer_fixed_t *ab) {
+    if (ab == NULL)
+    {
+        LOGE("buffer deinit already\n");
+        return;
+    }
+    memset(ab->buffer, 0, ab->size);
+    if (ab->buffer)
+    {
+        os_free(ab->buffer);
+    }
+    ab->head = 0;
+    ab->tail = 0;
+    ab->size = 0;
+    memset(ab, 0, sizeof(data_buffer_fixed_t));
+    if(ab) {
+        os_free(ab);
+    }
+}
+
+bool play_fixed_data_buffer_write(data_buffer_fixed_t *ab, const uint8_t *data, size_t len) {
+
+    if (len > ab->size) {
+        return false;
+    }
+
+    size_t free_space = (ab->tail > ab->head) ? (ab->tail - ab->head) : (ab->size - ab->head + ab->tail);
+    if (free_space < len) {
+        LOGE("%s free_space:%d len:%d full\n", __func__, free_space, len);
+        return false;
+    }
+
+    if (ab->head + len <= ab->size) {
+        memcpy(&ab->buffer[ab->head], data, len);
+    } else {
+        size_t first_part = ab->size - ab->head;
+        memcpy(&ab->buffer[ab->head], data, first_part);
+        memcpy(ab->buffer, data + first_part, len - first_part);
+    }
+
+    ab->head = (ab->head + len) % ab->size;
+    return true;
+}
+
+size_t play_fixed_data_buffer_read(data_buffer_fixed_t *ab, uint8_t *data, size_t len) {
+    if (len > ab->size) {
+        return 0;
+    }
+    size_t available_data = (ab->head >= ab->tail) ? (ab->head - ab->tail) : (ab->size - ab->tail + ab->head);
+    if (available_data == 0) {
+        return 0;
+    }
+
+    if (available_data < len) {
+        LOGE("%s available:%d len:%d\n", __func__, available_data, len);
+        len = available_data;
+    }
+
+    if (ab->tail + len <= ab->size) {
+        memcpy(data, &ab->buffer[ab->tail], len);
+    } else {
+        size_t first_part = ab->size - ab->tail;
+        memcpy(data, &ab->buffer[ab->tail], first_part);
+        memcpy(data + first_part, ab->buffer, len - first_part);
+    }
+
+    ab->tail = (ab->tail + len) % ab->size;
+    return len;
+}
+
+void play_fixed_data_buffer_clean(data_buffer_fixed_t *ab)
+{
+    size_t available_data = (ab->head >= ab->tail) ? (ab->head - ab->tail) : (ab->size - ab->tail + ab->head);
+    LOGI("%s available:%d\r\n", __func__, available_data);
+    memset(ab->buffer, 0, ab->size);
+    ab->head = 0;
+    ab->tail = 0;
+    return;
+}
+
+void play_fixed_data_check(void *param)
+{
+    play_config_t *play = (play_config_t *) param;
+    if(play == NULL) {
+        LOGE("play config null...\n");
+        return;
+    }
+    int size = 0;
+    uint8_t *packet = NULL;
+    packet = os_zalloc(play->info.dec_node_size);
+    if (packet != NULL && (play->info.dec_node_size <= bk_aud_intf_get_dec_rb_free_size()))
+    {
+        if (play->ring_buffer_fix && (size = play_fixed_data_buffer_read(play->ring_buffer_fix, packet, play->info.dec_node_size))) {
+            LOGD("data coming...len:%d\n", size);
+            play_user_audio_rx_data_handle(packet, size);
+        } else {
+            LOGD("Buffer empty, waiting for data...\n");
+        }
+    }
+    os_free(packet);
+}
+
 data_buffer_t *play_data_buffer_init (size_t buffer_size, size_t length_buffer_size) {
 #if CONFIG_PSRAM_AS_SYS_MEMORY
     data_buffer_t *rb = (data_buffer_t *)psram_malloc(sizeof(data_buffer_t));
@@ -171,6 +344,19 @@ size_t play_data_buffer_read(data_buffer_t *rb, uint8_t *output) {
     return data_len;
 }
 
+void play_data_buffer_clean(data_buffer_t *rb)
+{
+    size_t available = (rb->write_index >= rb->read_index)? (rb->write_index - rb->read_index) : (rb->size - rb->read_index + rb->write_index);
+    LOGI("%s available:%d\r\n", __func__, available);
+    memset(rb->buffer, 0, rb->size);
+    memset(rb->length_buffer, 0, (rb->buffer_count * sizeof (size_t)));
+    rb->read_index = 0;
+    rb->write_index = 0;
+    rb->length_read_index = 0;
+    rb->length_write_index = 0;
+    return;
+}
+
 void play_data_check(void *param)
 {
     play_config_t *play = (play_config_t *) param;
@@ -183,15 +369,12 @@ void play_data_check(void *param)
     int size = 0;
     if (packet != NULL)
     {
-        //rtos_lock_mutex(&lock);
         if (play->ring_buffer && (size = play_data_buffer_read(play->ring_buffer, packet))) {
-            if (play->running_state)
-                bk_aud_intf_write_spk_data(packet, size);
+            play_user_audio_rx_data_handle(packet, size);
             LOGD("data coming...\n");
         } else {
             LOGD("Buffer empty, waiting for data...\n");
         }
-        //rtos_unlock_mutex(&lock);
     }
     os_free(packet);
 }
@@ -206,7 +389,7 @@ int play_data_start_timeout_check(uint32_t timeout, void *param)
     }
 
     LOGI("ring_data status timer start!!! dectype:%s\n", play->info.decoding_type);
-    err = rtos_init_timer(&(play->data_read_tmr), timeout, (timer_handler_t)play_data_check, param);
+    err = rtos_init_timer(&(play->data_read_tmr), timeout, (timer_handler_t)play_fixed_data_check, param);
 
     BK_ASSERT(kNoErr == err);
     err = rtos_start_timer(&(play->data_read_tmr));
@@ -239,6 +422,14 @@ int play_data_end(void *param)
     return BK_OK;
 }
 
+void Play_audioClean(void)
+{
+    play_config_t *play = play_info;
+    if (play && play->ring_buffer_fix) {
+        play_fixed_data_buffer_clean(play->ring_buffer_fix);
+    }
+}
+
 play_config_t *Play_audioInit()
 {
     int max_count;
@@ -249,7 +440,6 @@ play_config_t *Play_audioInit()
     }
     os_memcpy(&play->info, &general_audio, sizeof(audio_info_t));
     if (play->info.dec_node_size) {
-        play->info.dec_node_size = play->info.dec_node_size * 2.5;  //TODO, not ready, org is 1940
         max_count = WSS_AUDIO_BUFFER_SIZE / (play->info.dec_node_size);
         LOGI("module_bufferPlay_audioInit. enctype:%s dectype:%s adc_rate:%d dac_rate:%d enc:%d dec:%d encsize:%d decsize:%d max_count:%d\n",
             play->info.encoding_type, play->info.decoding_type, play->info.adc_samp_rate, play->info.dac_samp_rate,
@@ -261,10 +451,10 @@ play_config_t *Play_audioInit()
     audio_register_play_finish_func(play_data_end);
 
     if (play->info.decoding_type) {
-        play->ring_buffer = play_data_buffer_init(((play->info.dec_node_size) * max_count), max_count);
-        if (play->ring_buffer == NULL)
+        play->ring_buffer_fix = play_fixed_data_buffer_init(WSS_AUDIO_BUFFER_SIZE);
+        if (play->ring_buffer_fix == NULL)
         {
-            LOGE("%s, %d, data_buffer_init fail\n", __func__, __LINE__);
+            LOGE("%s, %d, fixed_data_buffer_init fail\n", __func__, __LINE__);
             goto exit;
         }
     }
@@ -290,8 +480,9 @@ void Play_audioDeinit(play_config_t *play)
         return;
     }
     play_data_stop_timeout_check(&play->data_read_tmr);
-    play_data_buffer_deinit(play->ring_buffer);
-    play->ring_buffer = NULL;
+    play_fixed_data_buffer_deinit(play->ring_buffer_fix);
+    play->ring_buffer_fix = NULL;
+
     if (play) {
         os_free(play);
     }
@@ -305,7 +496,6 @@ void module_bufferPlay_audioInit()
      if (play_info == NULL) {
         play_info = Play_audioInit();
      }
-     play_info->running_state = 1;
      bk_aud_intf_voc_write_spk_data_ctrl(1);
      state_machine_run_event(State_Event_BufferPlay_AudioInitEnd);
 }
@@ -313,13 +503,10 @@ void module_bufferPlay_audioInit()
 // buf为mp3数据 rlen为当前数据长度
 void module_bufferPlay_data(void *buf, int rlen)
 {
-    if (rlen > (play_info->info.dec_node_size)) {
-        LOGE("data too large, dropping packet!!!!! len:%d limit:%d\n", rlen, general_audio.dec_node_size);
-        return;
-    }
     LOGD("%s rlen:%d\n", __func__, rlen);
-    if (play_info->ring_buffer) {
-        play_data_buffer_write(play_info->ring_buffer, buf, rlen);
+
+    if (play_info->ring_buffer_fix) {
+        play_fixed_data_buffer_write(play_info->ring_buffer_fix, buf, rlen);
     }
 }
 
@@ -329,17 +516,16 @@ void module_bufferPlay_audioEnd()
 {
     LOGI("module_bufferPlay_audioEnd\n");
     bk_aud_intf_voc_write_spk_data_ctrl(0);
+    //Play_audioDeinit(play_info);
+    //play_info = NULL;
 }
 
 // 功能：停止当前的播放逻辑
 // 调用时机：由chat套件内核发起调用，客户实现
 void module_bufferPlay_terminate()
 {
-    //Play_audioDeinit(play_info);
-    //play_info = NULL;
     LOGI("module_bufferPlay_terminate\n");
-    if (play_info)
-        play_info->running_state = 0;
+    Play_audioClean();
     state_machine_run_event(State_Event_BufferPlay_TerminateEnd);
 }
 

@@ -20,7 +20,7 @@ list(APPEND srcs
 			voice_chat_engine.c
 )
 endif()
-armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES bk_common lwip_intf_v2_1 bk_vfs mbedtls psa_mbedtls audio_engine multimedia)
+armino_component_register(SRCS "${srcs}" INCLUDE_DIRS "${incs}" PRIV_REQUIRES bk_common lwip_intf_v2_1 bk_vfs mbedtls psa_mbedtls audio_engine multimedia avdk_utils)
 
 if (CONFIG_LINGXIN_AI_EN)
 get_filename_component(lib_name ${CMAKE_CURRENT_SOURCE_DIR}/chat_base_sdk/lib/libAI_IOT_SDK.a NAME)

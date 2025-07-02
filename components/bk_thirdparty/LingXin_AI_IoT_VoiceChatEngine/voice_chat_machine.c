@@ -19,6 +19,13 @@ static ChatState chat_current_state = State_Idle;
 
 static ChatState chat_last_state = State_Idle;
 
+int playDingDongAudio()
+{
+    LOGI("%s State_Event_Play_DingDong\r\n", __func__);
+    state_machine_run_event(State_Event_Play_DingDong);
+    return 1;
+}
+
 /**
  * voice chat交互逻辑
  */
