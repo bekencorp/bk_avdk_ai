@@ -27,6 +27,8 @@
 #define LOGD(...) BK_LOGD(ARRAY_SOURCE_TAG, ##__VA_ARGS__)
 
 
+#define ARRAY_DATA_READ_MSG_QUEUE_NUM     (20)
+
 #define ARRAY_SOURCE_CHECK_NULL(ptr) do {\
         if (ptr == NULL) {\
             LOGE("ARRAY_SOURCE_CHECK_NULL fail \n");\
@@ -217,7 +219,7 @@ static bk_err_t array_data_read_task_init(array_source_priv_t *array_source_priv
     ret = rtos_init_queue(&array_source_priv->array_data_read_msg_que,
                           "ary_data_rd_que",
                           sizeof(array_data_read_msg_t),
-                          5);
+                          ARRAY_DATA_READ_MSG_QUEUE_NUM);
     if (ret != BK_OK)
     {
         LOGE("%s, %d, create array data read message queue fail\n", __func__, __LINE__);

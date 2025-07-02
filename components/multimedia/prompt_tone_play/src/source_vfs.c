@@ -33,6 +33,7 @@
 
 
 #define UNMOUNT_VFS_TIMER_INTERVAL      (3000)
+#define VFS_DATA_READ_MSG_QUEUE_NUM     (20)
 
 #define VFS_SOURCE_CHECK_NULL(ptr) do {\
         if (ptr == NULL) {\
@@ -380,7 +381,7 @@ static bk_err_t vfs_data_read_task_init(vfs_source_priv_t *vfs_source_priv)
     ret = rtos_init_queue(&vfs_source_priv->vfs_data_read_msg_que,
                           "vfs_data_rd_que",
                           sizeof(vfs_data_read_msg_t),
-                          5);
+                          VFS_DATA_READ_MSG_QUEUE_NUM);
     if (ret != BK_OK)
     {
         LOGE("%s, %d, create vfs data read message queue fail\n", __func__, __LINE__);
