@@ -1251,21 +1251,18 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 	switch (aud_intf_info.voc_info.aud_codec_setup.encoder_type) {
 		case AUD_INTF_VOC_DATA_TYPE_G711A:
 		case AUD_INTF_VOC_DATA_TYPE_G711U:
-			aud_intf_info.voc_info.tx_info.buff_length = aud_intf_info.voc_info.aud_setup.mic_samp_rate_points;
-			break;
-
 		case AUD_INTF_VOC_DATA_TYPE_PCM:
-			aud_intf_info.voc_info.tx_info.buff_length = aud_intf_info.voc_info.aud_setup.mic_samp_rate_points * 2;
+			aud_intf_info.voc_info.tx_info.buff_length = aud_intf_info.voc_info.aud_codec_setup.enc_output_size_in_byte;
 			break;
 
 #if CONFIG_AUD_INTF_SUPPORT_G722
 		case AUD_INTF_VOC_DATA_TYPE_G722:
-			aud_intf_info.voc_info.tx_info.buff_length = (aud_intf_info.voc_info.aud_codec_setup.enc_output_size_in_byte);
+			aud_intf_info.voc_info.tx_info.buff_length = aud_intf_info.voc_info.aud_codec_setup.enc_output_size_in_byte;
 			break;
 #endif
 #if CONFIG_AUD_INTF_SUPPORT_OPUS
 		case AUD_INTF_VOC_DATA_TYPE_OPUS:
-			aud_intf_info.voc_info.tx_info.buff_length = (aud_intf_info.voc_info.aud_codec_setup.enc_output_size_in_byte);
+			aud_intf_info.voc_info.tx_info.buff_length = aud_intf_info.voc_info.aud_codec_setup.enc_output_size_in_byte;
 			break;
 #endif             
 		default:
@@ -1298,19 +1295,12 @@ bk_err_t bk_aud_intf_voc_init(aud_intf_voc_setup_t setup)
 	switch (aud_intf_info.voc_info.aud_codec_setup.decoder_type) {
 		case AUD_INTF_VOC_DATA_TYPE_G711A:
 		case AUD_INTF_VOC_DATA_TYPE_G711U:
-			aud_intf_info.voc_info.rx_info.frame_size = 320;		//apk receive one frame 40ms
-			//aud_intf_info.voc_info.rx_info.frame_size = aud_intf_info.voc_info.aud_setup.mic_samp_rate_points;
-			break;
-
 		case AUD_INTF_VOC_DATA_TYPE_PCM:
-			aud_intf_info.voc_info.rx_info.frame_size = 320 * 2;		//apk receive one frame 40ms
-			//aud_intf_info.voc_info.rx_info.frame_size = aud_intf_info.voc_info.aud_setup.mic_samp_rate_points * 2;
+			aud_intf_info.voc_info.rx_info.frame_size = aud_intf_info.voc_info.aud_codec_setup.dec_input_size_in_byte;
 			break;
-
 #if CONFIG_AUD_INTF_SUPPORT_G722
 		case AUD_INTF_VOC_DATA_TYPE_G722:
-			aud_intf_info.voc_info.rx_info.frame_size = aud_intf_info.voc_info.aud_codec_setup.dec_input_size_in_byte;		//apk receive one frame 40ms
-			//aud_intf_info.voc_info.rx_info.frame_size = aud_intf_info.voc_info.aud_setup.mic_samp_rate_points;
+			aud_intf_info.voc_info.rx_info.frame_size = aud_intf_info.voc_info.aud_codec_setup.dec_input_size_in_byte;
 			break;
 #endif
 #if CONFIG_AUD_INTF_SUPPORT_OPUS
@@ -1736,7 +1726,7 @@ static bk_err_t aud_intf_voc_write_dec_data(uint8_t *dac_buff, uint32_t size)
     else
     {
         //LOGE("write fail, decoder_ring_buff is full!\r\n");
-        //return BK_FAIL;
+        return BK_FAIL;
     }
 
     return BK_OK;
@@ -1792,7 +1782,6 @@ static bk_err_t aud_intf_voc_write_dec_data_opus(uint8_t *dac_buff, uint32_t siz
 /* write speaker data in voice work mode */
 static bk_err_t aud_intf_voc_write_spk_data(uint8_t *dac_buff, uint32_t size)
 {
-
     if(AUD_INTF_VOC_DATA_TYPE_OPUS == bk_aud_get_decoder_type())
     {
         return aud_intf_voc_write_dec_data_opus(dac_buff, size);
