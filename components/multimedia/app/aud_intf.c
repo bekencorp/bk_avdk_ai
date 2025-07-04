@@ -1491,6 +1491,7 @@ bk_err_t bk_aud_intf_voc_start(void)
 				if (temp_buff == NULL) {
 					return BK_ERR_AUD_INTF_MEMY;
 				} else {
+					uint8_t skip_flag = 0;
 					switch (aud_intf_info.voc_info.aud_codec_setup.decoder_type) {
 						case AUD_INTF_VOC_DATA_TYPE_G711A:
 							os_memset(temp_buff, 0xD5, temp_size);
@@ -1523,16 +1524,25 @@ bk_err_t bk_aud_intf_voc_start(void)
 #if CONFIG_AUD_INTF_SUPPORT_OPUS 
                         case AUD_INTF_VOC_DATA_TYPE_OPUS:
                         {
+                            skip_flag = 1;
+                            break;
+                        }
+#endif
+#if CONFIG_AUD_INTF_SUPPORT_MP3
+                        case AUD_INTF_VOC_DATA_TYPE_MP3:
+                        {
+                            skip_flag = 1;
                             break;
                         }
 #endif
 						default:
 							break;
 					}
-                    LOGE("bk_aud_intf_voc_start:status:%d,size:%d\n",aud_intf_info.voc_status,temp_size);
-                    #if !CONFIG_AUD_INTF_SUPPORT_OPUS 
-					aud_intf_voc_write_spk_data(temp_buff, temp_size);
-                    #endif
+					LOGE("bk_aud_intf_voc_start:status:%d,size:%d\n",aud_intf_info.voc_status,temp_size);
+					if(!skip_flag)
+					{
+						aud_intf_voc_write_spk_data(temp_buff, temp_size);
+					}
 					audio_intf_free(temp_buff);
 				}
 			}
