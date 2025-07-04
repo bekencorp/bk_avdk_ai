@@ -26,7 +26,7 @@
 #include <common/bk_assert.h>
 
 
-#define WIFI_READ_DATA_TIME_DEBUG
+//#define WIFI_READ_DATA_TIME_DEBUG
 #ifdef WIFI_READ_DATA_TIME_DEBUG
 #include <driver/aon_rtc.h>
 
@@ -328,13 +328,10 @@ __err:
 }
 
 
-
-
 static int32_t codec_mp3_fill_buffer(audio_codec_t *codec)
 {
     int bytes_read;
     size_t bytes_to_read;
-//    int retry_cnt = 5;
 
     mp3_codec_priv_t *priv = (mp3_codec_priv_t *)codec->codec_priv;
 
@@ -354,7 +351,6 @@ static int32_t codec_mp3_fill_buffer(audio_codec_t *codec)
 
     bytes_to_read = (MP3_AUDIO_BUF_SZ - priv->bytes_left) & ~(512 - 1);
 
-__retry:
     bytes_read = audio_source_read_data(codec->source, (char *)(priv->read_buffer + priv->bytes_left), bytes_to_read);
     if (bytes_read > 0)
     {
@@ -371,21 +367,18 @@ __retry:
             }
             else
             {
+                player_log(LOG_WARN, "can't read more data, end of stream. left=%d\n", priv->bytes_left);
                 goto exit;
             }
         }
 
-        //if (bytes_read == PLAYER_ERR_TIMEOUT && (retry_cnt--) > 0)
         if (bytes_read == PLAYER_ERR_TIMEOUT)
         {
             if (priv->bytes_left >= MAINBUF_SIZE)
             {
                 return 0;
             }
-            else
-            {
-                goto __retry;
-            }
+            return PLAYER_ERR_TIMEOUT;
         }
         else
         {
@@ -395,8 +388,7 @@ __retry:
     }
 
 exit:
-    player_log(LOG_WARN, "can't read more data, end of stream. left=%d\n", priv->bytes_left);
-    return -1;
+    return PLAYER_ERR_UNKNOWN;
 }
 
 
@@ -624,11 +616,19 @@ retry:
 #endif      //#if CONFIG_ARCH_RISCV
 #endif      //#ifdef WIFI_READ_DATA_TIME_DEBUG
 
-        if (codec_mp3_fill_buffer(codec) != 0)
+        int ret = codec_mp3_fill_buffer(codec);
+        if (ret != 0)
         {
-            /* play complete */
-            player_log(LOG_ERR, "play complete\n");
-            return 0;
+            if (ret == PLAYER_ERR_TIMEOUT)
+            {
+                return PLAYER_ERR_TIMEOUT;
+            }
+            else
+            {
+                /* play complete */
+                player_log(LOG_INFO, "play complete\n");
+                return 0;
+            }
         }
 
 #ifdef WIFI_READ_DATA_TIME_DEBUG

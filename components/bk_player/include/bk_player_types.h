@@ -39,6 +39,7 @@ typedef enum
     PLAYER_EVENT_FINISH,
 
     PLAYER_EVENT_TICK,
+    PLAYER_EVENT_READ_DATA_TIMEOUT,
 } bk_player_event_t;
 
 typedef struct player *bk_player_handle_t;

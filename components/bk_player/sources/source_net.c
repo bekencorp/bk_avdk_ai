@@ -386,7 +386,7 @@ static int net_source_read(audio_source_t *source, char *buffer, int len)
     }
     else
     {
-        ret = rb_read(priv->pipe, buffer, len, 300 / portTICK_RATE_MS);
+        ret = rb_read(priv->pipe, buffer, len, 100 / portTICK_RATE_MS);
     }
 
     if (ret > 0)
@@ -395,12 +395,12 @@ static int net_source_read(audio_source_t *source, char *buffer, int len)
     }
     else if (ret == RB_TIMEOUT)
     {
-        player_log(LOG_INFO, "net_source_read: RB_TIMEOUT\n");
+        player_log(LOG_WARN, "net_source_read: RB_TIMEOUT\n");
         return PLAYER_ERR_TIMEOUT;
     }
     else
     {
-        player_log(LOG_INFO, "net_source_read, ret: %d\n", ret);
+        player_log(LOG_ERR, "net_source_read, ret: %d\n", ret);
         return PLAYER_ERR_UNKNOWN;
     }
 }

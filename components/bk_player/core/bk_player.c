@@ -359,11 +359,12 @@ int player_pipeline_process(bk_player_handle_t player)
     int ret = 0;
     int len;
     int len2;
-    //int event = EVENT_LAST;
     int result = 0;
+    int retry_cnt = CONFIG_PLAYER_READ_DATA_TIMEOUT_MS/100;
 
     //player_log(LOG_INFO, "%s\n", __func__);
 
+__retry:
     result = player_event_handle(player, 0);
     if (result == PLAYER_BREAKOUT || result == PLAYER_EXIT)
     {
@@ -377,8 +378,23 @@ int player_pipeline_process(bk_player_handle_t player)
     if (len < 0)
     {
         player_log(LOG_ERR, "%s, %d, codec return = %d\n", __func__, __LINE__, len);
-        //ret = CHUNK_CODEC_ERR;
-        //event = EVENT_SONG_FAILURE;
+        if (len == PLAYER_ERR_TIMEOUT)
+        {
+            if ((retry_cnt--) > 0)
+            {
+                player_log(LOG_WARN, "read data timeout. retry: %d\n", retry_cnt);
+                goto __retry;
+            }
+
+            /* player read data timeout error, stop playing and report event */
+            player_pipeline_teardown(player);
+            player->state = PLAYER_STAT_STOPPED;
+            if (player->event_handle)
+            {
+                player->event_handle(PLAYER_EVENT_READ_DATA_TIMEOUT, NULL, player->args);
+            }
+        }
+
         ret = -1;
     }
     else if (len == 0)
@@ -391,8 +407,6 @@ int player_pipeline_process(bk_player_handle_t player)
         {
             player->event_handle(PLAYER_EVENT_FINISH, NULL, player->args);
         }
-        //ret = CHUNK_CONTINUE;
-        //event = EVENT_LAST;
     }
     else
     {
@@ -400,14 +414,10 @@ int player_pipeline_process(bk_player_handle_t player)
         if (len2 <= 0)
         {
             player_log(LOG_ERR, "%s, sink return = %d\n", __func__, len2);
-            //ret = CHUNK_SINK_ERR;
-            //event = EVENT_SONG_FAILURE;
             ret = -1;
         }
         else
         {
-            //ret = CHUNK_CONTINUE;
-            //event = EVENT_LAST;
             player->consumed_bytes += len2;
             _play_sm_progress(player);
         }

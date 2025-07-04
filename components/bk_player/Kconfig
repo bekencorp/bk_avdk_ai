@@ -61,4 +61,12 @@ menu "Bk_player"
         range 0 1
         default 0
 
+    config PLAYER_READ_DATA_TIMEOUT_MS
+        depends on PLAYER
+        int "Config layer read data timeout(ms)"
+        range 100 60000
+        default 3000
+	    help
+            Player will automatically stop and report event when player read data timeout. The timeout duration must be a multiple of 100ms.
+
 endmenu
