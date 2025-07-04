@@ -33,17 +33,10 @@ typedef struct {
 } data_buffer_t;
 
 typedef struct {
-    uint8_t *buffer;
-    size_t head;
-    size_t tail;
-    size_t size;
-} data_buffer_fixed_t;
-
-typedef struct {
     data_buffer_t *ring_buffer;
-    data_buffer_fixed_t *ring_buffer_fix;
     beken_timer_t data_read_tmr;
     audio_info_t info;
+    int playing_flags; //0:running 1:end
     beken_mutex_t lock; //TODO if needed
 } play_config_t;
 
@@ -83,138 +76,6 @@ int play_user_audio_rx_data_handle(unsigned char *data, unsigned int size)
     }
 
     return ret;
-}
-
-data_buffer_fixed_t *play_fixed_data_buffer_init(size_t buffer_size) {
-#if CONFIG_PSRAM_AS_SYS_MEMORY
-    data_buffer_fixed_t *ab = (data_buffer_fixed_t *)psram_malloc(sizeof(data_buffer_fixed_t));
-#else
-    data_buffer_fixed_t *ab = (data_buffer_fixed_t *)os_malloc(sizeof(data_buffer_fixed_t));
-#endif
-    if (ab == NULL)
-    {
-        LOGE("malloc ab fail\n");
-        return NULL;
-    }
-    memset(ab, 0, sizeof(data_buffer_fixed_t));
-#if CONFIG_PSRAM_AS_SYS_MEMORY
-    ab->buffer = psram_malloc(buffer_size);
-#else
-    ab->buffer = os_malloc(buffer_size);
-#endif
-    if (ab->buffer == NULL)
-    {
-        LOGE("malloc data buffer fail\n");
-        return NULL;
-    }
-    memset(ab->buffer, 0, buffer_size);
-    ab->head = 0;
-    ab->tail = 0;
-    ab->size = buffer_size;
-
-    return ab;
-}
-
-void play_fixed_data_buffer_deinit(data_buffer_fixed_t *ab) {
-    if (ab == NULL)
-    {
-        LOGE("buffer deinit already\n");
-        return;
-    }
-    memset(ab->buffer, 0, ab->size);
-    if (ab->buffer)
-    {
-        os_free(ab->buffer);
-    }
-    ab->head = 0;
-    ab->tail = 0;
-    ab->size = 0;
-    memset(ab, 0, sizeof(data_buffer_fixed_t));
-    if(ab) {
-        os_free(ab);
-    }
-}
-
-bool play_fixed_data_buffer_write(data_buffer_fixed_t *ab, const uint8_t *data, size_t len) {
-
-    if (len > ab->size) {
-        return false;
-    }
-
-    size_t free_space = (ab->tail > ab->head) ? (ab->tail - ab->head) : (ab->size - ab->head + ab->tail);
-    if (free_space < len) {
-        LOGE("%s free_space:%d len:%d full\n", __func__, free_space, len);
-        return false;
-    }
-
-    if (ab->head + len <= ab->size) {
-        memcpy(&ab->buffer[ab->head], data, len);
-    } else {
-        size_t first_part = ab->size - ab->head;
-        memcpy(&ab->buffer[ab->head], data, first_part);
-        memcpy(ab->buffer, data + first_part, len - first_part);
-    }
-
-    ab->head = (ab->head + len) % ab->size;
-    return true;
-}
-
-size_t play_fixed_data_buffer_read(data_buffer_fixed_t *ab, uint8_t *data, size_t len) {
-    if (len > ab->size) {
-        return 0;
-    }
-    size_t available_data = (ab->head >= ab->tail) ? (ab->head - ab->tail) : (ab->size - ab->tail + ab->head);
-    if (available_data == 0) {
-        return 0;
-    }
-
-    if (available_data < len) {
-        LOGE("%s available:%d len:%d\n", __func__, available_data, len);
-        len = available_data;
-    }
-
-    if (ab->tail + len <= ab->size) {
-        memcpy(data, &ab->buffer[ab->tail], len);
-    } else {
-        size_t first_part = ab->size - ab->tail;
-        memcpy(data, &ab->buffer[ab->tail], first_part);
-        memcpy(data + first_part, ab->buffer, len - first_part);
-    }
-
-    ab->tail = (ab->tail + len) % ab->size;
-    return len;
-}
-
-void play_fixed_data_buffer_clean(data_buffer_fixed_t *ab)
-{
-    size_t available_data = (ab->head >= ab->tail) ? (ab->head - ab->tail) : (ab->size - ab->tail + ab->head);
-    LOGI("%s available:%d\r\n", __func__, available_data);
-    memset(ab->buffer, 0, ab->size);
-    ab->head = 0;
-    ab->tail = 0;
-    return;
-}
-
-void play_fixed_data_check(void *param)
-{
-    play_config_t *play = (play_config_t *) param;
-    if(play == NULL) {
-        LOGE("play config null...\n");
-        return;
-    }
-    int size = 0;
-    uint8_t *packet = NULL;
-    packet = os_zalloc(play->info.dec_node_size);
-    if (packet != NULL && (play->info.dec_node_size <= bk_aud_intf_get_dec_rb_free_size()))
-    {
-        if (play->ring_buffer_fix && (size = play_fixed_data_buffer_read(play->ring_buffer_fix, packet, play->info.dec_node_size))) {
-            LOGD("data coming...len:%d\n", size);
-            play_user_audio_rx_data_handle(packet, size);
-        } else {
-            LOGD("Buffer empty, waiting for data...\n");
-        }
-    }
-    os_free(packet);
 }
 
 data_buffer_t *play_data_buffer_init (size_t buffer_size, size_t length_buffer_size) {
@@ -339,8 +200,8 @@ size_t play_data_buffer_read(data_buffer_t *rb, uint8_t *output) {
         }
     }
     rb->length_read_index = (rb->length_read_index + 1) % rb->buffer_count;
-    LOGD("%s length_read_index:%d length_write_index:%d write_index:%d read_index:%d available:%d data_len:%d\r\n",
-        __func__, rb->length_read_index, rb->length_write_index, rb->write_index, rb->read_index, available, data_len);
+    LOGD("%s length_read_index:%d length_write_index:%d write_index:%d read_index:%d available:%d data_len:%d size:%d\r\n",
+        __func__, rb->length_read_index, rb->length_write_index, rb->write_index, rb->read_index, available, data_len, rb->size);
     return data_len;
 }
 
@@ -367,7 +228,7 @@ void play_data_check(void *param)
     uint8_t *packet = NULL;
     packet = os_zalloc(play->info.dec_node_size);
     int size = 0;
-    if (packet != NULL)
+    if (packet != NULL && (play->info.dec_node_size <= bk_aud_intf_get_dec_rb_free_size()))
     {
         if (play->ring_buffer && (size = play_data_buffer_read(play->ring_buffer, packet))) {
             play_user_audio_rx_data_handle(packet, size);
@@ -389,7 +250,7 @@ int play_data_start_timeout_check(uint32_t timeout, void *param)
     }
 
     LOGI("ring_data status timer start!!! dectype:%s\n", play->info.decoding_type);
-    err = rtos_init_timer(&(play->data_read_tmr), timeout, (timer_handler_t)play_fixed_data_check, param);
+    err = rtos_init_timer(&(play->data_read_tmr), timeout, (timer_handler_t)play_data_check, param);
 
     BK_ASSERT(kNoErr == err);
     err = rtos_start_timer(&(play->data_read_tmr));
@@ -418,15 +279,16 @@ void play_data_stop_timeout_check(beken_timer_t *data_read_tmr)
 int play_data_end(void *param)
 {
     LOGI("%s\r\n", __func__);
-    state_machine_run_event(State_Event_BufferPlay_PlayEnd);
+    if (play_info && play_info->playing_flags == 0)
+        state_machine_run_event(State_Event_BufferPlay_PlayEnd);
     return BK_OK;
 }
 
 void Play_audioClean(void)
 {
     play_config_t *play = play_info;
-    if (play && play->ring_buffer_fix) {
-        play_fixed_data_buffer_clean(play->ring_buffer_fix);
+    if (play && play->ring_buffer) {
+        play_data_buffer_clean(play->ring_buffer);
     }
 }
 
@@ -440,6 +302,7 @@ play_config_t *Play_audioInit()
     }
     os_memcpy(&play->info, &general_audio, sizeof(audio_info_t));
     if (play->info.dec_node_size) {
+        play->info.dec_node_size = play->info.dec_node_size * 4;  //TODO, max size set to 1232 * 4
         max_count = WSS_AUDIO_BUFFER_SIZE / (play->info.dec_node_size);
         LOGI("module_bufferPlay_audioInit. enctype:%s dectype:%s adc_rate:%d dac_rate:%d enc:%d dec:%d encsize:%d decsize:%d max_count:%d\n",
             play->info.encoding_type, play->info.decoding_type, play->info.adc_samp_rate, play->info.dac_samp_rate,
@@ -451,10 +314,10 @@ play_config_t *Play_audioInit()
     audio_register_play_finish_func(play_data_end);
 
     if (play->info.decoding_type) {
-        play->ring_buffer_fix = play_fixed_data_buffer_init(WSS_AUDIO_BUFFER_SIZE);
-        if (play->ring_buffer_fix == NULL)
+        play->ring_buffer = play_data_buffer_init(((play->info.dec_node_size) * max_count), max_count);
+        if (play->ring_buffer == NULL)
         {
-            LOGE("%s, %d, fixed_data_buffer_init fail\n", __func__, __LINE__);
+            LOGE("%s, %d, data_buffer_init fail\n", __func__, __LINE__);
             goto exit;
         }
     }
@@ -480,8 +343,8 @@ void Play_audioDeinit(play_config_t *play)
         return;
     }
     play_data_stop_timeout_check(&play->data_read_tmr);
-    play_fixed_data_buffer_deinit(play->ring_buffer_fix);
-    play->ring_buffer_fix = NULL;
+    play_data_buffer_deinit(play->ring_buffer);
+    play->ring_buffer = NULL;
 
     if (play) {
         os_free(play);
@@ -496,6 +359,7 @@ void module_bufferPlay_audioInit()
      if (play_info == NULL) {
         play_info = Play_audioInit();
      }
+     play_info->playing_flags = 0;
      bk_aud_intf_voc_write_spk_data_ctrl(1);
      state_machine_run_event(State_Event_BufferPlay_AudioInitEnd);
 }
@@ -503,10 +367,15 @@ void module_bufferPlay_audioInit()
 // buf为mp3数据 rlen为当前数据长度
 void module_bufferPlay_data(void *buf, int rlen)
 {
+    if (rlen > (play_info->info.dec_node_size)) {
+        LOGE("data too large, len:%d limit:%d\n", rlen, general_audio.dec_node_size);
+        return;
+    }
+
     LOGD("%s rlen:%d\n", __func__, rlen);
 
-    if (play_info->ring_buffer_fix) {
-        play_fixed_data_buffer_write(play_info->ring_buffer_fix, buf, rlen);
+    if (play_info->ring_buffer) {
+        play_data_buffer_write(play_info->ring_buffer, buf, rlen);
     }
 }
 
@@ -526,6 +395,8 @@ void module_bufferPlay_terminate()
 {
     LOGI("module_bufferPlay_terminate\n");
     Play_audioClean();
+    if (play_info)
+        play_info->playing_flags = 1;
     state_machine_run_event(State_Event_BufferPlay_TerminateEnd);
 }
 
