@@ -785,6 +785,7 @@ const uint16_t EQTAB[257] =
 uint32 aec_gtbuf[94*1024/4] __attribute__((section(".aec_bss")));
 #endif
 int16_t temp_buf[640] = {0};
+int16_t asr_data_buf[320]= {0};
 
 void aud_production_mode_init()
 {
@@ -947,6 +948,7 @@ static bk_err_t aud_tras_drv_aec_cfg(void)
 	uint8_t *aec_buff_start=NULL;
     uint32_t offset=0;
  	uint32_t ex_size = 0;
+
 	aec_info_t *temp_aec_info = aud_tras_drv_info.voc_info.aec_info;
 
 	#if (CONFIG_AEC_VERSION_V3 && CONFIG_AUD_AI_NS_SUPPORT && (!CONFIG_AUD_AI_NS_USE_STATIC_SRAM))
@@ -1006,16 +1008,17 @@ static bk_err_t aud_tras_drv_aec_cfg(void)
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_EC_DEPTH, temp_aec_info->aec_config->ec_depth);							//建议取值范围1~50; 后面几个参数建议先用aec_init内的默认值，具体需要根据实际情况调试; 总得来说回声越大需要调的越大
 
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_REF_SCALE, temp_aec_info->aec_config->ref_scale);						//取值0,1,2；rx数据如果幅值太小的话适当放大
-	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_VOL, temp_aec_info->aec_config->voice_vol);								//通话过程中如果需要经常调节喇叭音量就设置下当前音量等级
+	//aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_VOL, temp_aec_info->aec_config->voice_vol);								//通话过程中如果需要经常调节喇叭音量就设置下当前音量等级
 	/* 降噪相关 */
-	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_NS_LEVEL, temp_aec_info->aec_config->ns_level);							//建议取值范围1~8；值越小底噪越小
-	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_NS_PARA, temp_aec_info->aec_config->ns_para);							//只能取值0,1,2; 降噪由弱到强，建议默认值
+	//aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_NS_LEVEL, temp_aec_info->aec_config->ns_level);							//建议取值范围1~8；值越小底噪越小
+	//aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_NS_PARA, temp_aec_info->aec_config->ns_para);							//只能取值0,1,2; 降噪由弱到强，建议默认值
 	/* drc(输出音量相关) */
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_DRC, temp_aec_info->aec_config->drc);									//建议取值范围0x10~0x1f;   越大输出声音越大
 
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_EC_FILTER, aud_para.aec_config_voice.ec_filter);//0x01	 0x03	0x07
 	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_DELAY_BUFF, (uint32_t)temp_aec_info->aec->refbuff);
 #if CONFIG_AEC_VERSION_V3
+	aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_DELAY_BUFF, (uint32_t)temp_aec_info->aec->Abuf);
 if(aud_para.aec_config_voice.ns_type == NS_AI)
 {
     #if CONFIG_AUD_AI_NS_SUPPORT
@@ -1034,17 +1037,7 @@ if(aud_para.aec_config_voice.ns_type == NS_AI)
 			aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_GTTEMP, (uint32_t)temp_aec_info->aec->tmp2);
 	#endif
 }	
-else
-{
-		if(aud_para.aec_config_voice.ns_filter != 0x80)
-		{
-	        aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_NS_FILTER, aud_para.aec_config_voice.ns_filter);
-		}
-		else
-		{
-	        aec_ctrl(temp_aec_info->aec, AEC_CTRL_CMD_SET_NS_FILTER, 0x7);
-		}
-}
+
 
 
 	if((aud_para.aec_config_voice.vad_start_threshold !=0 && aud_para.aec_config_voice.vad_stop_threshold != 0xff)
@@ -1056,8 +1049,11 @@ else
 		                        aud_para.aec_config_voice.vad_silence_threshold,
 								aud_para.aec_config_voice.vad_eng_threshold);
 	}
-
+	uint32 delay_num = 0;
+	delay_num = 2+ (temp_aec_info->aec->SPthr[1])/(temp_aec_info->aec->SPthr[3] + temp_aec_info->aec->SPthr[4]);
+	vad_delay_ring_buf_init(temp_aec_info->samp_rate_points,delay_num);
 #endif
+
 	return BK_OK;
 }
 
@@ -1373,8 +1369,9 @@ static void aud_tras_drv_vad_flag_send(uint32 flag)
 }
 
 
-static void aud_aec_vad_process(void)
+static int aud_aec_vad_process(void)
 {
+	int ret_val = 0;
 #if CONFIG_SYS_CPU1
 #if CONFIG_AEC_VERSION_V3
     aec_info_t *aec_info_pr = aud_tras_drv_info.voc_info.aec_info;
@@ -1382,13 +1379,7 @@ static void aud_aec_vad_process(void)
     static int aec_vad_flag=0;
     static int aec_vad_mem=0;
 
-	if(aud_para.aec_config_voice.vad_enable == 0)
-	{
-		aec_vad_flag = 0;
-		aec_vad_mem = 0;
-		badframe = 16;
-		return;
-	}
+
 
     int dc = aec_info_pr->aec->dc >> 14;
     if (dc<0)
@@ -1449,11 +1440,16 @@ static void aud_aec_vad_process(void)
         }
         aec_vad_mem = aec_info_pr->aec->test;
     }
-	aud_tras_drv_vad_flag_send(aec_vad_flag);
-
+	if(aud_para.aec_config_voice.vad_enable == 1)
+	{
+		aud_tras_drv_vad_flag_send(aec_vad_flag);
+	}
+	ret_val = aec_vad_flag;
 #endif
 #endif
+    return ret_val;
 }
+
 
 
 
@@ -1638,18 +1634,20 @@ if(aud_get_production_mode())
 
 	spk_play_flag = check_rx_spk_data_silence(aec_info_pr->ref_addr, 32);
 	/* aec process data */
-	
+	int16_t cur_aec_vad_flag = 0;
+	__maybe_unused_var(cur_aec_vad_flag);
 	if(aud_para.aec_config_voice.aec_enable)
 	{
 		aec_proc(aec_info_pr->aec, aec_info_pr->ref_addr, aec_info_pr->mic_addr, aec_info_pr->out_addr);
-		aud_aec_vad_process();
+		cur_aec_vad_flag = aud_aec_vad_process();
 	}
 	else
 	{
 		os_memcpy(aec_info_pr->out_addr, aec_info_pr->mic_addr, aec_info_pr->samp_rate_points*2);
 	}
 
-	//voice_ul_post_process(aec_info_pr->out_addr, aec_info_pr->samp_rate_points);
+	 os_memcpy(asr_data_buf, aec_info_pr->out_addr, aec_info_pr->samp_rate_points*2);
+	 voice_ul_post_process(aec_info_pr->out_addr, aec_info_pr->samp_rate_points,cur_aec_vad_flag,0);
 	if (aud_tras_drv_info.voc_info.aud_tras_dump_aec_cb) {
 		aud_tras_drv_info.voc_info.aud_tras_dump_aec_cb((uint8_t *)aec_info_pr->out_addr, aec_info_pr->samp_rate_points*2);
 	}
@@ -1728,7 +1726,8 @@ if(aud_get_production_mode())
     }
     else
     {
-        gl_asr_data.data = (unsigned char *)aec_info_pr->out_addr;
+        // gl_asr_data.data = (unsigned char *)aec_info_pr->out_addr;
+        gl_asr_data.data = (unsigned char *)asr_data_buf;
         gl_asr_data.size = (unsigned int)aec_info_pr->samp_rate_points*2;
     }
     gl_asr_data.spk_play_flag = spk_play_flag;	
