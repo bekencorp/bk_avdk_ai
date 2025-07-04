@@ -352,4 +352,8 @@ menu "Media"
 		bool "Enable JPEG software decode use cpu2"
 		default y
 
+	config CLEAR_AUDIO_DEC_BUFFER_AFTER_PROMPT_TONE_PLAY
+		depends on AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
+		bool "Clear audio decoder buffer after prompt tone play"
+		default n
 endmenu

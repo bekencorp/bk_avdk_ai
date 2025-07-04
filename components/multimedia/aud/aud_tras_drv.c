@@ -2735,6 +2735,11 @@ static void read_prompt_tone_data(void)
                 LOGE("%s, %d, send tras stop prompt tone fail\n", __func__, __LINE__);
             }
         }
+
+        #if CONFIG_CLEAR_AUDIO_DEC_BUFFER_AFTER_PROMPT_TONE_PLAY
+        ring_buffer_clear(aud_tras_drv_info.voc_info.rx_info.decoder_rb);
+        #endif
+
     } else {
         if (r_size != aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2) {
             os_memset((uint8_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data + r_size, 0, aud_tras_drv_info.voc_info.speaker_samp_rate_points * 2 - r_size);
