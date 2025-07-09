@@ -264,7 +264,7 @@ static mp3_decoder_context_t mp3_dec_ctx;
 #if CONFIG_AUD_SWEEP_TEST
 Sweep_Info sweep_info;
 Sweep_Info *sweep = &sweep_info;
-int flag_mic_dac_sweep_mode = 1;
+int flag_mic_dac_sweep_mode = 0;
 static int aud_production_mode_init_flag = 0;
 #endif
 void aud_set_production_mode(int val);
@@ -870,10 +870,11 @@ int aud_get_production_mode(void)
 }
 
 
-static void aud_aec_production_result(void)
+void aud_aec_production_result(void)
 {
 #if CONFIG_AUD_SWEEP_TEST
 	bool ret1 = false, ret2 = false;
+	__maybe_unused_var(ret2);
 	if(aud_get_production_mode())
 	{
 		aec_info_t *aec_info_pr = aud_tras_drv_info.voc_info.aec_info;
@@ -933,6 +934,9 @@ static void aud_aec_production_result(void)
 			else
 			{
 				if((170*4+90 == aec_info_pr->aec->frame_cnt))
+				{
+
+				}
 			}
 		}
 	}
@@ -3265,15 +3269,17 @@ static bk_err_t aud_tras_dec(void)
 	}
 #endif
 
-#if CONFIG_AUD_SWEEP_TEST
-	aud_production_mode_init();
-	aud_production_data_generate(sweep, (int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points);			
-#endif
+
 
 	if(EQ_SAMPLE_RATE == aud_tras_drv_info.voc_info.aud_codec_setup.dac_samp_rate)
 	{
 		voice_dl_process((int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data,aud_tras_drv_info.voc_info.speaker_samp_rate_points);
 	}
+#if CONFIG_AUD_SWEEP_TEST
+	aud_production_mode_init();
+	aud_production_data_generate(sweep, (int16_t *)aud_tras_drv_info.voc_info.decoder_temp.pcm_data, aud_tras_drv_info.voc_info.speaker_samp_rate_points);			
+#endif
+	
 #if CONFIG_AEC_ECHO_COLLECT_MODE_SOFTWARE
 	if (aud_tras_drv_info.voc_info.aec_enable) {
 		/* read mic fill data size */
