@@ -7,4 +7,11 @@ menu "VolcEngineRTCLite"
 		default n
 		help
 			Enable Volc RTC
+
+	config VOLC_RTC_ENABLE_LICENSE
+		bool "Enable volc RTC license check"
+		depends on VOLC_RTC_EN
+		default n
+		help
+			Enable volc RTC license check
 endmenu
