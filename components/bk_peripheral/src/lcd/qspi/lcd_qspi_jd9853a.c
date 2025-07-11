@@ -57,7 +57,7 @@ static uint8_t jd9853a_cmd[4] = {0x32, 0x00, 0x2c, 0x00};
 
 static const lcd_qspi_t lcd_qspi_jd9853a_config =
 {
-    .clk = LCD_QSPI_40M,
+    .clk = LCD_QSPI_48M,
     .refresh_method = LCD_QSPI_REFRESH_BY_FRAME,
     .reg_write_cmd = LCD_QSPI_JD9853A_REGISTER_WRITE_COMMAND,
     .reg_read_cmd = LCD_QSPI_JD9853A_REGISTER_READ_COMMAND,
