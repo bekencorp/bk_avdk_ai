@@ -6533,6 +6533,7 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
                 }
 
                 case AUD_TRAS_STOP_PROMPT_TONE_REQ:
+                    mailbox_msg = (media_mailbox_msg_t *)msg.param;
                     ret = prompt_tone_play_stop(gl_prompt_tone_play_handle);
                     msg_send_rsp_to_media_major_mailbox(mailbox_msg, ret, APP_MODULE);
                     break;
