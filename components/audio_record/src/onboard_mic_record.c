@@ -591,7 +591,7 @@ static bk_err_t onboard_mic_open(onboard_mic_record_priv_t *onboard_mic)
     }
 
     /* init ringbuffer */
-    onboard_mic->rb = rb_create(onboard_mic->rb_size);
+    onboard_mic->rb = rb_create_by_mem_type(onboard_mic->rb_size, RB_MEM_TYPE_PSRAM);
     if (!onboard_mic->rb)
     {
         LOGE("%s, %d, create ringbuffer fail\n", __func__, __LINE__);

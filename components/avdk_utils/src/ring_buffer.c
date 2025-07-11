@@ -21,7 +21,6 @@
 #include "task.h"
 #include "semphr.h"
 #include "ring_buffer.h"
-//#include "player_mem.h"
 
 #define TAG   "RING_BUFFER"
 
@@ -39,6 +38,7 @@ struct ringbuf
     bool abort_write;
     bool is_done_write;             /**< To signal that we are done writing */
     bool unblock_reader_flag;       /**< To unblock instantly from rb_read */
+    rb_mem_type_t mem_type;         /**< Memory type */
 };
 
 bk_err_t rb_abort_read(ringbuf_handle_t rb);
@@ -76,12 +76,86 @@ ringbuf_handle_t rb_create(int size)
     rb->unblock_reader_flag = false;
     rb->abort_read = false;
     rb->abort_write = false;
+    rb->mem_type = RB_MEM_TYPE_SRAM;
     return rb;
 
 _rb_init_failed:
     rb_destroy(rb);
     return NULL;
 }
+
+ringbuf_handle_t rb_create_by_mem_type(int size, rb_mem_type_t mem_type)
+{
+    if (size <= 0)
+    {
+        BK_LOGE(TAG, "%s, Invalid size: %d, %d \n", __func__, size, __LINE__);
+        return NULL;
+    }
+
+    ringbuf_handle_t rb = NULL;
+    char *buf = NULL;
+
+    if (mem_type == RB_MEM_TYPE_PSRAM)
+    {
+        rb = psram_malloc(sizeof(struct ringbuf));
+    }
+    else
+    {
+        rb = os_malloc(sizeof(struct ringbuf));
+    }
+    if (!rb)
+    {
+        return NULL;
+    }
+    os_memset(rb, 0, sizeof(struct ringbuf));
+
+    if (mem_type == RB_MEM_TYPE_PSRAM)
+    {
+        buf = psram_malloc(size);
+    }
+    else
+    {
+        buf = os_malloc(size);
+    }
+    if (!buf)
+    {
+        goto _rb_init_failed;
+    }
+    os_memset(buf, 0, size);
+
+    bool _success =
+        (
+            (rb->can_read   = xSemaphoreCreateBinary())               &&
+            (rb->lock       = xSemaphoreCreateMutex())                &&
+            (rb->can_write  = xSemaphoreCreateBinary())
+        );
+
+    if (!_success)
+    {
+        goto _rb_init_failed;
+    }
+
+
+    rb->p_o = rb->p_r = rb->p_w = buf;
+    rb->fill_cnt = 0;
+    rb->size = size;
+    rb->is_done_write = false;
+    rb->unblock_reader_flag = false;
+    rb->abort_read = false;
+    rb->abort_write = false;
+    rb->mem_type = mem_type;
+    return rb;
+
+_rb_init_failed:
+    if (buf)
+    {
+        os_free(buf);
+        buf = NULL;
+    }
+    rb_destroy(rb);
+    return NULL;
+}
+
 
 bk_err_t rb_destroy(ringbuf_handle_t rb)
 {

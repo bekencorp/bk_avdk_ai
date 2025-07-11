@@ -702,7 +702,7 @@ static int mp3_codec_open(audio_codec_t *codec, audio_codec_cfg_t *config)
     temp_mp3_codec->out_buffer_size = config->chunk_size;
 
     /* init ringbuffer */
-    temp_mp3_codec->rb = rb_create(temp_mp3_codec->rb_size);
+    temp_mp3_codec->rb = rb_create_by_mem_type(temp_mp3_codec->rb_size, RB_MEM_TYPE_PSRAM);
     if (!temp_mp3_codec->rb)
     {
         LOGE("%s, %d, create pool ringbuffer fail\n", __func__, __LINE__);

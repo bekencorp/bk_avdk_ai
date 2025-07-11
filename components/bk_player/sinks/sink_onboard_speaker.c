@@ -558,7 +558,7 @@ static bk_err_t onboard_speaker_open(onboard_speaker_sink_priv_t *onboard_spk)
 
     /* init ringbuffer */
     onboard_spk->rb_size = RB_SIZE;
-    onboard_spk->rb = rb_create(onboard_spk->rb_size);
+    onboard_spk->rb = rb_create_by_mem_type(onboard_spk->rb_size, RB_MEM_TYPE_PSRAM);
     if (!onboard_spk->rb)
     {
         player_log(LOG_ERR, "%s, %d, create ringbuffer fail\n", __func__, __LINE__);

@@ -32,16 +32,32 @@ extern "C" {
 #define RB_ABORT        (-3)
 #define RB_TIMEOUT      (-4)
 
+typedef enum
+{
+    RB_MEM_TYPE_SRAM = 1,
+    RB_MEM_TYPE_PSRAM,
+} rb_mem_type_t;
+
 typedef struct ringbuf *ringbuf_handle_t;
 
 /**
- * @brief      Create ringbuffer with total size = block_size * n_blocks
+ * @brief      Create ringbuffer with size in sram
  *
  * @param[in]  size   Size of   ring buffer
  *
  * @return     ringbuf_handle_t
  */
 ringbuf_handle_t rb_create(int size);
+
+/**
+ * @brief      Create ringbuffer with total size
+ *
+ * @param[in]  size     Size of   ring buffer
+ * @param[in]  mem_type Memory type of ring buffer, sram: 1, psram: 2
+ *
+ * @return     ringbuf_handle_t
+ */
+ringbuf_handle_t rb_create_by_mem_type(int size, rb_mem_type_t mem_type);
 
 /**
  * @brief      Cleanup and free all memory created by ringbuf_handle_t
@@ -152,8 +168,26 @@ bk_err_t rb_done_write(ringbuf_handle_t rb);
  */
 bk_err_t rb_unblock_reader(ringbuf_handle_t rb);
 
+/**
+ * @brief      Abort write data
+ *
+ * @param[in]  rb    The Ringbuffer handle
+ *
+ * @return
+ *     - BK_OK
+ *     - BK_FAIL
+ */
 bk_err_t rb_abort_write(ringbuf_handle_t rb);
 
+/**
+ * @brief      Abort read data
+ *
+ * @param[in]  rb    The Ringbuffer handle
+ *
+ * @return
+ *     - BK_OK
+ *     - BK_FAIL
+ */
 bk_err_t rb_abort_read(ringbuf_handle_t rb);
 
 #ifdef __cplusplus

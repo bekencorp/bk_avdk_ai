@@ -193,7 +193,7 @@ static int net_source_start_worker(audio_source_t *source)
         return PLAYER_ERR_NO_MEM;
     }
 
-    priv->pipe = rb_create(NET_PIPE_SIZE);
+    priv->pipe = rb_create_by_mem_type(NET_PIPE_SIZE, RB_MEM_TYPE_PSRAM);
     if (!priv->pipe)
     {
         player_log(LOG_ERR, "net_source_start_worker : can't create pipe\n");

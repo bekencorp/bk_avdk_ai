@@ -5311,7 +5311,7 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
         rb_destroy(gl_prompt_tone_rb);
         gl_prompt_tone_rb = NULL;
     }
-    gl_prompt_tone_rb = rb_create(PROMPT_TONE_RB_SIZE);
+    gl_prompt_tone_rb = rb_create_by_mem_type(PROMPT_TONE_RB_SIZE, RB_MEM_TYPE_PSRAM);
     if (!gl_prompt_tone_rb)
     {
         LOGE("%s, %d, create gl_prompt_tone_rb: %d fail\n", __func__, __LINE__, PROMPT_TONE_RB_SIZE);
