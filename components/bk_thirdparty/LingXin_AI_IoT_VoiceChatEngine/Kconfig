@@ -7,4 +7,16 @@ menu "LingXin_AI_IoT_VoiceChatEngine"
 		default n
 		help
 			Enable LingXin AI
+	config AUDIO_BUFFER_CUSTOM_ENABLE
+		depends on LINGXIN_AI_EN
+		bool "Enable Audio Buffer Play"
+		default y
+		help
+			Enable Audio Buffer
+	config RECORD_CUSTOM_ENABLE
+		depends on LINGXIN_AI_EN
+		bool "Enable Record Buffer"
+		default y
+		help
+			Enable Record Buffer
 endmenu
