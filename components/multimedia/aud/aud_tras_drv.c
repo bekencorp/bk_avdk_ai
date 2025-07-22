@@ -4634,7 +4634,7 @@ static bk_err_t aud_tras_drv_voc_deinit(void)
     if (aud_tras_drv_info.asr_rsp_out_buff)
     {
         bk_aud_rsp_deinit_multi_instance(aud_tras_drv_info.asr_rsp_handler);
-        psram_free(aud_tras_drv_info.asr_rsp_out_buff);
+        audio_tras_drv_free(aud_tras_drv_info.asr_rsp_out_buff);
         aud_tras_drv_info.asr_rsp_out_buff = NULL;
     }
 
@@ -4649,12 +4649,12 @@ static bk_err_t aud_tras_drv_voc_deinit(void)
 #if CONFIG_DEBUG_DUMP
     if (aud_tras_drv_info.aec_mic_data_save)
     {
-        psram_free(aud_tras_drv_info.aec_mic_data_save);
+        audio_tras_drv_free(aud_tras_drv_info.aec_mic_data_save);
         aud_tras_drv_info.aec_mic_data_save = NULL;
     }
     if (aud_tras_drv_info.aec_ref_data_save)
     {
-        psram_free(aud_tras_drv_info.aec_ref_data_save);
+        audio_tras_drv_free(aud_tras_drv_info.aec_ref_data_save);
         aud_tras_drv_info.aec_ref_data_save = NULL;
     }
 #endif
@@ -5345,7 +5345,7 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
             goto aud_tras_drv_voc_init_exit;
         }
 
-        aud_tras_drv_info.asr_rsp_out_buff = psram_malloc(ASR_SAMP_CNT_20MS);
+        aud_tras_drv_info.asr_rsp_out_buff = audio_tras_drv_malloc(ASR_SAMP_CNT_20MS);
         if (!aud_tras_drv_info.asr_rsp_out_buff)
         {
             LOGE("%s, %d, malloc asr rsp output buffer fail\n", __func__, __LINE__);
@@ -5360,13 +5360,13 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
     }
 
     #if CONFIG_DEBUG_DUMP
-    aud_tras_drv_info.aec_mic_data_save = psram_malloc(aud_tras_drv_info.voc_info.aud_codec_setup.enc_input_size_in_byte);
+    aud_tras_drv_info.aec_mic_data_save = audio_tras_drv_malloc(aud_tras_drv_info.voc_info.aud_codec_setup.enc_input_size_in_byte);
     if (!aud_tras_drv_info.aec_mic_data_save)
     {
         LOGE("%s, %d, malloc aec_mic_data_save buffer fail\n", __func__, __LINE__);
         goto aud_tras_drv_voc_init_exit;
     }
-    aud_tras_drv_info.aec_ref_data_save = psram_malloc(aud_tras_drv_info.voc_info.aud_codec_setup.enc_input_size_in_byte);
+    aud_tras_drv_info.aec_ref_data_save = audio_tras_drv_malloc(aud_tras_drv_info.voc_info.aud_codec_setup.enc_input_size_in_byte);
     if (!aud_tras_drv_info.aec_ref_data_save)
     {
         LOGE("%s, %d, malloc aec_ref_data_save buffer fail\n", __func__, __LINE__);
