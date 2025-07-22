@@ -4,6 +4,7 @@ set(srcs)
 if (CONFIG_LINGXIN_AI_EN) 
 list(APPEND incs
             .
+            adapter_LingXin/auth
             AI2T_LingXinEngine/inc/func
             AI2T_LingXinEngine/inc/system_adapter
             AI2T_LingXinEngine/src/inc

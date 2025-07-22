@@ -19,4 +19,9 @@ menu "LingXin_AI_IoT_VoiceChatEngine"
 		default y
 		help
 			Enable Record Buffer
+	config ENABLE_LINGXIN_COSTOM_AUTH
+		bool "Enable LingXin Costom Auth"
+		default n
+		help
+			Enable LingXin Costom Auth
 endmenu
