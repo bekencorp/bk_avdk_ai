@@ -723,6 +723,10 @@ void media_cli_test_cmd(char *pcWriteBuffer, int xWriteBufferLen, int argc, char
 
 				ret = media_app_lcd_pipeline_open(&lcd_open);
 			}
+			if (os_strcmp(argv[2], "decode") == 0)
+			{
+				ret = media_app_decode_by_line(NULL);
+            }
 
 			if (os_strcmp(argv[2], "lcd_close") == 0)
 			{

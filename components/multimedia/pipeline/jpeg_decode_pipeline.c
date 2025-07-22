@@ -45,11 +45,11 @@
 #define JPEGDEC_BUFFER_LENGTH        (60 * 1024)
 
 #ifdef DECODE_DIAG_DEBUG
-#define DECODER_FRAME_START()		do { GPIO_UP(GPIO_DVP_D0); } while (0)
-#define DECODER_FRAME_END()			do { GPIO_DOWN(GPIO_DVP_D0); } while (0)
+#define DECODER_FRAME_START()		do { GPIO_UP(3); } while (0)
+#define DECODER_FRAME_END()			do { GPIO_DOWN(3); } while (0)
 
-#define DECODER_LINE_START()		do { GPIO_UP(GPIO_DVP_D1); } while (0)
-#define DECODER_LINE_END()			do { GPIO_DOWN(GPIO_DVP_D1); } while (0)
+#define DECODER_LINE_START()		do { GPIO_UP(4); } while (0)
+#define DECODER_LINE_END()			do { GPIO_DOWN(4); } while (0)
 
 
 #define H264_DECODER_NOTIFY() \
@@ -128,6 +128,7 @@ typedef struct {
 	media_rotate_t rotate_angle;
 	mux_request_callback_t cb[PIPELINE_MOD_MAX];
 	mux_reset_callback_t   reset_cb[PIPELINE_MOD_MAX];
+    mux_callback_t  display_req;
 } jdec_config_t;
 
 typedef struct {
@@ -610,7 +611,7 @@ static void jpeg_decode_start_handle(frame_buffer_t *jpeg_frame, frame_module_t 
 	}
 	else
 	{
-	    if (jdec_config->jpeg_frame != NULL)
+		if (jdec_config->jpeg_frame != NULL)
         {
             LOGI("%s %d\n", __func__, __LINE__);
             frame_buffer_fb_free(jpeg_frame, module);
@@ -909,7 +910,7 @@ static void jpeg_decode_line_done_handle(uint32_t param)
 	request.width = jdec_config->jpeg_frame->width;
 	request.height = jdec_config->jpeg_frame->height;
 	request.buffer = &mux_buf->buffer;
-
+    request.display_req =  jdec_config->display_req;
 	rtos_lock_mutex(&jdec_info->lock);
 
 	for (int i = 0; i < PIPELINE_MOD_LINE_MAX; i++)
@@ -945,7 +946,11 @@ static void jpeg_decode_finish_handle(uint32_t param)
 
 	if (jdec_config->jpeg_frame)
 	{
+#if !CONFIG_LCD_PARTIAL_DISPLAY
         frame_buffer_fb_free(jdec_config->jpeg_frame, MODULE_DECODER);
+#else
+        os_free(jdec_config->jpeg_frame);
+#endif
         jdec_config->jpeg_frame = NULL;
 	}
 
@@ -981,6 +986,7 @@ static void jpeg_decode_finish_handle(uint32_t param)
 	{
 		if (jdec_config->module[PIPELINE_MOD_H264].start)
 		{
+#ifdef CONFIG_H264
 			pipeline_encode_request_t *jdec_pipeline_info = os_malloc(sizeof(pipeline_encode_request_t));
 
 			//jdec_pipeline_info->decode_buf = (void *)jdec_config->jdec_frame;
@@ -991,6 +997,7 @@ static void jpeg_decode_finish_handle(uint32_t param)
 
 			// step 1: send decode buf to h264
 			ret = h264_encode_task_send_msg(H264_ENCODE_START, (uint32_t)jdec_pipeline_info);
+#endif
 		}
 		else
 		{
@@ -1246,6 +1253,7 @@ static void jpeg_decode_reset(void)
 
 void h264_frame_start()
 {
+#ifdef CONFIG_H264
 	frame_buffer_t *frame = jpeg_decode_list_pop(&jdec_config->jpeg_decode_queue);
 	bk_err_t ret = BK_OK;
 	if (frame)
@@ -1256,6 +1264,7 @@ void h264_frame_start()
 			LOGE("%s %d malloc error\r\n", __func__, __LINE__);
 			return;
 		}
+
 		jdec_config->mux_buf[0].buffer.data = (uint8_t *)frame;
 		jdec_config->mux_buf[0].buffer.index = 0;
 		jdec_pipeline_info->buffer = &jdec_config->mux_buf[0].buffer;
@@ -1274,6 +1283,7 @@ void h264_frame_start()
 			}
 		}
 	}
+#endif
 }
 
 static void jpeg_decode_software_decode_finish_handle(frame_module_t module, uint32_t result)
@@ -1310,6 +1320,7 @@ static void jpeg_decode_software_decode_finish_handle(frame_module_t module, uin
 	if (result == BK_OK)
 	{
 		jpeg_decode_list_push(jdec_config->sw_dec_info[index_1].out_frame, &jdec_config->jpeg_decode_queue);
+#ifdef CONFIG_H264
 		if (check_h264_task_is_open())
 		{
 			if ((jdec_config->sw_dec_info[index_2].out_frame != NULL) && (jdec_config->sw_dec_info[index_1].out_frame->sequence > jdec_config->sw_dec_info[index_2].out_frame->sequence))
@@ -1323,6 +1334,9 @@ static void jpeg_decode_software_decode_finish_handle(frame_module_t module, uin
 			}
 		}
 		else if (check_lcd_task_is_open())
+#else
+		if (check_lcd_task_is_open())
+#endif
 		{
 			if ((jdec_config->sw_dec_info[index_2].out_frame != NULL) && (jdec_config->sw_dec_info[index_1].out_frame->sequence > jdec_config->sw_dec_info[index_2].out_frame->sequence))
 			{
@@ -1903,7 +1917,40 @@ void bk_jdec_buffer_request_deregister(pipeline_module_t module)
 	rtos_unlock_mutex(&jdec_info->lock);
 }
 
+bk_err_t bk_jdec_display_request_register(mux_callback_t cb)
+{
+	if (jdec_config == NULL || !jdec_config->task_state)
+    {
+        LOGE("%s decode pipeline not open\n", __func__);
+        return BK_FAIL;
+    }
+    jdec_config->display_req = cb;
 
+    return BK_OK;
+}
+
+bk_err_t bk_jpeg_hw_decode_by_line(uint8_t *jpeg_addr, uint32_t jpeg_size, uint16_t jpeg_width, uint16_t jpeg_height)
+{
+    bk_err_t ret = BK_FAIL;
+
+    frame_buffer_t *jpeg_frame = os_malloc(sizeof(frame_buffer_t));
+    if (jpeg_frame == NULL)
+    {
+    	LOGW("%s malloc fail: %d\n", __func__);
+        return ret;
+    }
+    os_memset(jpeg_frame, 0, sizeof(frame_buffer_t));
+
+    jpeg_frame->frame =  jpeg_addr;
+    jpeg_frame->width = jpeg_width;
+    jpeg_frame->height = jpeg_height;
+    jpeg_frame->size = jpeg_size;
+    jpeg_frame->length = jpeg_size;
+
+    ret = jpeg_decode_task_send_more_msg(JPEGDEC_START, (uint32_t)jpeg_frame, 1);
+
+    return ret;
+}
 
 bk_err_t bk_jdec_pipeline_init(void)
 {

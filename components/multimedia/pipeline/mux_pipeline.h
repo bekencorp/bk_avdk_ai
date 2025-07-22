@@ -55,6 +55,7 @@ extern "C" {
 #define SCALE_DIAG_DEBUG
 //#define DISP_DIAG_DEBUG
 #endif
+typedef bk_err_t (*mux_callback_t)(void *param);
 
 typedef enum
 {
@@ -120,12 +121,12 @@ typedef struct {
 	pixel_format_t fmt;
 	complex_buffer_t *buffer;
 	LIST_HEADER_T list;
+    mux_callback_t display_req;
 } pipeline_encode_request_t;
 
-
-typedef bk_err_t (*mux_callback_t)(void *param);
 typedef bk_err_t (*mux_request_callback_t)(pipeline_encode_request_t *request, mux_callback_t cb);
 typedef bk_err_t (*mux_reset_callback_t)(mux_callback_t reset_cb);
+
 
 typedef struct
 {
@@ -138,6 +139,7 @@ typedef struct
 #define DISPLAY_MAX_PIPELINE_LINE	(16)
 #define IMAGE_PIPEL_SIZE			(2)
 
+#ifdef CONFIG_PSRAM
 #if SUPPORTED_IMAGE_MAX_720P
 
 #define IMAGE_MAX_WIDTH				(1280)
@@ -174,6 +176,20 @@ typedef struct {
 	uint8_t rotate[ROTATE_MAX_PIPELINE_LINE_SIZE * 2];
 #endif
 } mux_sram_buffer_t;
+#else
+#define IMAGE_MAX_WIDTH				(320)
+
+#define DISPLAY_MAX_WIDTH			(320)
+
+#define DECODE_MAX_PIPELINE_LINE_SIZE	(IMAGE_MAX_WIDTH * IMAGE_MAX_PIPELINE_LINE * IMAGE_PIPEL_SIZE)
+#define ROTATE_MAX_PIPELINE_LINE_SIZE	(IMAGE_MAX_WIDTH * IMAGE_MAX_PIPELINE_LINE * IMAGE_PIPEL_SIZE)
+
+typedef struct {
+	uint8_t decoder[DECODE_MAX_PIPELINE_LINE_SIZE * 2];
+	uint8_t rotate[ROTATE_MAX_PIPELINE_LINE_SIZE * 2];
+} mux_sram_buffer_t;
+#endif
+
 
 extern mux_sram_buffer_t *mux_sram_buffer;
 
@@ -194,6 +210,10 @@ bk_err_t bk_scale_reset_request(mux_callback_t cb);
 bk_err_t bk_rotate_reset_request(mux_callback_t cb);
 
 void decoder_mux_dump(void);
+
+bk_err_t bk_jdec_display_request_register(mux_callback_t cb);
+
+bk_err_t bk_jpeg_hw_decode_by_line(uint8_t *jpeg_addr, uint32_t jpeg_size, uint16_t jpeg_width, uint16_t jpeg_height);
 
 #ifdef __cplusplus
 }

@@ -62,6 +62,8 @@ typedef enum {
 	ROTATE_STOP,
 	ROTATE_NO_ROTATE_DIRECT_COPY,
 	ROTATE_RESET,
+    ROTATE_PARTIAL_DISPLAY_START,
+	ROTATE_PARTIAL_DISPLAY_FINISH,
 } rotate_msg_type_t;
 
 typedef enum {
@@ -107,6 +109,8 @@ bk_err_t lcd_display_open(lcd_open_t *config);
 bk_err_t lcd_display_close(void);
 
 bool check_lcd_task_is_open(void);
+
+bk_err_t lcd_display_partial_refresh(lcd_partial_area_t *area);
 
 bk_err_t rotate_task_open(rot_open_t *rot_open);
 

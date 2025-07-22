@@ -71,6 +71,8 @@ typedef struct {
 	beken_semaphore_t disp_task_sem;
 	beken_thread_t disp_task;
 	beken_queue_t queue;
+    bool partial_refresh;
+    uint16_t partial_y;
 } lcd_disp_config_t;
 
 typedef struct {
@@ -117,6 +119,15 @@ static void lcd_driver_display_mcu_isr(void)
 
 		rtos_set_semaphore(&lcd_disp_config->disp_sem);
 	}
+    if (lcd_disp_config->partial_refresh)
+    {
+        if (lcd_disp_config->partial_y == lcd_disp_config->lcd_height - 16)
+        {
+            media_debug->fps_lcd++;
+        }
+        bk_lcd_8080_start_transfer(0);
+        rtos_set_semaphore(&lcd_disp_config->disp_sem);
+    }
 }
 
 #if CONFIG_LV_ATTRIBUTE_FAST_MEM
@@ -240,7 +251,48 @@ static bk_err_t lcd_display_frame(frame_buffer_t *frame)
 	return ret;
 }
 
+bk_err_t lcd_display_partial_refresh(lcd_partial_area_t *area)
+{
+    int ret = BK_OK;
 
+    complex_buffer_t * partial_refresh_buf = (complex_buffer_t *)area->buffer;
+    if (partial_refresh_buf == NULL || partial_refresh_buf->data == NULL)
+    {
+        LOGE("%s partial_refresh_buf NULL \n", __func__);
+        return BK_FAIL;
+    }
+    lcd_disp_config->partial_y = area->start_y;
+    lcd_driver_set_display_base_addr((uint32_t)partial_refresh_buf->data);
+
+    if (lcd_disp_config->partial_refresh == 0)
+    {
+        lcd_disp_config->partial_refresh = 1;
+        bk_lcd_set_yuv_mode(PIXEL_FMT_RGB565_LE);
+        g_lcd_device->mcu->set_display_area(area->start_x, area->end_x, area->start_y, area->end_y);
+        bk_lcd_pixel_config(area->width, 16);
+        lcd_driver_display_enable();
+    }
+    else
+    {
+        uint16 ys_l, ys_h, ye_l, ye_h;
+        ys_h = area->start_y >> 8;
+        ys_l = area->start_y & 0xff;
+        ye_h = (area->start_y + area->height - 1) >> 8;
+        ye_l = (area->start_y + area->height - 1) & 0xff;
+        uint32_t param_row[4] = {ys_h, ys_l, ye_h, ye_l};
+        bk_lcd_8080_send_cmd(4, 0x2B, param_row);
+        bk_lcd_pixel_config(area->width, 16);
+        lcd_driver_display_continue();
+    }
+
+    ret = rtos_get_semaphore(&lcd_disp_config->disp_sem, BEKEN_NEVER_TIMEOUT);
+    if (ret != BK_OK)
+    {
+        LOGD("%s semaphore get failed: %d\n", __func__, ret);
+    }
+
+    return ret;
+}
 
 bk_err_t lcd_display_task_send_msg(uint8_t type, uint32_t param)
 {
@@ -483,7 +535,8 @@ uint8_t lcd_display_get_type(void)
     {
         return lcd_disp_config->lcd_type;
     }
-}
+
+}
 
 bk_err_t lcd_display_open(lcd_open_t *config)
 {

@@ -356,4 +356,8 @@ menu "Media"
 		depends on AUD_INTF_SUPPORT_MULTIPLE_SPK_SOURCE_TYPE
 		bool "Clear audio decoder buffer after prompt tone play"
 		default n
+
+	config LCD_PARTIAL_DISPLAY
+		bool "mcu lcd partial display"
+		default n
 endmenu

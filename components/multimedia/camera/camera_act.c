@@ -396,9 +396,9 @@ static bk_err_t camera_get_h264_encode_param_handle(media_mailbox_msg_t *msg)
 	int ret = BK_OK;
 
 	h264_base_config_t base_config = {0};
-
+#ifdef CONFIG_H264
 	ret = bk_h264_get_h264_base_config(&base_config);
-
+#endif
 	os_memcpy((h264_base_config_t *)msg->param, &base_config, sizeof(h264_base_config_t));
 
 	msg_send_rsp_to_media_major_mailbox(msg, ret, APP_MODULE);

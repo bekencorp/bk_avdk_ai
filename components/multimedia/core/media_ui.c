@@ -81,8 +81,16 @@ static void media_debug_dump(void)
 #if (CONFIG_CACHE_ENABLE)
 	flush_dcache(media_debug, sizeof(media_debug_t));
 #endif
-	if (get_camera_state() == CAMERA_STATE_DISABLED && !check_lcd_task_is_open())
-		return;
+
+#if (CONFIG_DVP_CAMERA || CONFIG_USB_UVC)
+	if (get_camera_state() == CAMERA_STATE_DISABLED)
+#endif
+    {
+        if(!check_lcd_task_is_open()) {
+            return;
+        }
+        return;
+    }
 
 	uint16_t jpg = (media_debug->isr_jpeg - media_debug_cached->isr_jpeg) / DEBUG_INTERVAL;
 	uint16_t h264 = (media_debug->isr_h264 - media_debug_cached->isr_h264) / DEBUG_INTERVAL;
@@ -319,6 +327,15 @@ static void media_ui_task_main(beken_thread_arg_t data)
 					media_ui_ota_event_handle(mb_msg);
 					break;
 #endif
+
+#if (CONFIG_AVI_PLAY && !CONFIG_PSRAM)
+				case AVI_PLAY_EVENT:
+					mb_msg = (media_mailbox_msg_t *)msg.param;
+					extern void bk_avi_play_event_handle(media_mailbox_msg_t *msg);
+					bk_avi_play_event_handle(mb_msg);
+					break;
+#endif
+
 				case EXIT_EVENT:
 					goto exit;
 					break;
@@ -420,7 +437,9 @@ static bk_err_t media_free_cpu1_handle(void *param)
 void media_ui_init()
 {
 	bk_pm_cp1_recovery_response(PM_CP1_RECOVERY_CMD, PM_CP1_PREPARE_CLOSE_MODULE_NAME_MEDIA,PM_CP1_MODULE_RECOVERY_STATE_INIT);
+#if CONFIG_PSRAM
 	bk_pm_module_vote_psram_ctrl(PM_POWER_PSRAM_MODULE_NAME_MEDIA, PM_POWER_MODULE_STATE_ON);
+#endif
 	stop_cpu1_register_notification(media_free_cpu1_handle, NULL);
 	frame_buffer_init();
 

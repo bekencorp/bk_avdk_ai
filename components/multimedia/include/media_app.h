@@ -112,7 +112,7 @@ bk_err_t media_app_dump_jpeg_frame(void);
 bk_err_t media_app_lcd_step_mode(bool enable);
 bk_err_t media_app_lcd_step_trigger(void);
 bk_err_t media_app_transfer_pause(bool pause);
-bk_err_t  media_app_lcd_display_file(char *file_name);  //display sd card file
+bk_err_t media_app_lcd_display_file(char *file_name);  //display sd card file
 bk_err_t media_app_lcd_display(void* lcd_display);
 bk_err_t media_app_lcd_display_beken(void* lcd_display);
 bk_err_t media_app_lcd_blend(void *param);
@@ -127,11 +127,6 @@ bk_err_t media_app_lcd_scale(void);
 bk_err_t media_app_get_lcd_status(void);
 bk_err_t media_app_get_uvc_camera_status(void);
 
-#if CONFIG_VIDEO_AVI
-bk_err_t media_app_avi_open(void);
-bk_err_t media_app_avi_close(void);
-#endif
-
 bk_err_t media_app_lvgl_open(void *lcd_open);
 bk_err_t media_app_lvgl_close(void);
 bk_err_t media_app_lvcam_lvgl_open(void *lcd_open);
@@ -141,6 +136,10 @@ bk_err_t media_app_lvgl_switch_ui(lvgl_ui_index_t ui_index);
 
 bk_err_t media_app_rtsp_open(video_config_t *config);
 bk_err_t media_app_rtsp_close();
+bk_err_t media_app_decode_by_line(void *config);
+
+bk_err_t media_app_avi_play_start(void *lcd_open);
+bk_err_t media_app_avi_play_stop(void);
 
 bk_err_t media_app_lcd_pipeline_open(void *config);
 bk_err_t media_app_lcd_pipeline_close(void);

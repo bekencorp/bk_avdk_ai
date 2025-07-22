@@ -152,18 +152,27 @@ endif()
 if (CONFIG_MEDIA_PIPELINE)
 	list(APPEND srcs
 		pipeline/jpeg_decode_pipeline.c
-		pipeline/lcd_scale_pipeline.c
 		pipeline/yuv_rotate_pipeline.c
 		pipeline/uvc_pipeline_act.c
 		pipeline/jpeg_decode_list.c
 		pipeline/jpeg_get_pipeline.c
-		pipeline/h264_encode_pipeline.c
 	)
 	if (CONFIG_JPEG_SW_DECODE_SUPPORT_BY_FRAME)
 		list(APPEND srcs
 			pipeline/software_decode_pipeline.c
 		)
 	endif()#CONFIG_JPEG_SW_DECODE_SUPPORT_BY_FRAME
+	if (CONFIG_H264)
+	list(APPEND srcs
+		pipeline/h264_encode_pipeline.c
+	)
+	endif() #CONFIG_H264
+
+	if (CONFIG_HW_SCALE)
+	list(APPEND srcs
+		pipeline/lcd_scale_pipeline.c
+	)
+	endif() #CONFIG_HW_SCALE
 endif()
 
 if (CONFIG_MEDIA_MAJOR)

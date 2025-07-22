@@ -46,6 +46,7 @@ mux_sram_buffer_t *mux_sram_buffer = NULL;
 
 static bk_err_t h264_jdec_pipeline_open(media_mailbox_msg_t *msg)
 {
+#ifdef CONFIG_H264
 	int ret = BK_OK;
 
 	media_camera_device_t device = DEFAULT_CAMERA_CONFIG();
@@ -83,13 +84,14 @@ error:
 	bk_jdec_buffer_request_deregister(PIPELINE_MOD_H264);
     h264_encode_task_close();
     jpeg_decode_task_close();
+#endif
     return BK_FAIL;
 }
 
 static bk_err_t h264_jdec_pipeline_close(media_mailbox_msg_t *msg)
 {
 	LOGI("%s %d\n", __func__, __LINE__);
-
+#ifdef CONFIG_H264
 	if (check_rotate_task_is_open() || check_lcd_task_is_open())
 	{
 		bk_jdec_buffer_request_deregister(PIPELINE_MOD_H264);
@@ -106,7 +108,7 @@ static bk_err_t h264_jdec_pipeline_close(media_mailbox_msg_t *msg)
 
 	}
 	LOGI("%s complete, %d \n", __func__, __LINE__);
-
+#endif
 	return BK_OK;
 }
 
@@ -149,7 +151,8 @@ static bk_err_t lcd_disp_pipeline_close(media_mailbox_msg_t *msg)
     ret = lcd_display_close();
 
     return ret;
-}
+
+}
 
 static bk_err_t lcd_jdec_pipeline_open(media_mailbox_msg_t *msg)
 {
@@ -210,6 +213,7 @@ static bk_err_t lcd_jdec_pipeline_open(media_mailbox_msg_t *msg)
 #endif
 	}
 	LOGI("%s %d\n", __func__, __LINE__);
+
 	return ret;
 
 error:
@@ -224,7 +228,7 @@ static bk_err_t lcd_jdec_pipeline_close(media_mailbox_msg_t *msg)
 	int ret = BK_OK;
 
 	LOGI("%s %d\n", __func__, __LINE__);
-
+#ifdef CONFIG_H264
 	if (check_h264_task_is_open())
 	{
 #if SUPPORTED_IMAGE_MAX_720P
@@ -239,6 +243,7 @@ static bk_err_t lcd_jdec_pipeline_close(media_mailbox_msg_t *msg)
 #endif
 	}
 	else
+#endif
 	{
 #if SUPPORTED_IMAGE_MAX_720P
 		LOGI("%s deregister scale, %d \n", __func__, __LINE__);
@@ -359,7 +364,9 @@ void uvc_pipeline_event_handle(media_mailbox_msg_t *msg)
 			break;
 
 		case EVENT_PIPELINE_H264_RESET_IND:
-			ret = h264_encode_regenerate_idr_frame();
+			#ifdef CONFIG_H264
+				ret = h264_encode_regenerate_idr_frame();
+			#endif
 			break;
 
 		case EVENT_LCD_SET_FMT_IND:
@@ -417,8 +424,9 @@ bk_err_t uvc_pipeline_init(void)
 #endif
 
 	bk_rotate_pipeline_init();
+#ifdef CONFIG_H264
 	bk_h264_pipeline_init();
-
+#endif
 	return BK_OK;
 }
 

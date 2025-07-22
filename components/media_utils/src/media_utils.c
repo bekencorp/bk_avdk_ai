@@ -96,6 +96,10 @@ char * get_string_to_lcd_name(char *string)
 	{
 		value = "spd2010";
 	}
+    else if (os_strcmp(string, "jd9853a") == 0)
+	{
+		value = "jd9853a";
+	}
 
 	return value;
 }

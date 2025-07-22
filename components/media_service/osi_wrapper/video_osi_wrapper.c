@@ -38,17 +38,29 @@ static void *realloc_wrapper(void *old_mem, size_t size)
 
 static void *psram_malloc_wrapper(size_t size)
 {
+#if CONFIG_PSRAM
 	return psram_malloc(size);
+#else
+	return os_malloc(size);
+#endif
 }
 
 static void *psram_zalloc_wrapper(size_t num, size_t size)
 {
+#if CONFIG_PSRAM
 	return psram_zalloc(num * size);
+#else
+	return os_zalloc(num * size);
+#endif
 }
 
 static void *psram_realloc_wrapper(void *old_mem, size_t size)
 {
+#if CONFIG_PSRAM
 	return bk_psram_realloc(old_mem, size);
+#else
+	return os_realloc(old_mem, size);
+#endif
 }
 
 static void free_wrapper(void *ptr)

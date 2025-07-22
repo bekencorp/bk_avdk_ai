@@ -260,6 +260,7 @@ frame_buffer_t *scale_request_list_pop(LIST_HEADER_T *list)
 
 bk_err_t lcd_scale_finish(uint32_t param)
 {
+	#ifdef CONFIG_PSRAM
 	if (rtos_is_oneshot_timer_running(&scale_config->scale_timer))
 	{
 		rtos_stop_oneshot_timer(&scale_config->scale_timer);
@@ -282,14 +283,15 @@ bk_err_t lcd_scale_finish(uint32_t param)
         scale_task_send_msg(SCALE_START ,(uint32_t)request);
 
     scale_config->state = SCALE_STATE_IDLE;
+	#endif
     return BK_OK;
 }
 
 
 bk_err_t lcd_scale_start(uint32_t param)
 {
+#ifdef CONFIG_PSRAM
     bk_err_t ret = BK_OK;
-
     frame_buffer_t *scale_src_frame = (frame_buffer_t * )param;
     if (scale_src_frame == NULL)
        return BK_FAIL;
@@ -355,11 +357,14 @@ error:
 
     if(scale_config->scale_frame)
     {
+		#ifdef CONFIG_PSRAM
         bk_psram_disable_write_through(scale_config->psram_overwrite_id);
         frame_buffer_display_free(scale_config->scale_frame);
         scale_config->scale_frame = NULL;
+    	#endif
         LOGE("%s free scale_frame\n", __func__);
     }
+#endif
 
     return BK_FAIL;
 }
@@ -1192,18 +1197,22 @@ bk_err_t scale_task_close(void)
 
 	if (scale_config->scale_frame)
 	{
+		#ifdef CONFIG_PSRAM
 		frame_buffer_fb_direct_free(scale_config->scale_frame);
 		scale_config->scale_frame = NULL;
+		#endif
 		LOGI("%s free scale_frame\n", __func__);
 	}
-
+	#ifdef CONFIG_PSRAM
 	bk_psram_disable_write_through(scale_config->psram_overwrite_id);
 	bk_psram_free_write_through_channel(scale_config->psram_overwrite_id);
-
+	#endif
 	if(scale_config->scale_src_frame)
 	{
+		#ifdef CONFIG_PSRAM
 		frame_buffer_fb_direct_free(scale_config->scale_src_frame);
 		scale_config->scale_src_frame = NULL;
+		#endif
 	}
 
 	os_free(scale_config);

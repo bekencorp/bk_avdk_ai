@@ -38,8 +38,12 @@
 #include "modules/image_scale.h"
 #include "dma2d_ll_macro_def.h"
 
+#include <driver/lcd_types.h>
 #include "bk_list.h"
 
+#if CONFIG_LCD_QSPI
+#include <driver/lcd_qspi.h>
+#endif
 #include "mux_pipeline.h"
 
 #define TAG "rot_pipline"
@@ -54,11 +58,11 @@ uint8_t lvgl_disp_enable = 0;
 #endif
 
 #ifdef ROTATE_DIAG_DEBUG
-#define ROTATE_LINE_START()			do { GPIO_UP(GPIO_DVP_D3); } while (0)
-#define ROTATE_LINE_END()			do { GPIO_DOWN(GPIO_DVP_D3); } while (0)
+#define ROTATE_LINE_START()			do { GPIO_UP(5); } while (0)
+#define ROTATE_LINE_END()			do { GPIO_DOWN(5); } while (0)
 
-#define DMA2D_LINE_START()			do { GPIO_UP(GPIO_DVP_D4); } while (0)
-#define DMA2D_LINE_END()			do { GPIO_DOWN(GPIO_DVP_D4); } while (0)
+#define DMA2D_LINE_START()			do { GPIO_UP(5); } while (0)
+#define DMA2D_LINE_END()			do { GPIO_DOWN(5); } while (0)
 
 #else
 #define ROTATE_LINE_START()
@@ -87,6 +91,13 @@ typedef struct {
 	complex_buffer_t *rotate_buf;
 	LIST_HEADER_T list;
 } rotate_copy_request_t;
+
+typedef struct {
+    /** area define*/
+	uint16_t width;
+	uint16_t height;
+    lcd_type_t interface;
+} lcd_param_t;
 
 typedef struct {
 	uint8_t enable;
@@ -120,12 +131,17 @@ typedef struct {
 
 	mux_callback_t decoder_free_cb;
     mux_callback_t reset_cb;
+    lcd_param_t lcd_info;
+    mux_callback_t display_req;
+    lcd_partial_area_t partial_area;
+    bool partial_display_start;
 } rotate_config_t;
 
 typedef struct {
 	beken_mutex_t lock;
 } rotate_info_t;
 
+extern const lcd_device_t *g_lcd_device;
 
 static rotate_config_t *rotate_config = NULL;
 static rotate_info_t *rotate_info = NULL;
@@ -161,7 +177,7 @@ static void rotate_cfg_err_cb(void)
 }
 static void rotate_complete_cb(void)
 {
-	if (rotate_config)
+	if (rotate_config  && rotate_config->enable)
 	{
 		rotate_task_send_msg(ROTATE_FINISH, (uint32_t)rotate_config->rotate_buffer);
 	}
@@ -174,6 +190,52 @@ static void dma2d_config_error(void)
 static void dma2d_transfer_error(void)
 {
 	LOGE("%s %d %p\n", __func__, rotate_config->rotate_buffer->index, rotate_config->rotate_frame->frame);
+}
+
+extern void  bk_mem_dump_ex(const char * title, unsigned char * data, uint32_t data_len);
+
+void partial_display_complete_cb(void * buffer)
+{
+    bk_err_t ret = BK_FAIL;
+
+    lcd_partial_area_t *area =  (lcd_partial_area_t *)buffer;
+    if (area != NULL)
+    {
+        ret= rotate_task_send_msg(ROTATE_PARTIAL_DISPLAY_FINISH, (uint32_t)area->buffer);
+        if (ret != BK_OK)
+        {
+            LOGW("%s rotate pipeline is closed\n", __func__, ret);
+        }
+        os_free(area);
+    }
+}
+
+void rotate_display_partial_start_handler(uint32_t param)
+{
+	complex_buffer_t *rotate_buf = (complex_buffer_t*)param;
+    lcd_partial_area_t *partial_area = (lcd_partial_area_t *)os_malloc(sizeof(lcd_partial_area_t));
+    if (partial_area == NULL)
+    {
+        BK_ASSERT(0);
+    }
+    partial_area->buffer = (uint8_t *)rotate_buf;
+    partial_area->start_x = 0;
+    partial_area->end_x =  partial_area->start_x + rotate_config->lcd_info.width;
+    partial_area->start_y = PIPELINE_DECODE_LINE * (rotate_buf->index - 1);
+    partial_area->end_y = PIPELINE_DECODE_LINE * rotate_buf->index;
+    partial_area->width = rotate_config->lcd_info.width;
+    partial_area->height = PIPELINE_DECODE_LINE;
+    partial_area->post_refresh = partial_display_complete_cb;
+    partial_area->lcd_device = g_lcd_device;
+    if (rotate_config->display_req)
+    {
+        rotate_config->display_req(partial_area);
+    }
+    else
+    {
+        partial_display_complete_cb(partial_area);
+    }
+//    bk_mem_dump_ex("240x320", rotate_buf->data, 240*16*2);
 }
 
 static complex_buffer_t *rotate_get_idle_buf(void)
@@ -189,9 +251,11 @@ static complex_buffer_t *rotate_get_idle_buf(void)
 
 static void dma2d_transfer_complete(void)
 {
-	int ret = BK_OK;
 	DMA2D_LINE_END();
 
+#if !CONFIG_LCD_PARTIAL_DISPLAY
+#ifdef CONFIG_PSRAM
+	int ret = BK_OK;
 	uint32_t rot_buf = dma2d_ll_get_dma2d_fg_address_value();
 	//rotate_config->dma2d_isr_cnt++;
 
@@ -211,7 +275,9 @@ static void dma2d_transfer_complete(void)
     		rotate_config->rotate_frame->height = rotate_config->jpeg_height;
         }
 
-        bk_psram_disable_write_through(rotate_config->psram_overwrite_id);
+#ifdef CONFIG_PSRAM
+		bk_psram_disable_write_through(rotate_config->psram_overwrite_id);
+#endif
         if (rotate_config->err_frame || rotate_config->reset_status)
         {
             frame_buffer_display_free(rotate_config->rotate_frame);
@@ -300,6 +366,35 @@ static void dma2d_transfer_complete(void)
 		rotate_config->decoder_buffer = NULL;
         rotate_config->state = ROTATE_STATE_IDLE;
     }
+#endif
+#else
+	int ret = BK_OK;
+    uint32_t rot_buf = dma2d_ll_get_dma2d_out_mem_address_value();
+
+	complex_buffer_t * rotate_buffer = NULL;;
+
+	if (rot_buf == (uint32_t)rotate_config->buf[0].data)
+	{
+		rotate_buffer = &rotate_config->buf[0];
+	}
+	else if(rot_buf == (uint32_t)rotate_config->buf[1].data)
+	{
+		rotate_buffer = &rotate_config->buf[1];
+	}
+    else
+    {
+        LOGI("%s %p %p\n", __func__, rot_buf, rotate_config->buf[0].data);
+    }
+    ret = rotate_task_send_msg(ROTATE_PARTIAL_DISPLAY_START, (uint32_t)rotate_buffer);
+    if(ret != BK_OK)
+    {
+        LOGI("%s %d\n", __func__, __LINE__);
+    }
+	rotate_config->decoder_free_cb(rotate_config->decoder_buffer);
+	rotate_config->decoder_buffer = NULL;
+	rotate_config->state = ROTATE_STATE_IDLE;
+#endif
+
 
 	rotate_config->dma2d_copy = false;
 }
@@ -316,14 +411,9 @@ void rotate_set_dma2d_cb(void)
 static void rotate_finish_handler(uint32_t param)
 {
 	ROTATE_LINE_END();
-	int ret = BK_OK;
+	int ret = BK_FAIL;
 
-	complex_buffer_t *rotate_buf = (complex_buffer_t*)param;
-
-	if (rtos_is_oneshot_timer_running(&rotate_timer))
-	{
-		rtos_stop_oneshot_timer(&rotate_timer);
-	}
+	rtos_stop_oneshot_timer(&rotate_timer);
 
 	if (!list_empty(&rotate_config->rotate_pedding_list))
 	{
@@ -345,7 +435,10 @@ static void rotate_finish_handler(uint32_t param)
 			}
 		}
 	}
+#if !CONFIG_LCD_PARTIAL_DISPLAY
+#ifdef CONFIG_PSRAM
 
+	complex_buffer_t *rotate_buf = (complex_buffer_t*)param;
 	rotate_copy_request_t *rotate_copy_request = (rotate_copy_request_t*)os_malloc(sizeof(rotate_copy_request_t));
 	rotate_copy_request->rotate_buf = rotate_buf;
 
@@ -363,6 +456,17 @@ static void rotate_finish_handler(uint32_t param)
 
 	rotate_config->rotate_ena = 0;
 	rotate_config->state = ROTATE_STATE_IDLE;
+#endif
+#else
+
+	complex_buffer_t *rotate_buf = (complex_buffer_t*)param;
+	rotate_config->decoder_free_cb(rotate_config->decoder_buffer);
+	rotate_config->decoder_buffer = NULL;
+	rotate_config->rotate_ena = 0;
+	rotate_config->state = ROTATE_STATE_IDLE;
+
+    rotate_display_partial_start_handler((uint32_t)rotate_buf);
+#endif
 }
 
 static bk_err_t rotate_memcopy_handler(uint32_t param)
@@ -410,8 +514,10 @@ static bk_err_t rotate_memcopy_handler(uint32_t param)
 		if (rotate_config->rotate_frame != NULL)
 		{
 			rotate_config->rotate_frame->fmt = rotate_config->fmt;
+#ifdef CONFIG_PSRAM
 			bk_psram_enable_write_through(rotate_config->psram_overwrite_id, (uint32_t)rotate_config->rotate_frame->frame,
 				(uint32_t)(rotate_config->rotate_frame->frame + rotate_config->rotate_frame->size));
+#endif
 		}
         else
         {
@@ -531,6 +637,7 @@ bk_err_t rotate_clear_status(void)
 	bk_err_t ret= BK_FAIL;
 	LOGI("%s, set reset\n", __func__);
 	rotate_config->reset_status = true;
+	rotate_config->partial_display_start = false;
     if(rotate_config->reset_cb)
         rotate_config->reset_cb(NULL);
     return ret;
@@ -607,11 +714,11 @@ static void rotate_timer_handle(void *arg1, void *arg2)
 
 static bk_err_t rotate_no_rotate_direct_copy_handler(uint32_t param)
 {
-	if (rtos_is_oneshot_timer_running(&rotate_timer))
-	{
-		rtos_stop_oneshot_timer(&rotate_timer);
-	}
+	rtos_stop_oneshot_timer(&rotate_timer);
 
+
+#if !CONFIG_LCD_PARTIAL_DISPLAY
+#ifdef CONFIG_PSRAM
     //1:dma2d memcopy, rotate_buf = decode buffer
     complex_buffer_t *dec_buf = (complex_buffer_t *)param;
     rotate_copy_request_t *rotate_copy_request = (rotate_copy_request_t*)os_malloc(sizeof(rotate_copy_request_t));
@@ -631,11 +738,63 @@ static bk_err_t rotate_no_rotate_direct_copy_handler(uint32_t param)
         LOGE("%s, malloc fail \n", __func__);
         os_free(rotate_copy_request);
     }
+
+#endif
     return BK_OK;
+#else
+	DMA2D_LINE_START();
+    //1:dma2d memcopy, rotate_buf = decode buffer
+    complex_buffer_t *dec_buf = (complex_buffer_t *)param;
+	dma2d_memcpy_pfc_t dma2d_memcpy_pfc = {0};
+	complex_buffer_t *temp_buf = rotate_get_idle_buf();
+    if(temp_buf == NULL)
+    {
+        LOGI("%s temp_buf %p\n",__func__,  temp_buf);
+        return BK_FAIL;
+    }
 
-    //2:dma2d isr finish send to decode notify
+    temp_buf->index = dec_buf->index;
+	rotate_config->dma2d_isr_cnt = dec_buf->index;
+	dec_buf->state = BUF_COPYING;
+	temp_buf->state = BUF_COPYING;
 
-    //3:get dma2d pendding list to memcopy
+	dma2d_memcpy_pfc.input_addr = (char *)dec_buf->data;
+	dma2d_memcpy_pfc.output_addr = (char *)temp_buf->data;
+
+	dma2d_memcpy_pfc.mode = DMA2D_M2M_PFC;
+	dma2d_memcpy_pfc.input_color_mode = DMA2D_INPUT_YUYV;
+	dma2d_memcpy_pfc.src_pixel_byte = TWO_BYTES;
+	dma2d_memcpy_pfc.output_color_mode = DMA2D_OUTPUT_RGB565;
+	dma2d_memcpy_pfc.dst_pixel_byte = TWO_BYTES;
+    dma2d_memcpy_pfc.out_byte_by_byte_reverse = BYTE_BY_BYTE_REVERSE;
+
+	dma2d_memcpy_pfc.src_frame_xpos = 0;
+	dma2d_memcpy_pfc.src_frame_ypos = 0;
+
+#if (CONFIG_LCD_SPI_DEVICE_NUM > 1) || (CONFIG_LCD_QSPI_DEVICE_NUM > 1)
+    uint16_t dma2d_width = rotate_config->jpeg_width;
+#else
+    uint16_t dma2d_width = (rotate_config->lcd_info.width < rotate_config->jpeg_width) ? rotate_config->lcd_info.width : rotate_config->jpeg_width;
+#endif
+    dma2d_memcpy_pfc.dma2d_width = dma2d_width; //rotate_config->lcd_info.width;
+    dma2d_memcpy_pfc.dma2d_height = PIPELINE_DECODE_LINE;
+
+	dma2d_memcpy_pfc.src_frame_width = rotate_config->jpeg_width;
+	dma2d_memcpy_pfc.src_frame_height = PIPELINE_DECODE_LINE;
+
+#if (CONFIG_LCD_SPI_DEVICE_NUM > 1) || (CONFIG_LCD_QSPI_DEVICE_NUM > 1)
+    dma2d_memcpy_pfc.dst_frame_width = dma2d_width;
+#else
+    dma2d_memcpy_pfc.dst_frame_width = rotate_config->lcd_info.width;
+#endif
+	dma2d_memcpy_pfc.dst_frame_height =  PIPELINE_DECODE_LINE;
+	dma2d_memcpy_pfc.dst_frame_xpos = 0;
+	dma2d_memcpy_pfc.dst_frame_ypos = 0;
+
+	bk_dma2d_memcpy_or_pixel_convert(&dma2d_memcpy_pfc);
+	bk_dma2d_start_transfer();
+	return BK_OK;
+#endif
 }
 
 //decode complete, start to rotate
@@ -667,11 +826,15 @@ static bk_err_t rotate_dec_line_complete_handler(uint32_t param)
 		rotate_config->jpeg_width = rotate_notify->width;
 		rotate_config->jpeg_height = rotate_notify->height;
 		rotate_config->reset_status = false;
+        rotate_config->display_req = rotate_notify->display_req;
 	}
 
 	if (rotate_notify->buffer->index == (rotate_config->jpeg_height / PIPELINE_DECODE_LINE))
 	{
 		rotate_config->err_frame = !(rotate_notify->buffer->ok);
+        if (!(rotate_notify->buffer->ok)) {
+            rotate_config->partial_display_start = false;
+        }
 	}
 
 	rotate_config->rotate_buffer = temp_buf;
@@ -699,12 +862,6 @@ static bk_err_t rotate_dec_line_complete_handler(uint32_t param)
 		os_memcpy(rotate_config->decoder_buffer, rotate_notify->buffer, sizeof(complex_buffer_t));
 	}
 
-	ROTATE_LINE_START();
-
-	if (!rtos_is_oneshot_timer_running(&rotate_timer))
-	{
-		rtos_start_oneshot_timer(&rotate_timer);
-	}
 
 	int (*func)(unsigned char *vuyy, unsigned char *rotatedVuyy, int width, int height);
     switch (rotate_config->rot_angle)
@@ -727,18 +884,23 @@ static bk_err_t rotate_dec_line_complete_handler(uint32_t param)
 	    if (rotate_config->rot_angle == ROTATE_NONE)
         {
             rotate_config->rotate_buffer->state = BUF_IDLE;
-
             //yuv-->DMA2D-->rgb888 or yuv-->copy to psram-->yuv
             rotate_task_send_msg(ROTATE_NO_ROTATE_DIRECT_COPY, (uint32_t)rotate_config->decoder_buffer);
         }
         else
         {
+        	ROTATE_LINE_START();
             func(rotate_notify->buffer->data, rotate_config->rotate_buffer->data, rotate_config->jpeg_width, PIPELINE_DECODE_LINE);
             rotate_task_send_msg(ROTATE_FINISH, (uint32_t)rotate_config->rotate_buffer);
         }
     }
     else
 	{
+    	ROTATE_LINE_START();
+		if (!rtos_is_oneshot_timer_running(&rotate_timer))
+    	{
+    		rtos_start_oneshot_timer(&rotate_timer);
+    	}
 		rott_config_t rott_cfg = {0};
 		rott_cfg.input_addr = rotate_notify->buffer->data;
 		rott_cfg.output_addr = rotate_config->rotate_buffer->data;
@@ -817,6 +979,9 @@ static void rotate_main(beken_thread_arg_t data)
 					rotate_memcopy_handler(msg.param);
 					break;
 
+				case ROTATE_PARTIAL_DISPLAY_START:
+					rotate_display_partial_start_handler(msg.param);
+				break;
 				case ROTATE_RESET:
 					rotate_clear_status();
 					break;
@@ -826,15 +991,9 @@ static void rotate_main(beken_thread_arg_t data)
 					LOGI("%s exit\n", __func__);
 					rotate_config->task_running = 0;
 
-					if (rtos_is_oneshot_timer_running(&rotate_timer))
-					{
-						rtos_stop_oneshot_timer(&rotate_timer);
-					}
+					rtos_stop_oneshot_timer(&rotate_timer);
 
-					if (rtos_is_oneshot_timer_init(&rotate_timer))
-					{
-						rtos_deinit_oneshot_timer(&rotate_timer);
-					}
+					rtos_deinit_oneshot_timer(&rotate_timer);
 
 					beken_semaphore_t *beken_semaphore = (beken_semaphore_t*)msg.param;
 					rtos_deinit_queue(&rotate_config->rotate_queue);
@@ -845,6 +1004,44 @@ static void rotate_main(beken_thread_arg_t data)
 				}
 				break;
 
+				case ROTATE_PARTIAL_DISPLAY_FINISH:
+				{
+					complex_buffer_t *rotate_buf = (complex_buffer_t*)msg.param;
+					if (rotate_buf == &rotate_config->buf[0])
+					{
+						rotate_config->buf[0].state = BUF_IDLE;
+					}
+					else if(rotate_buf == &rotate_config->buf[1])
+					{
+						rotate_config->buf[1].state = BUF_IDLE;
+					}
+                    else
+                    {
+                        LOGI("%s %d rotate_buf err\n", __func__, __LINE__);
+                    }
+
+					if ((rotate_config->state == ROTATE_STATE_IDLE)
+						&& (!list_empty(&rotate_config->rotate_pedding_list)))
+					{
+						LIST_HEADER_T *pos, *n, *list = &rotate_config->rotate_pedding_list;
+						pipeline_encode_request_t *request = NULL;
+
+						list_for_each_safe(pos, n, list)
+						{
+							request = list_entry(pos, pipeline_encode_request_t, list);
+							if (request != NULL)
+							{
+								ret = rotate_task_send_msg(ROTATE_DEC_LINE_NOTIFY, (uint32_t)request);
+								if (ret == BK_OK)
+								{
+									list_del(pos);
+								}
+								break;
+							}
+						}
+					}
+				}
+				break;
 				default:
 					break;
 			}
@@ -927,11 +1124,26 @@ bk_err_t rotate_task_open(rot_open_t *rot_open)
 
 	os_memset(rotate_config, 0, sizeof(rotate_config_t));
 
+    if (g_lcd_device != NULL)
+    {
+        rotate_config->lcd_info.width =  g_lcd_device->ppi >> 16;
+        rotate_config->lcd_info.height = g_lcd_device->ppi & 0xFFFF;
+        rotate_config->lcd_info.interface = g_lcd_device->type;
+        LOGI("%s get lcd info: lcd_type = %d (0/1:rgb,2:mcu,3:qspi,4:spi ), lcd_width * height = (%d * %d)\n", __func__, 
+            g_lcd_device->type, rotate_config->lcd_info.width, rotate_config->lcd_info.height);
+    }
+    else
+    {
+        rotate_config->lcd_info.width = 240;
+        rotate_config->lcd_info.height = 320;
+        LOGI("%s lcd_not open, get lcd info NULL，default lcd 240*320\n", __func__);
+    }
+
 	INIT_LIST_HEAD(&rotate_config->rotate_pedding_list);
 	INIT_LIST_HEAD(&rotate_config->copy_pedding_list);
-
+#ifdef CONFIG_PSRAM
 	rotate_config->psram_overwrite_id = bk_psram_alloc_write_through_channel();
-
+#endif
 	if (!rtos_is_oneshot_timer_init(&rotate_timer))
 	{
 		ret = rtos_init_oneshot_timer(&rotate_timer, 1 * 1000, rotate_timer_handle, NULL, NULL);
@@ -989,9 +1201,9 @@ bk_err_t rotate_task_open(rot_open_t *rot_open)
         ///yuyv-->hw rotate-->RGB565
         rotate_config->fmt = rot_open->fmt; //RGB656_LE 22
     }
-    LOGI("%s, mode %d(1:sw, 2:hw) angle(0:0, 1:90,2:180,3:270) %d, fmt:%d(5:yuv, 22:rgb565_LE, 25:rgb888)\r\n", __func__, rotate_config->rot_mode, rot_open->angle, rotate_config->fmt);
 
 	rotate_config->rot_angle = rot_open->angle;
+	LOGI("%s, mode %d(1:sw, 2:hw) angle(0:0, 1:90,2:180,3:270) %d, fmt:%d(5:yuv, 22:rgb565_LE, 25:rgb888)\r\n", __func__, rotate_config->rot_mode, rot_open->angle, rotate_config->fmt);
 
 	ret = rtos_init_semaphore(&rotate_config->rot_sem, 1);
 
@@ -1107,6 +1319,7 @@ bk_err_t rotate_task_close(void)
 	rotate_task_stop();
 	rtos_deinit_semaphore(&rotate_config->rot_sem);
 	rotate_config->rot_sem = NULL;
+	rotate_config->partial_display_start = false;
 
 	rotate_task_deinit();
 
@@ -1164,9 +1377,10 @@ bk_err_t rotate_task_close(void)
 		rotate_config->rotate_frame = NULL;
 		LOGI("%s free rotate_frame\n", __func__);
 	}
+#ifdef CONFIG_PSRAM
 	bk_psram_disable_write_through(rotate_config->psram_overwrite_id);
 	bk_psram_free_write_through_channel(rotate_config->psram_overwrite_id);
-
+#endif
 	os_free(rotate_config);
 	rotate_config = NULL;
 
