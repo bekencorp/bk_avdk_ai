@@ -390,13 +390,23 @@ void frame_buffer_fb_free(frame_buffer_t *frame, frame_module_t index)
 	fb_mem_list_t *mem_list = &fb_mem_list[type];
 	frame_buffer_node_t *node = list_entry(frame, frame_buffer_node_t, frame);
 	uint32_t isr_context = platform_is_in_interrupt_context();
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
 	if (mem_list == NULL)
 	{
 		LOGE("%s invalid mem_list: %p, %d\n", __func__, mem_list, index);
 		if (fb_info->modules[index].enable)
 		{
-			xEventGroupSetBits(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE);
+			if (isr_context)
+			{
+				xEventGroupSetBitsFromISR(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE, &xHigherPriorityTaskWoken);
+				/* If a higher-priority task is awakened, request a context switch. */
+				portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+			}
+			else
+			{
+				xEventGroupSetBits(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE);
+			}
 		}
 
 		return;
@@ -420,7 +430,16 @@ void frame_buffer_fb_free(frame_buffer_t *frame, frame_module_t index)
 		if (fb_info->modules[index].enable)
 		{
 			LOGE("%s fb_mem_list disable: %p, %d\n", __func__, mem_list, index);
-			xEventGroupSetBits(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE);
+			if (isr_context)
+			{
+				xEventGroupSetBitsFromISR(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE, &xHigherPriorityTaskWoken);
+				/* If a higher-priority task is awakened, request a context switch. */
+				portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+			}
+			else
+			{
+				xEventGroupSetBits(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE);
+			}
 		}
 
 		if (!isr_context)
@@ -469,7 +488,16 @@ void frame_buffer_fb_free(frame_buffer_t *frame, frame_module_t index)
 
 		if (fb_info->modules[index].enable)
 		{
-			xEventGroupSetBits(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE);
+			if (isr_context)
+			{
+				xEventGroupSetBitsFromISR(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE, &xHigherPriorityTaskWoken);
+				/* If a higher-priority task is awakened, request a context switch. */
+				portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+			}
+			else
+			{
+				xEventGroupSetBits(fb_info->modules[index].handle, FRAME_BUFFER_READ_COMPLETE);
+			}
 		}
 
 		if (!isr_context)
@@ -823,6 +851,7 @@ void frame_buffer_fb_push(frame_buffer_t *frame)
 	uint32_t i = 0, length = 0;
 	bk_err_t ret;
 	GLOBAL_INT_DECLARATION() = 0;
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
 	if (type >= FB_INDEX_MAX)
 	{
@@ -891,7 +920,16 @@ void frame_buffer_fb_push(frame_buffer_t *frame)
 				if (mem_list->mode == FB_MEM_SHARED
 				    && fb_info->modules[i].plugin == false)
 				{
-					xEventGroupSetBits(fb_info->modules[i].handle, FRAME_BUFFER_READ_COMPLETE);
+					if (isr_context)
+					{
+						xEventGroupSetBitsFromISR(fb_info->modules[i].handle, FRAME_BUFFER_READ_COMPLETE, &xHigherPriorityTaskWoken);
+						/* If a higher-priority task is awakened, request a context switch. */
+						portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+					}
+					else
+					{
+						xEventGroupSetBits(fb_info->modules[i].handle, FRAME_BUFFER_READ_COMPLETE);
+					}
 
 					fb_info->modules[i].plugin = true;
 				}
