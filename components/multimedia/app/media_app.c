@@ -419,16 +419,6 @@ bk_err_t media_app_lcd_pipeline_open(void *config)
     return ret;
 }
 
-bk_err_t media_app_decode_by_line(void *config)
-{
-    int ret = BK_OK;
-
-    ret = media_send_msg_sync(EVENT_PIPELINE_LCD_JDEC_BY_LINE_IND, 0);
-    LOGI("%s complete %x\n", __func__, ret);
-
-    return ret;
-}
-
 bk_err_t media_app_avi_play_start(void *lcd_open)
 {
     int ret = BK_OK;

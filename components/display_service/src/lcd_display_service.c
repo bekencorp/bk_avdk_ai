@@ -524,12 +524,12 @@ bool check_lcd_task_is_open(void)
 	}
 }
 
-uint8_t lcd_display_get_type(void)
+lcd_type_t lcd_display_get_type(void)
 {
-    if (lcd_disp_config == NULL)
+    if (lcd_disp_config == NULL && lcd_disp_config->disp_task_running)
     {
         LOGI("%s lcd_disp_config is null\r\n", __func__);
-        return 0;
+        return BK_FAIL;
     }
     else
     {

@@ -45,11 +45,11 @@
 #define JPEGDEC_BUFFER_LENGTH        (60 * 1024)
 
 #ifdef DECODE_DIAG_DEBUG
-#define DECODER_FRAME_START()		do { GPIO_UP(3); } while (0)
-#define DECODER_FRAME_END()			do { GPIO_DOWN(3); } while (0)
+#define DECODER_FRAME_START()		do { GPIO_UP(GPIO_DVP_D0); } while (0)
+#define DECODER_FRAME_END()			do { GPIO_DOWN(GPIO_DVP_D0); } while (0)
 
-#define DECODER_LINE_START()		do { GPIO_UP(4); } while (0)
-#define DECODER_LINE_END()			do { GPIO_DOWN(4); } while (0)
+#define DECODER_LINE_START()		do { GPIO_UP(GPIO_DVP_D1); } while (0)
+#define DECODER_LINE_END()			do { GPIO_DOWN(GPIO_DVP_D1); } while (0)
 
 
 #define H264_DECODER_NOTIFY() \

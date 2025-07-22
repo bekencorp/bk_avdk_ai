@@ -136,7 +136,6 @@ bk_err_t media_app_lvgl_switch_ui(lvgl_ui_index_t ui_index);
 
 bk_err_t media_app_rtsp_open(video_config_t *config);
 bk_err_t media_app_rtsp_close();
-bk_err_t media_app_decode_by_line(void *config);
 
 bk_err_t media_app_avi_play_start(void *lcd_open);
 bk_err_t media_app_avi_play_stop(void);

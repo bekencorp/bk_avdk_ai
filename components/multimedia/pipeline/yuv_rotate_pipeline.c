@@ -58,11 +58,11 @@ uint8_t lvgl_disp_enable = 0;
 #endif
 
 #ifdef ROTATE_DIAG_DEBUG
-#define ROTATE_LINE_START()			do { GPIO_UP(5); } while (0)
-#define ROTATE_LINE_END()			do { GPIO_DOWN(5); } while (0)
+#define ROTATE_LINE_START()			do { GPIO_UP(GPIO_DVP_D3); } while (0)
+#define ROTATE_LINE_END()			do { GPIO_DOWN(GPIO_DVP_D3); } while (0)
 
-#define DMA2D_LINE_START()			do { GPIO_UP(5); } while (0)
-#define DMA2D_LINE_END()			do { GPIO_DOWN(5); } while (0)
+#define DMA2D_LINE_START()			do { GPIO_UP(GPIO_DVP_D4); } while (0)
+#define DMA2D_LINE_END()			do { GPIO_DOWN(GPIO_DVP_D4); } while (0)
 
 #else
 #define ROTATE_LINE_START()
@@ -192,8 +192,6 @@ static void dma2d_transfer_error(void)
 	LOGE("%s %d %p\n", __func__, rotate_config->rotate_buffer->index, rotate_config->rotate_frame->frame);
 }
 
-extern void  bk_mem_dump_ex(const char * title, unsigned char * data, uint32_t data_len);
-
 void partial_display_complete_cb(void * buffer)
 {
     bk_err_t ret = BK_FAIL;
@@ -235,7 +233,6 @@ void rotate_display_partial_start_handler(uint32_t param)
     {
         partial_display_complete_cb(partial_area);
     }
-//    bk_mem_dump_ex("240x320", rotate_buf->data, 240*16*2);
 }
 
 static complex_buffer_t *rotate_get_idle_buf(void)
@@ -1134,9 +1131,7 @@ bk_err_t rotate_task_open(rot_open_t *rot_open)
     }
     else
     {
-        rotate_config->lcd_info.width = 240;
-        rotate_config->lcd_info.height = 320;
-        LOGI("%s lcd_not open, get lcd info NULL，default lcd 240*320\n", __func__);
+        LOGI("%s lcd_not open, get lcd info NULL\n", __func__);
     }
 
 	INIT_LIST_HEAD(&rotate_config->rotate_pedding_list);
