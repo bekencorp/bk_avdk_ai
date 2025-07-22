@@ -45,7 +45,7 @@ typedef struct {
 extern bool rx_spk_data_flag;
 #endif
 play_config_t *play_info = NULL;
-#define WSS_AUDIO_BUFFER_SIZE (980*1024)
+#define WSS_AUDIO_BUFFER_SIZE (1500*1024)
 
 // 实现自定义的逻辑
 int play_user_audio_rx_data_handle(unsigned char *data, unsigned int size)
@@ -151,13 +151,11 @@ void play_data_buffer_deinit(data_buffer_t *rb) {
     }
 }
 
-void play_data_buffer_write (data_buffer_t* rb, const uint8_t *data, size_t data_len) {
+int play_data_buffer_write (data_buffer_t* rb, const uint8_t *data, size_t data_len) {
 
     size_t remaining = rb->size - rb->write_index;
     if ((rb->length_write_index + 1) % rb->buffer_count == rb->length_read_index) {
-        LOGE("%s, write buffer fail length_write_index:%d write_index:%d read_index:%d data_len:%d\r\n",
-            __func__, rb->length_write_index, rb->write_index, rb->read_index, data_len);
-        return;
+        return -1;
     }
 
     if (data_len <= remaining) {
@@ -172,6 +170,8 @@ void play_data_buffer_write (data_buffer_t* rb, const uint8_t *data, size_t data
     }
     rb->length_buffer [rb->length_write_index] = data_len;
     rb->length_write_index = (rb->length_write_index + 1) % rb->buffer_count;
+
+    return 0;
 }
 
 size_t play_data_buffer_read(data_buffer_t *rb, uint8_t *output) {
@@ -367,6 +367,8 @@ void module_bufferPlay_audioInit()
 // buf为mp3数据 rlen为当前数据长度
 void module_bufferPlay_data(void *buf, int rlen)
 {
+    int i = 0;
+
     if (rlen > (play_info->info.dec_node_size)) {
         LOGE("data too large, len:%d limit:%d\n", rlen, general_audio.dec_node_size);
         return;
@@ -374,8 +376,18 @@ void module_bufferPlay_data(void *buf, int rlen)
 
     LOGD("%s rlen:%d\n", __func__, rlen);
 
+retry:
     if (play_info->ring_buffer) {
-        play_data_buffer_write(play_info->ring_buffer, buf, rlen);
+        if (play_data_buffer_write(play_info->ring_buffer, buf, rlen) != 0) {
+            rtos_delay_milliseconds(20);
+            i++;
+            if (i > 50) {
+                LOGE("%s, write buffer fail length_write_index:%d write_index:%d read_index:%d data_len:%d\r\n",
+                        __func__, play_info->ring_buffer->length_write_index, play_info->ring_buffer->write_index, play_info->ring_buffer->read_index, rlen);
+                return;
+            }
+            goto retry;
+        }
     }
 }
 
