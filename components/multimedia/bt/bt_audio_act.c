@@ -61,6 +61,7 @@ enum
 enum
 {
     TONE_STATUS_IDLE,
+    TONE_STATUS_WAIT_ANOTHER_TONE_END,
     TONE_STATUS_WAIT_ENABLE,
     TONE_STATUS_ENABLE,
 };
@@ -104,6 +105,7 @@ static void bt_audio_task(void *arg)
     uint32_t evt = 0;
     bt_audio_msg_t msg;
     media_mailbox_msg_t *mb_msg = NULL;
+    uint8_t another_tone_status = 0; //0 stop 1 play
 
     while (s_bt_audio_task_run)
     {
@@ -145,11 +147,19 @@ static void bt_audio_task(void *arg)
                 if (final)
                 {
                     write_count = 0;
-                    tone_status = TONE_STATUS_WAIT_ENABLE;
+                    if(!another_tone_status)
+                    {
+                        tone_status = TONE_STATUS_WAIT_ENABLE;
+                    }
+                    else
+                    {
+                        tone_status = TONE_STATUS_WAIT_ANOTHER_TONE_END;
+                    }
                 }
 
                 break;
 
+            case TONE_STATUS_WAIT_ANOTHER_TONE_END:
             case TONE_STATUS_WAIT_ENABLE:
             case TONE_STATUS_ENABLE:
                 if (!final)
@@ -176,6 +186,10 @@ static void bt_audio_task(void *arg)
 
             switch (tone_status)
             {
+            case TONE_STATUS_WAIT_ANOTHER_TONE_END:
+                LOGV("wait another tone end");
+                break;
+
             case TONE_STATUS_WAIT_ENABLE:
             case TONE_STATUS_ENABLE:
             {
@@ -231,6 +245,21 @@ static void bt_audio_task(void *arg)
                 LOGV("tone status not match %d, len %d", tone_status, req->data_len);
                 break;
             }
+        }
+        break;
+
+        case EVENT_BT_NOTIFY_TONE_STATUS_REQ:
+        {
+            uint8_t old_tone_status = tone_status;
+
+            another_tone_status = (typeof(another_tone_status))mb_msg->param;
+
+            if(tone_status == TONE_STATUS_WAIT_ANOTHER_TONE_END)
+            {
+                tone_status = TONE_STATUS_WAIT_ENABLE;
+            }
+
+            LOGI("EVENT_BT_NOTIFY_TONE_STATUS_REQ %d, status %d -> %d", another_tone_status, old_tone_status, tone_status);
         }
         break;
 
@@ -473,7 +502,7 @@ end:
         if (s_bt_audio_task)
         {
             s_bt_audio_task_run = 0;
-            rtos_thread_join(s_bt_audio_task);
+            rtos_thread_join(&s_bt_audio_task);
             s_bt_audio_task = NULL;
         }
 
@@ -509,7 +538,7 @@ static bk_err_t bt_audio_deinit_handle(media_mailbox_msg_t *msg)
     }
 
     s_bt_audio_task_run = 0;
-    rtos_thread_join(s_bt_audio_task);
+    rtos_thread_join(&s_bt_audio_task);
     s_bt_audio_task = NULL;
 
     if (s_bt_audio_sema)
@@ -547,7 +576,7 @@ end:
         if (s_bt_audio_task)
         {
             s_bt_audio_task_run = 0;
-            rtos_thread_join(s_bt_audio_task);
+            rtos_thread_join(&s_bt_audio_task);
             s_bt_audio_task = NULL;
         }
 
@@ -591,7 +620,7 @@ bk_err_t bt_audio_event_handle(media_mailbox_msg_t *msg)
 
         if (EVENT_BT_PCM_RESAMPLE_REQ != msg->event && EVENT_BT_PCM_ENCODE_REQ != msg->event && EVENT_BT_PCM_WRITE_REQ != msg->event)
         {
-            LOGI("evt %d", msg->event);
+            LOGI("evt 0x%x", msg->event);
         }
 
 #if USE_QUEUE
