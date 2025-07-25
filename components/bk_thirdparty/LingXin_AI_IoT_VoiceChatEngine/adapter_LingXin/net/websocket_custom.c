@@ -126,18 +126,21 @@ void websocket_event_handler(void *event_handler_arg, char *event_base, int32_t 
           listener(ON_WEBSOCKET_DESTROY, NULL, 0, 0,
                    globalClient->config->userContext);
           freeWebsocketClient(globalClient);
+          globalClient = NULL;
         }
       }
       else
       {
-        // websocket库内部主动回调
-        closeWebsocket(globalClient);
-        WebSocketEventListener listener = getWebSocketEventListener(globalClient);
-        if (listener)
+        if (!client->isWebsocketDestroyed)
         {
-          listener(ON_WEBSOCKET_DESTROY, NULL, 0, 0,
-                   globalClient->config->userContext);
-          freeWebsocketClient(globalClient);
+          client->isWebsocketDestroyed = true;
+          WebSocketEventListener listener = getWebSocketEventListener(globalClient);
+          if (listener)
+          {
+            listener(ON_WEBSOCKET_DESTROY, NULL, 0, 0, globalClient->config->userContext);
+            freeWebsocketClient(globalClient);
+            globalClient = NULL;
+          }
         }
       }
     }
@@ -185,6 +188,7 @@ WebsocketClient *initWebsocket(WebsocketConfig *config)
   { // 添加空指针检查
     LOGE("Failed to allocate memory for WebSocket client handler\r\n");
     free(globalClient);
+    globalClient = NULL;
     return NULL;
   }
 
@@ -204,7 +208,7 @@ WebsocketClient *initWebsocket(WebsocketConfig *config)
       config->header_signature, config->header_timestamp);
   websocket_cfg.ws_event_handler = websocket_event_handler;
   websocket_cfg.user_context = globalClient;
-
+  websocket_cfg.disable_auto_reconnect = true;
   handler->wsiDestroyFromClose = false;
   handler->bk_rtc_client = websocket_client_init(&websocket_cfg);
 
