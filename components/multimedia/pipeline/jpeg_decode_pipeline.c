@@ -255,7 +255,7 @@ static void jpeg_decode_frame_complete_handler(jpeg_dec_res_t *result)
 
 static inline bool jpeg_decode_frame_is_last_line(uint8 index)
 {
-	return index == (jdec_config->jpeg_frame->height >> 4);
+	return index == (jdec_config->jpeg_frame->height / PIPELINE_DECODE_LINE);
 }
 
 static inline uint8_t jpeg_decode_mux_buf_index_get(void)
@@ -946,11 +946,7 @@ static void jpeg_decode_finish_handle(uint32_t param)
 
 	if (jdec_config->jpeg_frame)
 	{
-#if !CONFIG_LCD_PARTIAL_DISPLAY
         frame_buffer_fb_free(jdec_config->jpeg_frame, MODULE_DECODER);
-#else
-        os_free(jdec_config->jpeg_frame);
-#endif
         jdec_config->jpeg_frame = NULL;
 	}
 

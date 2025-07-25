@@ -135,8 +135,8 @@ typedef struct
     frame_buffer_t *frame;
 } jpeg_decode_list_t;
 
-#define IMAGE_MAX_PIPELINE_LINE		(16)
-#define DISPLAY_MAX_PIPELINE_LINE	(16)
+#define IMAGE_MAX_PIPELINE_LINE		(PIPELINE_DECODE_LINE)
+#define DISPLAY_MAX_PIPELINE_LINE	(PIPELINE_DECODE_LINE)
 #define IMAGE_PIPEL_SIZE			(2)
 
 #ifdef CONFIG_PSRAM

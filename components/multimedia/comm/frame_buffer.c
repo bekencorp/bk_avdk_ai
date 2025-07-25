@@ -380,6 +380,7 @@ void frame_buffer_fb_clear(fb_type_t type)
 
 void frame_buffer_fb_free(frame_buffer_t *frame, frame_module_t index)
 {
+#ifdef CONFIG_PSRAM
 	if (frame == NULL || index >= MODULE_MAX)
 	{
 		LOGE("%s %d, frame is null\r\n", __func__, index);
@@ -528,6 +529,9 @@ out:
 		GLOBAL_INT_RESTORE();
 		rtos_unlock_mutex(&mem_list->lock);
 	}
+#else
+    os_free(frame);
+#endif
 }
 
 frame_buffer_t *frame_buffer_fb_dual_malloc(fb_type_t type, uint32_t size)
