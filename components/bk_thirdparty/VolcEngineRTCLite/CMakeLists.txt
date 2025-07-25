@@ -15,7 +15,6 @@ list(APPEND srcs
             hal/src/common/volc_string.c
             hal/src/common/volc_tls.c
             hal/src/platform/bk7258/volc_atomic.c
-            hal/src/platform/bk7258/volc_cond.c
             hal/src/platform/bk7258/volc_device.c
             hal/src/platform/bk7258/volc_device_finger_print.c
             hal/src/platform/bk7258/volc_directory.c
@@ -45,8 +44,8 @@ if (CONFIG_VOLC_RTC_EN)
 endif()
 
 if (CONFIG_VOLC_RTC_EN)
-get_filename_component(lib_name ${CMAKE_CURRENT_SOURCE_DIR}/libVolcEngineRTCLite_a.a NAME)
-add_prebuilt_library(${lib_name} "${CMAKE_CURRENT_SOURCE_DIR}/lib/libVolcEngineRTCLite_a.a")
+get_filename_component(lib_name ${CMAKE_CURRENT_SOURCE_DIR}/libVolcEngineRTCLite.a NAME)
+add_prebuilt_library(${lib_name} "${CMAKE_CURRENT_SOURCE_DIR}/lib/libVolcEngineRTCLite.a")
 target_link_libraries(${COMPONENT_LIB} INTERFACE ${lib_name})
 endif()
 

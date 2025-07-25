@@ -84,7 +84,7 @@ uint32_t volc_certificate_and_key_create(int32_t certificate_bits, bool generate
     // generate a new certificate
     VOLC_CHK(mbedtls_mpi_read_binary(&serial, cert_sn, sizeof(cert_sn)) == 0, VOLC_STATUS_CERTIFICATE_GENERATION_FAILED);
 
-    now = volc_get_time();
+    now = volc_get_time_ms() * VOLC_HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
     VOLC_CHK(volc_generate_timestamp_str(now, "%Y%m%d%H%M%S", not_before_buf, sizeof(not_before_buf), &written) == VOLC_STATUS_SUCCESS,
         VOLC_STATUS_CERTIFICATE_GENERATION_FAILED);
     not_after = now + VOLC_GENERATED_CERTIFICATE_DAYS * VOLC_HUNDREDS_OF_NANOS_IN_A_DAY;
@@ -208,5 +208,5 @@ uint32_t volc_pk_verify(const char* pub_key, size_t pub_key_len, const char* cre
     }
 err_out_label:
     mbedtls_pk_free(&pk);
-    return VOLC_STATUS_SUCCESS;
+    return ret;
 }

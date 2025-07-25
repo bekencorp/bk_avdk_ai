@@ -111,7 +111,7 @@ void volc_thread_sleep(uint64_t time) {
 }
 
 void volc_thread_sleep_until(uint64_t time) {
-    uint64_t cur_time = volc_get_time();
+    uint64_t cur_time = volc_get_time_ms() * VOLC_HUNDREDS_OF_NANOS_IN_A_MILLISECOND;
     if (time > cur_time) {
         volc_thread_sleep(time - cur_time);
     }

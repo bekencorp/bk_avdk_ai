@@ -30,6 +30,8 @@ extern "C" {
 #define VOLC_HUNDREDS_OF_NANOS_IN_A_MINUTE      (VOLC_HUNDREDS_OF_NANOS_IN_A_SECOND * 60LL)
 #define VOLC_HUNDREDS_OF_NANOS_IN_AN_HOUR       (VOLC_HUNDREDS_OF_NANOS_IN_A_MINUTE * 60LL)
 #define VOLC_MILLISECONDS_IN_A_SECOND           1000
+#define VOLC_MICROSECONDS_IN_A_MILLISECONDS_SECOND           1000
+#define VOLC_NANOS_IN_A_MILLISECONDS_SECOND     1000000LL
 #define VOLC_SECONDS_IN_A_DAY (24 * 60 * 60LL)
 #define VOLC_HUNDREDS_OF_NANOS_IN_A_DAY (VOLC_HUNDREDS_OF_NANOS_IN_AN_HOUR * 24LL)
 
@@ -42,16 +44,11 @@ extern "C" {
 #define VOLC_MAX_TIMESTAMP_STR_LEN 17
 
 /**
- * @locale zh
- * @type api
- * @list 方法
- * @brief 获取系统时间, 100ns
- * @return 方法调用结果：<br>
- *         - 系统时间
+ * @brief 获取系统时间, ms
  */
-__byte_rtc_api__ uint64_t volc_get_time(void);
+__byte_rtc_api__ uint64_t volc_get_time_ms(void);
 
-__byte_rtc_api__ uint64_t volc_get_montionic_time(void);
+__byte_rtc_api__ uint64_t volc_get_montionic_time_ms(void);
 
 /**
  * @locale zh

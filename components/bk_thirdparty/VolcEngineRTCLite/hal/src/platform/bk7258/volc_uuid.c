@@ -15,7 +15,7 @@ void volc_uuid_generate(char* uuid)
     uint16_t* short_buffer = NULL;
     uint64_t random_buffer[2] = {0};
 
-    srand(volc_get_time());
+    srand(volc_get_time_ms());
 
     short_buffer = (uint16_t*) random_buffer;
     for (int i = 0; i < sizeof(random_buffer) / sizeof(uint16_t); i++) {
