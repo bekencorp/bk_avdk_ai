@@ -111,9 +111,12 @@ void websocket_event_handler(void *event_handler_arg, char *event_base, int32_t 
 
     break;
   }
+  case WEBSOCKET_EVENT_CLOSED:
+    LOGI("WEBSOCKET_EVENT_CLOSED\r\n");
 
   case WEBSOCKET_EVENT_DISCONNECTED:
   {
+    LOGI("WEBSOCKET_EVENT_DISCONNECTED\r\n");
     WebsocketClientHandler *clientHandler = getClientHandler(globalClient);
     if (clientHandler)
     {
@@ -164,10 +167,6 @@ void websocket_event_handler(void *event_handler_arg, char *event_base, int32_t 
     }
     break;
   }
-
-  case WEBSOCKET_EVENT_CLOSED:
-    LOGI("WEBSOCKET_EVENT_CLOSED\r\n");
-    break;
   default:
     break;
   }

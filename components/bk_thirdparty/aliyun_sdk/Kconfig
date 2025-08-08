@@ -1,0 +1,10 @@
+#TODO remove all kconfigs which are defined in armino libs
+
+menu "aliyunsdk"
+
+	config ALIYUN_MMI_EN
+		bool "Enable BaiLian AI"
+		default n
+		help
+			Enable BaiLian AI
+endmenu
