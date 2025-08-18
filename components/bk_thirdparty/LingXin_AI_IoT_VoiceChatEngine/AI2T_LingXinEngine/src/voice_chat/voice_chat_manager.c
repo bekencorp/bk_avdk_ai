@@ -316,11 +316,10 @@ bool voiceChatContinueCheck(ContinueCheckCallback callback,
   if (globalHandler == NULL)
   {
     printf("0.0.6 %s 重新初始化 SDK", __func__);
+    isAIResponseding = true;
     doCreate();
 
     isFirstContinueAfterCreate = false;
-
-    isAIResponseding = true;
   }
   else
   {

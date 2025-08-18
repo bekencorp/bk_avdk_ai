@@ -567,10 +567,10 @@ char *voiceChatCreate(VoiceChatHandler **handlerAddress, VoiceChatConfig *config
     handler->extraInfo = extraInfo;
   }
 
-  startWebsocket(handler->websocket);
-
   handler->selfPointer = handlerAddress; // 设置 selfPointer
   *handlerAddress = handler;             // 返回 handler
+
+  startWebsocket(handler->websocket);
 
   logPrintf("[%s], voiceChatCreate finish", getVoiceChatLogPre(handler));
   return extraInfo ? extraInfo->instanceId : "";
