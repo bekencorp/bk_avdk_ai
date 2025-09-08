@@ -212,7 +212,8 @@ static void doCreate()
     config = NULL;
     return;
   }
-  isAIResponseding = false;
+  //modified by beken
+  //isAIResponseding = false;
   isAudioSending = false;
   printf("0.0.6 -----Create viocechat finish-----\n");
 }
@@ -316,6 +317,7 @@ bool voiceChatContinueCheck(ContinueCheckCallback callback,
   if (globalHandler == NULL)
   {
     printf("0.0.6 %s 重新初始化 SDK", __func__);
+    //modified by beken
     isAIResponseding = true;
     doCreate();
 

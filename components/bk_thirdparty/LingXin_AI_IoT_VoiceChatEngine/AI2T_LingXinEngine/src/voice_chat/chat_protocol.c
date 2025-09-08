@@ -569,7 +569,7 @@ char *voiceChatCreate(VoiceChatHandler **handlerAddress, VoiceChatConfig *config
 
   handler->selfPointer = handlerAddress; // 设置 selfPointer
   *handlerAddress = handler;             // 返回 handler
-
+  //modified by beken
   startWebsocket(handler->websocket);
 
   logPrintf("[%s], voiceChatCreate finish", getVoiceChatLogPre(handler));
