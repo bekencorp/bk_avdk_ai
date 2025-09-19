@@ -213,6 +213,12 @@ media_mailbox_msg_t spk_play_finish_msg = {0};
 media_mailbox_msg_t mic_to_media_app_msg = {0};
 media_mailbox_msg_t spk_to_media_app_msg = {0};
 media_mailbox_msg_t vad_to_media_app_msg = {0};
+
+#if (CONFIG_AUD_SWEEP_TEST)
+aud_tras_drv_sweep_notify_t sweep_notify = {0, 0};
+media_mailbox_msg_t sweep_to_media_app_msg = {0};
+#endif
+
 #if AUD_MEDIA_SEM_ENABLE
 beken_semaphore_t mailbox_media_aud_mic_sem = NULL;
 #endif
@@ -869,6 +875,18 @@ int aud_get_production_mode(void)
 #endif
 }
 
+#if CONFIG_AUD_SWEEP_TEST
+void aec_factory_result_notify(uint8_t res, bool b1, bool b2)
+{
+	sweep_notify.b1 = b1;
+	sweep_notify.b2 = b2;
+	sweep_notify.test_step = res;
+
+	sweep_to_media_app_msg.event = EVENT_AUD_FACTORY_NOTIFY;
+	sweep_to_media_app_msg.param = (uint32_t)&sweep_notify;
+	msg_send_notify_to_media_major_mailbox(&sweep_to_media_app_msg, APP_MODULE);
+}
+#endif
 
 void aud_aec_production_result(void)
 {
@@ -910,7 +928,7 @@ void aud_aec_production_result(void)
 				bk_printf("Main MIC & HW Echo is not good...\r\n");//default:6050
 				ret2 = false;
 			}
-            //aec_factory_result_notify(1, ret1, ret2);
+			aec_factory_result_notify(1, ret1, ret2);
 		}
 		//2.Test whether the mic is good or bad 
 		if((170*2+90 == aec_info_pr->aec->frame_cnt)||(170*3+90 == aec_info_pr->aec->frame_cnt)||(170*4+90 == aec_info_pr->aec->frame_cnt))
@@ -930,12 +948,13 @@ void aud_aec_production_result(void)
 
 			if(ret1 == true)
 			{
+				aec_factory_result_notify(2, true, true);
 			}
 			else
 			{
 				if((170*4+90 == aec_info_pr->aec->frame_cnt))
 				{
-
+					aec_factory_result_notify(2, false, false);
 				}
 			}
 		}

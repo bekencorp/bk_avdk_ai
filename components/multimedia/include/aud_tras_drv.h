@@ -131,6 +131,10 @@ typedef enum {
     AUD_TRAS_STOP_PROMPT_TONE_REQ,
 #endif
 
+#if CONFIG_AUD_SWEEP_TEST
+	AUD_TRAS_FACTORY_NOTIFY,
+#endif
+
 	AUD_TRAS_DRV_MAX,
 } aud_tras_drv_op_t;
 

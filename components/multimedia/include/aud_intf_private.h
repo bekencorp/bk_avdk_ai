@@ -441,6 +441,10 @@ typedef enum {
 	AUD_INTF_EVENT_PROMPT_TONE_PLAY_FINISH,
 #endif
 
+#if (CONFIG_AUD_SWEEP_TEST)
+	AUD_INTF_EVENT_SWEEP_TEST,
+#endif
+
 	AUD_INTF_EVENT_MAX,
 } aud_intf_event_t;
 
@@ -448,6 +452,22 @@ typedef struct {
 	uint32_t ptr_data;		/**< the mic data need to send */
 	uint32_t length;		/**< the data size (byte) */
 } aud_intf_mic_param_t;
+
+#if (CONFIG_AUD_SWEEP_TEST)
+/**
+ * @brief Audio sweep test notification structure
+ * @details 
+ * When test_step is 1: Test the air tightness of mic and echo mic
+ * When test_step is 2: Test whether the main mic is good or bad
+ */
+typedef struct {
+	uint8_t test_step;  /**< Test step identifier (1 or 2) */
+	bool b1;           /**< When test_step=1: Whether the air tightness of mic is good or bad
+	                    *   When test_step=2: Whether the main mic is good or bad */
+	bool b2;           /**< When test_step=1: Whether the echo mic is good or bad
+	                    *   When test_step=2: Invalid */
+} aud_tras_drv_sweep_notify_t;
+#endif
 
 typedef struct {
 	aud_intf_event_t op;

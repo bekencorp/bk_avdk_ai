@@ -593,7 +593,11 @@ static void media_app_mailbox_msg_handle(media_mailbox_msg_t *msg)
 				mic_param = (aud_intf_mic_param_t *)msg->param;
 				aud_intf_send_msg(AUD_INTF_EVENT_VAD_FLAG_UPDATE, mic_param->ptr_data, mic_param->length);
 				break;
-
+#if (CONFIG_AUD_SWEEP_TEST)
+			case EVENT_AUD_FACTORY_NOTIFY:
+				aud_intf_send_msg(AUD_INTF_EVENT_SWEEP_TEST, msg->param, 0);
+				break;
+#endif
 			case EVENT_UAC_CONNECT_STATE_NOTIFY:
 				aud_intf_send_msg(AUD_INTF_EVENT_UAC_STATE, msg->param, 0);
 				break;

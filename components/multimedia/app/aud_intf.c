@@ -202,7 +202,14 @@ static void aud_intf_main(beken_thread_arg_t param_data)
 					}
 					aec_vad_status_set(msg.data);
 					break;
-
+#if (CONFIG_AUD_SWEEP_TEST)
+				case AUD_INTF_EVENT_SWEEP_TEST:
+					if (aud_intf_info.drv_info.setup.aud_intf_notify_sweep_result)
+					{
+						aud_intf_info.drv_info.setup.aud_intf_notify_sweep_result((void *)msg.data);
+					}
+					break;
+#endif
 				case AUD_INTF_EVENT_SPK_RX:
 					if (aud_intf_info.drv_info.setup.aud_intf_rx_spk_data) {
 						aud_intf_info.drv_info.setup.aud_intf_rx_spk_data(msg.size);

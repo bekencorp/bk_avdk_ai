@@ -78,7 +78,10 @@ typedef struct {
 	aud_intf_task_config_t task_config;
 	int (*aud_intf_tx_mic_data)(unsigned char *data, unsigned int size);		/**< the api is called when collecting a frame mic packet data is complete */
 	bk_err_t (*aud_intf_rx_spk_data)(unsigned int size);						/**< the api is called when playing a frame speaker packet data is complete */
-	bk_err_t (*aud_intf_update_vad_flag)(unsigned char flag);						
+	bk_err_t (*aud_intf_update_vad_flag)(unsigned char flag);
+#if (CONFIG_AUD_SWEEP_TEST)
+	void (*aud_intf_notify_sweep_result)(void *);
+#endif
 } aud_intf_drv_setup_t;
 
 #define DEFAULT_AUD_INTF_DRV_SETUP_CONFIG() {          \
