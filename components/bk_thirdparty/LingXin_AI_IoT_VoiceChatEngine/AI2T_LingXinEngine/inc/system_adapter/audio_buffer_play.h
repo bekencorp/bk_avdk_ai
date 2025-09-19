@@ -17,6 +17,10 @@ void module_bufferPlay_audioEnd();
 // 调用时机：由chat套件内核发起调用，客户实现
 void module_bufferPlay_terminate();
 
+// 功能：设置当前播放的音量
+// 调用时机：由chat套件内核发起调用，客户实现
+void module_bufferPlay_setVolume(int volume);
+
 /**
  * 老接口
  */

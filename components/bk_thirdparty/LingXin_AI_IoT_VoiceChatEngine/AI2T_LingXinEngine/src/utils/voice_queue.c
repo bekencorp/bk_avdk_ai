@@ -4,6 +4,7 @@
 #include <time.h>
 #include <stdbool.h>
 #include "lingxin_voice_queue.h"
+#include "lingxin_log.h"
 
 #define HEADER_SIZE sizeof(size_t)
 
@@ -25,13 +26,13 @@ VoiceQueue *voiceQueueCreate(size_t capacity)
   VoiceQueue *queue = (VoiceQueue *)calloc(1, sizeof(VoiceQueue));
   if (!queue)
   {
-    logPrintf("voicequeue malloc failed");
+    lingxin_log_error("voicequeue malloc failed");
     return NULL;
   }
   queue->buffer = calloc(1, capacity);
   if (!queue->buffer)
   {
-    logPrintf("voicequeue buffer malloc failed");
+    lingxin_log_error("voicequeue buffer malloc failed");
     free(queue);
     return NULL;
   }
@@ -79,7 +80,7 @@ void destroyVoiceQueue(VoiceQueue *queue)
   {
     return;
   }
-  logPrintf("destroyVoiceQueue: begin");
+  lingxin_log_debug("destroyVoiceQueue: begin");
 
   pthread_mutex_destroy(queue->mutex); // 销毁互斥锁
   pthread_cond_destroy(queue->cond);
@@ -87,7 +88,7 @@ void destroyVoiceQueue(VoiceQueue *queue)
   free(queue->cond);
   free(queue->buffer);
   free(queue);
-  logPrintf("destroyVoiceQueue: finish");
+  lingxin_log_debug("destroyVoiceQueue: finish");
 }
 
 // 入队操作
@@ -97,7 +98,7 @@ bool voiceEnqueue(VoiceQueue *queue, const char *data, size_t length)
   {
     return false;
   }
-  logPrintf("voiceEnqueue: begin: %d", length);
+  lingxin_log_debug("voiceEnqueue: begin: %d", length);
 
   pthread_mutex_lock(queue->mutex);
 
@@ -143,7 +144,7 @@ bool voiceEnqueue(VoiceQueue *queue, const char *data, size_t length)
   pthread_cond_signal(queue->cond);
 
   pthread_mutex_unlock(queue->mutex);
-  logPrintf("voiceEnqueue: after");
+  lingxin_log_debug("voiceEnqueue: after");
 
   return true;
 }
@@ -156,12 +157,12 @@ bool voiceDequeue(VoiceQueue *queue, VoiceChunk *chunk,
   {
     return false;
   }
-  logPrintf("voiceDequeue: begin");
+  lingxin_log_debug("voiceDequeue: begin");
 
   pthread_mutex_lock(queue->mutex);
   while (queue && queue->count == 0)
   {
-    logPrintf("voiceDequeue: wait");
+    lingxin_log_debug("voiceDequeue: wait");
     if (isSpaceAvailableInner(queue))
     {
       size_t space = queue->capacity - queue->count;
@@ -185,16 +186,16 @@ bool voiceDequeue(VoiceQueue *queue, VoiceChunk *chunk,
     int ret = pthread_cond_timedwait(queue->cond, queue->mutex, &timeout);
     if (ret == ETIMEDOUT)
     {
-      logPrintf("voiceDequeue: timeout");
+      lingxin_log_debug("voiceDequeue: timeout");
       continue;
     }
     else if (ret != 0)
     {
-      logPrintf("voiceDequeue: pthread_cond_timedwait failed");
+      lingxin_log_error("voiceDequeue: pthread_cond_timedwait failed");
       pthread_mutex_unlock(queue->mutex);
       return false;
     }
-    logPrintf("voiceDequeue: after wait");
+    lingxin_log_debug("voiceDequeue: after wait");
   }
 
   size_t spaceAtEnd = queue->capacity - queue->front;
@@ -214,7 +215,7 @@ bool voiceDequeue(VoiceQueue *queue, VoiceChunk *chunk,
   chunk->data = malloc(chunk->length);
   if (!chunk->data)
   {
-    logPrintf("voiceDequeue: chunk->data fail malloc");
+    lingxin_log_error("voiceDequeue: chunk->data fail malloc");
     pthread_mutex_unlock(queue->mutex);
     return false;
   }
@@ -233,7 +234,7 @@ bool voiceDequeue(VoiceQueue *queue, VoiceChunk *chunk,
   }
   queue->count -= (HEADER_SIZE + chunk->length);
   pthread_mutex_unlock(queue->mutex);
-  logPrintf("voiceDequeue: finish %d", queue->count);
+  lingxin_log_debug("voiceDequeue: finish %d", queue->count);
 
   return true;
 }
@@ -256,13 +257,13 @@ void clearVoiceQueue(VoiceQueue *queue)
   {
     return;
   }
-  logPrintf("clearVoiceQueue begin");
+  lingxin_log_debug("clearVoiceQueue begin");
 
   pthread_mutex_lock(queue->mutex);
   queue->count = 0;
   queue->front = 0;
   queue->rear = 0;
   pthread_mutex_unlock(queue->mutex);
-  logPrintf("clearVoiceQueue finish");
+  lingxin_log_debug("clearVoiceQueue finish");
 }
 #endif // LINGXI_USE_VOICE_QUEUE

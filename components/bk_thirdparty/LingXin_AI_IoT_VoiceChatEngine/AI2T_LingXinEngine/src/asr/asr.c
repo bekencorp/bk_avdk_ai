@@ -4,6 +4,8 @@
 #include "lingxin_json_util.h"
 #include "lingxin_websocket.h"
 #include <stdarg.h>
+#include "lingxin_log.h"
+
 
 struct ASRHandler
 {
@@ -28,12 +30,12 @@ static void triggerCallback(ASRHandler *handler, ASREventType eventType,
 {
   if (!handler)
   {
-    logPrintf("triggerCallback handler null");
+     lingxin_log_error("", "triggerCallback handler null");
     return;
   }
   if (!handler->listener)
   {
-    logPrintf("[%s], triggerCallback listener null", getASRLogPre(handler));
+    lingxin_log_error( "[%s], triggerCallback listener null", getASRLogPre(handler));
     return;
   }
   handler->listener(eventType, data, len, handler->extraInfo);
@@ -44,7 +46,7 @@ static void dealEventFromServer(ASRHandler *handler, const char *event,
 {
   if (!event)
   {
-    logPrintf("[%s], aaa", "event is null", getASRLogPre(handler));
+   lingxin_log_error("[%s]", "event is null", getASRLogPre(handler));
     return;
   }
 
@@ -64,16 +66,20 @@ static void dealEventFromServer(ASRHandler *handler, const char *event,
   }
   else if (strcmp(event, "text_result_generated") == 0)
   {
+    //这里用到了cJSON_PrintUnformatted，注意要释放
     const char *textResult = parsePayloadStr(message);
     if (!textResult)
     {
-      logPrintf("[%s], Failed to parse text result", getASRLogPre(handler));
+     lingxin_log_error("[%s], Failed to parse text result", getASRLogPre(handler));
       return;
     }
     const int length = strlen(textResult);
-    logPrintf("[%s], dealEventFromServer: %d", getASRLogPre(handler), length);
+    lingxin_log_debug("[%s], dealEventFromServer: %d", getASRLogPre(handler), length);
 
     triggerCallback(handler, ASR_EVENT_ON_SEND_RESULT, textResult, length);
+    // 释放内存
+    cJSON_free((char*)textResult);
+    
   }
   else if (strcmp(event, "task_ended") == 0)
   {
@@ -81,14 +87,16 @@ static void dealEventFromServer(ASRHandler *handler, const char *event,
   }
   else if (strcmp(event, "error") == 0)
   {
+    //这里用到了cJSON_PrintUnformatted，注意要释放
     char *errorInfo = parseErrorInfo(message);
     triggerCallback(handler, ASR_EVENT_ON_ERROR, errorInfo, strlen(errorInfo));
+    cJSON_free(errorInfo);
   }
 }
 
 static void onMessageReceived(ASRHandler *handler, const char *message)
 {
-  logPrintf("[%s], asr onMessageReceived, eventStr = %s", getASRLogPre(handler), message);
+  lingxin_log_debug("[%s], asr onMessageReceived, eventStr = %s", getASRLogPre(handler), message);
 
   cJSON *jsonMessage = cJSON_Parse(message);
   if (!jsonMessage)
@@ -96,7 +104,7 @@ static void onMessageReceived(ASRHandler *handler, const char *message)
     const char *error_ptr = cJSON_GetErrorPtr();
     if (error_ptr)
     {
-      logPrintf("[%s], Error json: %s", getASRLogPre(handler), message);
+     lingxin_log_error("[%s], Error json: %s", getASRLogPre(handler), message);
     }
     return;
   }
@@ -111,16 +119,16 @@ static void freeASR(ASRHandler **handlerAddress)
 {
   if (!handlerAddress)
   {
-    logPrintf("freeASR handlerAddress null");
+   lingxin_log_error("freeASR handlerAddress null");
     return;
   }
   ASRHandler *handler = *handlerAddress;
   if (!handler)
   {
-    logPrintf("freeASR handler null");
+   lingxin_log_error("freeASR handler null");
     return;
   }
-  logPrintf("[%s], freeASR begin", getASRLogPre(handler));
+  lingxin_log_debug("[%s], freeASR begin", getASRLogPre(handler));
 
   if (handler->websocket && handler->websocket->config)
   {
@@ -135,7 +143,7 @@ static void freeASR(ASRHandler **handlerAddress)
 
   free(handler);
   *handlerAddress = NULL;
-  logPrintf("freeASR finish");
+  lingxin_log_debug("freeASR finish");
 }
 
 static void onWebSocketEvent(WebSocketEventType event, const char *data,
@@ -145,7 +153,7 @@ static void onWebSocketEvent(WebSocketEventType event, const char *data,
   ASRHandler *handler = (ASRHandler *)userData;
   if (!handler)
   {
-    logPrintf("onWebSocketEvent handler null");
+   lingxin_log_error("onWebSocketEvent handler null");
     return;
   }
   switch (event)
@@ -157,11 +165,11 @@ static void onWebSocketEvent(WebSocketEventType event, const char *data,
     onMessageReceived(handler, data);
     break;
   case ON_WEBSOCKET_CONNECTION_ERROR:
-    logPrintf("[%s], triggerCallback ON_WEBSOCKET_CONNECTION_ERROR", getASRLogPre(handler));
+    lingxin_log_error("[%s], triggerCallback ON_WEBSOCKET_CONNECTION_ERROR", getASRLogPre(handler));
     triggerCallback(handler, ASR_EVENT_ON_ERROR, data, len);
     break;
   case ON_WEBSOCKET_DESTROY:
-    logPrintf("[%s], triggerCallback ON_WEBSOCKET_DESTROY", getASRLogPre(handler));
+    lingxin_log_debug("[%s], triggerCallback ON_WEBSOCKET_DESTROY", getASRLogPre(handler));
     triggerCallback(handler, ASR_EVENT_ON_DESTROY, data, len);
     freeASR(handler->selfPointer);
     break;
@@ -172,15 +180,13 @@ static void onWebSocketEvent(WebSocketEventType event, const char *data,
 
 char *asrCreate(ASRHandler **handlerAddress, ASRConfig *config, ASREventListener listener)
 {
-  setLogEnable(config->showLog);
-
-  logPrintf("asrCreate  begin");
+  lingxin_log_debug("asrCreate  begin");
 
   ASRHandler *handler = (ASRHandler *)calloc(1, sizeof(ASRHandler));
 
   if (!handler)
   {
-    logPrintf("Failed to allocate memory for ASR handler");
+    lingxin_log_error("Failed to allocate memory for ASR handler");
     return NULL;
   }
   WebsocketConfig *websocketConfig =
@@ -188,7 +194,7 @@ char *asrCreate(ASRHandler **handlerAddress, ASRConfig *config, ASREventListener
                             WEBSOCKET_ASR_PATH, onWebSocketEvent);
   if (!websocketConfig)
   {
-    logPrintf("Failed to create WebsocketConfig");
+    lingxin_log_error("Failed to create WebsocketConfig");
     free(handler);
     return NULL;
   }
@@ -196,7 +202,7 @@ char *asrCreate(ASRHandler **handlerAddress, ASRConfig *config, ASREventListener
 
   if (!client)
   {
-    logPrintf("Failed to initialize WebSocket client");
+    lingxin_log_error("Failed to initialize WebSocket client");
     free(websocketConfig);
     free(handler);
     return NULL;
@@ -219,22 +225,22 @@ char *asrCreate(ASRHandler **handlerAddress, ASRConfig *config, ASREventListener
   handler->selfPointer = handlerAddress; // 设置 selfPointer
   *handlerAddress = handler;             // 返回 handler
 
-  logPrintf("[%s], asrCreate finish", getASRLogPre(handler));
+  lingxin_log_debug("[%s], asrCreate finish", getASRLogPre(handler));
   return extraInfo ? extraInfo->instanceId : "";
 }
 
 bool asrSendStart(ASRHandler *handler, const char *taskId, const char *payload)
 {
-  logPrintf("asrSendStart begin");
+  lingxin_log_debug("asrSendStart begin");
 
   if (!handler)
   {
-    logPrintf("handler null");
+   lingxin_log_error("handler null");
     return false;
   }
   if (!taskId || !payload)
   {
-    logPrintf("[%s], taskId or payload null", getASRLogPre(handler));
+    lingxin_log_error("[%s], taskId or payload null", getASRLogPre(handler));
     return false;
   }
 
@@ -248,59 +254,59 @@ bool asrSendStart(ASRHandler *handler, const char *taskId, const char *payload)
                                      taskId, payload);
   if (!message)
   {
-    logPrintf("[%s],Failed to allocate memory for message", getASRLogPre(handler));
+    lingxin_log_error("[%s],Failed to allocate memory for message", getASRLogPre(handler));
     return false;
   }
   bool result = websocketSendText(handler->websocket, message);
   free(message);
-  logPrintf("[%s],asrSendStart result: %s", getASRLogPre(handler), result ? "true" : "false");
+  lingxin_log_debug("[%s],asrSendStart result: %s", getASRLogPre(handler), result ? "true" : "false");
   return result;
 }
 
 int asrSend(ASRHandler *handler, const char *audioData, size_t dataSize)
 {
-  logPrintf("[%s], asrSend begin", getASRLogPre(handler));
+  lingxin_log_debug("[%s], asrSend begin", getASRLogPre(handler));
 
   if (!handler)
   {
-    logPrintf("handler null");
+    lingxin_log_error("handler null");
     return 0;
   }
   if (!audioData || !dataSize)
   {
-    logPrintf("[%s], audioData or dataSize null", getASRLogPre(handler));
+    lingxin_log_error("[%s], audioData or dataSize null", getASRLogPre(handler));
     return 0;
   }
   int result = websocketSendBinary(handler->websocket, audioData, dataSize);
-  logPrintf("[%s], asrSend result: %d", getASRLogPre(handler), result);
+  lingxin_log_debug("[%s], asrSend result: %d", getASRLogPre(handler), result);
   return result;
 }
 
 void asrDestroy(ASRHandler *handler)
 {
-  logPrintf("[%s], asrDestroy begin", getASRLogPre(handler));
+  lingxin_log_debug("[%s], asrDestroy begin", getASRLogPre(handler));
 
   if (!handler || !handler->selfPointer || !*handler->selfPointer)
   {
-    logPrintf("handler or handler->selfPointer null");
+    lingxin_log_error("handler or handler->selfPointer null");
     return;
   }
   closeWebsocket(handler->websocket);
-  logPrintf("asrDestroy after");
+  lingxin_log_debug("asrDestroy after");
 }
 
 bool asrSendStop(ASRHandler *handler, const char *taskId)
 {
-  logPrintf("[%s], asrSendStop begin", getASRLogPre(handler));
+  lingxin_log_debug("[%s], asrSendStop begin", getASRLogPre(handler));
 
   if (!handler)
   {
-    logPrintf("handler null");
+    lingxin_log_error("handler null");
     return false;
   }
   if (!taskId)
   {
-    logPrintf("[%s], taskId null", getASRLogPre(handler));
+    lingxin_log_error("[%s], taskId null", getASRLogPre(handler));
     return false;
   }
 
@@ -315,11 +321,11 @@ bool asrSendStop(ASRHandler *handler, const char *taskId)
       taskId, handler->extraInfo ? handler->extraInfo->requestId : "");
   if (!message)
   {
-    logPrintf("[%s], Failed to allocate memory for message", getASRLogPre(handler));
+    lingxin_log_error("[%s], Failed to allocate memory for message", getASRLogPre(handler));
     return false;
   }
   bool result = websocketSendText(handler->websocket, message);
   free(message);
-  logPrintf("[%s], asrSendStop result: %s", getASRLogPre(handler), result ? "true" : "false");
+  lingxin_log_debug("[%s], asrSendStop result: %s", getASRLogPre(handler), result ? "true" : "false");
   return result;
 }

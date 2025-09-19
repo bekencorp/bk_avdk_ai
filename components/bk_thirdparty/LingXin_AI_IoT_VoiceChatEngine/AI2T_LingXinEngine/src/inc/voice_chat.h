@@ -1,5 +1,5 @@
-#ifndef AI_IOT_SDK_VOICE_CHAT_H
-#define AI_IOT_SDK_VOICE_CHAT_H
+#ifndef LINGXIN_VOICE_CHAT_H
+#define LINGXIN_VOICE_CHAT_H
 
 #ifdef __cplusplus
 extern "C"
@@ -18,6 +18,7 @@ extern "C"
     VOICECHAT_EVENT_ON_RESULT_AI_VOICE_END,          // 当服务端推音频流结束,且清理操作完成后触发
     VOICECHAT_EVENT_ON_TERMINAL,                     // 当voicechat打断时触发
     VOICECHAT_EVENT_ON_TEXTOUT,                      // 当voicechat有信息透传时触发
+    VOICECHAT_EVENT_ON_SYSTEM_EVENT,                 // 当服务端主动推送定时任务列表时触发  
     VOICECHAT_EVENT_ON_VAD_END,                      // server vad场景下，当有断句时触发
     VOICECHAT_EVENT_ON_VAD_EXIT,                     // server vad场景下，当收到vad退出指令时触发
     VOICECHAT_EVENT_ON_ERROR,                        // 当voicechat发生错误时触发
@@ -38,7 +39,6 @@ extern "C"
 
   typedef struct
   {
-    bool showLog;
     const char *serverPath;
     const char *payload;
     const char *taskId;
@@ -58,11 +58,11 @@ extern "C"
 
   bool voiceChatContinue(VoiceChatHandler *handler);
 
-  bool voiceChatStartNewChat(VoiceChatHandler *handler, VoiceChatConfig *config);
+  bool voiceChatContinueWithConfig(VoiceChatHandler *handler, VoiceChatConfig *config);
 
   void voiceChatDestroy(VoiceChatHandler *handler);
 
 #ifdef __cplusplus
 }
 #endif
-#endif // AI_IOT_SDK_VOICE_CHAT_H
+#endif // LINGXIN_VOICE_CHAT_H

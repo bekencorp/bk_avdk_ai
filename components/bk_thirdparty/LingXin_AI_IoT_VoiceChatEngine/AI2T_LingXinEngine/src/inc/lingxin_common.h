@@ -1,5 +1,5 @@
-#ifndef AI_IOT_SDK_COMMON_COMMON_H
-#define AI_IOT_SDK_COMMON_COMMON_H
+#ifndef LINGXIN_COMMON_COMMON_H
+#define LINGXIN_COMMON_COMMON_H
 
 #ifdef __cplusplus
 extern "C"
@@ -28,25 +28,22 @@ extern "C"
 #define REQUEST_PORT 80
 #endif
 
+#define WEBSOCKET_CHAT_PATH "gw/ws/open/api/v1/unifiedAccess"
 #define WEBSOCKET_ASR_PATH "gw/ws/open/api/v1/asr"
 #define WEBSOCKET_TTS_PATH "gw/ws/open/api/v1/tts"
 #define LLM_TEXT_PATH "smart/api/v1/llm/compatible-mode/chat"
 #define LLM_IMAGE_PATH "/gw/d/api/v1/text2image/createImage"
 #define LLM_IMAGE_RESULT_PATH "/gw/d/api/v1/text2image/getImageCreateResult"
 
-    // 打印日志
-    extern bool enableLog;
-    void setLogEnable(bool enabled);
-    bool isLogEnabled();
-
     WebsocketConfig *createWebsocketConfig(void *handler, const char *sn, const char *appKey, const char *appId, const char *path, WebSocketEventListener listener);
     HttpConfig *createHttpConfig(const char *appId, const char *sn, const char *appKey, const char *path, const char *reqBody, HttpHeader *headers);
     char *generateUUID(int length);
     char *snprintfWithMalloc(const char *format, ...);
 
+    // 废弃，不要使用，留着是可能有地方在调用
     void logPrintf(const char *format, ...);
 
 #ifdef __cplusplus
 }
 #endif
-#endif // AI_IOT_SDK_COMMON_COMMON_H
+#endif // LINGXIN_COMMON_COMMON_H

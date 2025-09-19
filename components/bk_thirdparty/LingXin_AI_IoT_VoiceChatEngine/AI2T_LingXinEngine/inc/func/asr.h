@@ -1,5 +1,5 @@
-#ifndef AI_IOT_SDK_ASRT_H
-#define AI_IOT_SDK_ASRT_H
+#ifndef LINGXIN_ASRT_H
+#define LINGXIN_ASRT_H
 
 #ifdef __cplusplus
 extern "C"
@@ -34,7 +34,6 @@ extern "C"
 
   typedef struct
   {
-    bool showLog;
     const char *appKey;
     const char *sn;
     const char *appId;
@@ -54,4 +53,4 @@ extern "C"
 }
 #endif
 
-#endif // AI_IOT_SDK_ASRT_H
+#endif // LINGXIN_ASRT_H

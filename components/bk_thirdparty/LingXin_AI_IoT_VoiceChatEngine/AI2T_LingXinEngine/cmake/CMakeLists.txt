@@ -1,5 +1,13 @@
 cmake_minimum_required(VERSION 3.10)
 
+# 从lingxin_version.h文件中提取版本号
+file(READ "${CMAKE_SOURCE_DIR}/../src/inc/lingxin_version.h" LINGXIN_VERSION_FILE)
+string(REGEX MATCH "#define LINGXIN_VERSION \"([0-9.]+)\"" _ ${LINGXIN_VERSION_FILE})
+set(LINGXIN_VERSION ${CMAKE_MATCH_1})
+
+# 设置项目名称、版本
+project(AI2T_LINGXINEngine VERSION ${LINGXIN_VERSION})
+
 # 设置项目名称、版本
 project(AI2T_LINGXINEngine VERSION 1.2)
 
@@ -44,4 +52,5 @@ if(USE_LINGXIN_JSON)
 endif()
 
 # 设置sdk名称、版本
-set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "${PROJECT_NAME}-${ARCH}-${PROJECT_VERSION}")
+string(REPLACE "." "_" LINGXIN_VERSION_UNDERSCORE ${LINGXIN_VERSION})
+set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "${PROJECT_NAME}-${ARCH}-${LINGXIN_VERSION_UNDERSCORE}")

@@ -2,11 +2,13 @@
 #include "lingxin_common.h"
 #include "lingxin_json_util.h"
 #include "lingxin_websocket.h"
+#include "lingxin_log.h"
 
 #ifdef LINGXI_USE_VOICE_QUEUE
 #include "lingxin_event_queue.h"
 #include "lingxin_voice_queue.h"
 #endif // LINGXI_USE_VOICE_QUEUE
+
 
 struct TTSHandler
 {
@@ -45,7 +47,7 @@ static void triggerCallbackOrEnqueue(TTSHandler *handler, TTSEventType eventType
 {
   if (!handler->listener)
   {
-    logPrintf("[%s], triggerCallback listener null", getTTSLogPre(handler));
+    lingxin_log_error("[%s], triggerCallback listener null", getTTSLogPre(handler));
     return;
   }
   if (handler->notifyQueue)
@@ -64,13 +66,13 @@ static void onEventQueueCallback(void *userContext, int event, const char *data,
 {
   if (!userContext)
   {
-    logPrintf("onEventQueueCallback params null");
+    lingxin_log_error("onEventQueueCallback params null");
     return;
   }
   TTSHandler *handler = (TTSHandler *)userContext;
   if (!handler)
   {
-    logPrintf("onEventQueueCallback handler null");
+    lingxin_log_error("onEventQueueCallback handler null");
     return;
   }
   if (!handler->listener)
@@ -82,10 +84,10 @@ static void onEventQueueCallback(void *userContext, int event, const char *data,
 
 static bool requestNextAudioPackets(TTSHandler *handler, size_t space)
 {
-  logPrintf("[%s], requestNextAudioPackets", getTTSLogPre(handler));
+  lingxin_log_debug("[%s], requestNextAudioPackets", getTTSLogPre(handler));
   if (!handler || !handler->voiceQueue)
   {
-    logPrintf("[%s], requestNextAudioPackets params null", getTTSLogPre(handler));
+    lingxin_log_error("[%s], requestNextAudioPackets params null", getTTSLogPre(handler));
     return false;
   }
   char *message =
@@ -124,23 +126,23 @@ static void initFlowControl(TTSHandler *handler)
   int poolSize = parsePoolSize(handler->payload);
   if (!poolSize)
   {
-    logPrintf("[%s], initFlowControl poolSize null", getTTSLogPre(handler));
+    lingxin_log_error("[%s], initFlowControl poolSize null", getTTSLogPre(handler));
     return;
   }
   handler->notifyQueue = eventQueueCreate(handler, onEventQueueCallback);
   if (!handler->notifyQueue)
   {
-    logPrintf("[%s], handler->notifyQueue poolSize null", getTTSLogPre(handler));
+    lingxin_log_error("[%s], handler->notifyQueue poolSize null", getTTSLogPre(handler));
     return;
   }
 
   handler->voiceQueue = voiceQueueCreate(poolSize);
   if (!handler->voiceQueue)
   {
-    logPrintf("[%s], initFlowControl voiceQueueCreate fail", getTTSLogPre(handler));
+    lingxin_log_error("[%s], initFlowControl voiceQueueCreate fail", getTTSLogPre(handler));
     eventQueueDestroy(handler->notifyQueue);
   }
-  logPrintf("[%s], initFlowControl voiceQueueCreate after", getTTSLogPre(handler));
+  lingxin_log_debug("[%s], initFlowControl voiceQueueCreate after", getTTSLogPre(handler));
 }
 
 #endif // LINGXI_USE_VOICE_QUEUE
@@ -149,29 +151,29 @@ static void initFlowControl(TTSHandler *handler)
 // bool ttsGetNextFlow(TTSHandler *handler)
 // {
 // #ifdef LINGXI_USE_VOICE_QUEUE
-//   logPrintf("[%s], ttsGetNextFlow begin", getTTSLogPre(handler));
+//   lingxin_log_debug("[%s], ttsGetNextFlow begin", getTTSLogPre(handler));
 //   if (!handler)
 //   {
-//     logPrintf("[%s], handler null", getTTSLogPre(handler));
+//     lingxin_log_error("[%s], handler null", getTTSLogPre(handler));
 //     return false;
 //   }
 //   if (!handler->voiceQueue)
 //   {
-//     logPrintf("[%s], ttsGetNextFlow params null", getTTSLogPre(handler));
+//     lingxin_log_error("[%s], ttsGetNextFlow params null", getTTSLogPre(handler));
 //     return false;
 //   }
-//   logPrintf("[%s], getNextFlow: calloc VoiceChunk", getTTSLogPre(handler));
+//   lingxin_log_debug("[%s], getNextFlow: calloc VoiceChunk", getTTSLogPre(handler));
 
 //   VoiceChunk *chunk = (VoiceChunk *)calloc(1, sizeof(VoiceChunk));
 //   if (!chunk)
 //   {
-//     logPrintf("[%s], getNextFlow: Failed to allocate memory for voice chunk", getTTSLogPre(handler));
+//     lingxin_log_error("[%s], getNextFlow: Failed to allocate memory for voice chunk", getTTSLogPre(handler));
 //     return false;
 //   }
-//   logPrintf("[%s], getNextFlow: begin, %d", getTTSLogPre(handler), handler->isVoiceEnd);
+//   lingxin_log_debug("[%s], getNextFlow: begin, %d", getTTSLogPre(handler), handler->isVoiceEnd);
 //   bool result =
 //       voiceDequeue(handler->voiceQueue, chunk, continueWaitCheck, handler);
-//   logPrintf("[%s], getNextFlow: result length: %d", getTTSLogPre(handler), chunk->length);
+//   lingxin_log_debug("[%s], getNextFlow: result length: %d", getTTSLogPre(handler), chunk->length);
 
 //   if (result)
 //   {
@@ -184,7 +186,7 @@ static void initFlowControl(TTSHandler *handler)
 //     }
 //     return true;
 //   }
-//   logPrintf("[%s], getNextFlow: finish", getTTSLogPre(handler));
+//   lingxin_log_debug("[%s], getNextFlow: finish", getTTSLogPre(handler));
 // #endif // LINGXI_USE_VOICE_QUEUE
 //   return false;
 // }
@@ -192,7 +194,7 @@ static void initFlowControl(TTSHandler *handler)
 static void dealEventFromServer(TTSHandler *handler, const char *event,
                                 cJSON *message)
 {
-  logPrintf("[%s], dealEventFromServer: %s", getTTSLogPre(handler), event);
+  lingxin_log_debug("[%s], dealEventFromServer: %s", getTTSLogPre(handler), event);
 
   if (!event)
   {
@@ -238,9 +240,11 @@ static void dealEventFromServer(TTSHandler *handler, const char *event,
   }
   else if (strcmp(event, "error") == 0)
   {
+    //这里用到了cJSON_PrintUnformatted，注意要释放
     char *errorInfo = parseErrorInfo(message);
     triggerCallbackOrEnqueue(handler, TTS_EVENT_ON_ERROR, errorInfo,
                              strlen(errorInfo));
+    cJSON_free(errorInfo);
   }
 }
 
@@ -252,7 +256,7 @@ static void onEventMessageReceived(TTSHandler *handler, const char *message)
     const char *error_ptr = cJSON_GetErrorPtr();
     if (error_ptr)
     {
-      logPrintf("[%s], Error json: %s", getTTSLogPre(handler), message);
+      lingxin_log_error("[%s], Error json: %s", getTTSLogPre(handler), message);
     }
     return;
   }
@@ -267,16 +271,16 @@ static void freeTTS(TTSHandler **handlerAddress)
 {
   if (!handlerAddress)
   {
-    logPrintf("freeTTS handlerAddress null");
+    lingxin_log_error("freeTTS handlerAddress null");
     return;
   }
   TTSHandler *handler = *handlerAddress;
   if (!handler)
   {
-    logPrintf("freeTTS handler null");
+    lingxin_log_error("freeTTS handler null");
     return;
   }
-  logPrintf("[%s], freeTTS begin", getTTSLogPre(handler));
+  lingxin_log_debug("[%s], freeTTS begin", getTTSLogPre(handler));
 
 #ifdef LINGXI_USE_VOICE_QUEUE
   eventQueueDestroy(handler->notifyQueue);
@@ -296,7 +300,7 @@ static void freeTTS(TTSHandler **handlerAddress)
   free(handler);
   *handlerAddress = NULL;
 
-  logPrintf("freeTTS after");
+  lingxin_log_debug("freeTTS after");
 }
 
 static void onWebSocketEvent(WebSocketEventType event, const char *data,
@@ -306,24 +310,24 @@ static void onWebSocketEvent(WebSocketEventType event, const char *data,
   TTSHandler *handler = (TTSHandler *)userData;
   if (!handler)
   {
-    logPrintf("onWebSocketEvent handler null");
+    lingxin_log_error("onWebSocketEvent handler null");
     return;
   }
   switch (event)
   {
   case ON_WEBSOCKET_CONNECTION_SUCCESS:
-    logPrintf("[%s], TTS CONNECTION_SUCCESS", getTTSLogPre(handler));
+    lingxin_log_debug("[%s], TTS CONNECTION_SUCCESS", getTTSLogPre(handler));
     triggerCallbackOrEnqueue(handler, TTS_EVENT_ON_READY, NULL, 0);
     break;
   case ON_WEBSOCKET_DATA_RECEIVED:
-    logPrintf("[%s], TTS REVEIVE: %d, %d", getTTSLogPre(handler), len, isBinary);
+    lingxin_log_debug("[%s], TTS REVEIVE: %d, %d", getTTSLogPre(handler), len, isBinary);
     if (isBinary)
     {
       if (handler->voiceQueue)
       {
 #ifdef LINGXI_USE_VOICE_QUEUE
         bool result = voiceEnqueue(handler->voiceQueue, data, len);
-        logPrintf("[%s], onWebSocketEvent: enqueue result: %d", getTTSLogPre(handler), result);
+        lingxin_log_debug("[%s], onWebSocketEvent: enqueue result: %d", getTTSLogPre(handler), result);
 #endif // LINGXI_USE_VOICE_QUEUE
       }
       else
@@ -341,7 +345,7 @@ static void onWebSocketEvent(WebSocketEventType event, const char *data,
     triggerCallbackOrEnqueue(handler, TTS_EVENT_ON_ERROR, data, len);
     break;
   case ON_WEBSOCKET_DESTROY:
-    logPrintf("[%s], TTS_EVENT_ON_DESTROY", getTTSLogPre(handler));
+    lingxin_log_debug("[%s], TTS_EVENT_ON_DESTROY", getTTSLogPre(handler));
     triggerCallbackOrEnqueue(handler, TTS_EVENT_ON_DESTROY, data, len);
     freeTTS(handler->selfPointer);
     break;
@@ -353,19 +357,18 @@ static void onWebSocketEvent(WebSocketEventType event, const char *data,
 char *ttsCreate(TTSHandler **handlerAddress, TTSConfig *config, const char *payload, TTSEventListener listener)
 
 {
-  setLogEnable(config->showLog);
-  logPrintf("ttsCreate  begin");
+  lingxin_log_debug("ttsCreate  begin");
 
   if (!config || !config->sn || !config->appKey || !config->appId)
   {
-    logPrintf("ttsCreate config params error!");
+    lingxin_log_error("ttsCreate config params error!");
     return NULL;
   }
 
   TTSHandler *handler = (TTSHandler *)calloc(1, sizeof(struct TTSHandler));
   if (!handler)
   {
-    logPrintf("Failed to allocate memory for TTS handler");
+    lingxin_log_error("Failed to allocate memory for TTS handler");
     return NULL;
   }
   handler->listener = listener;
@@ -379,14 +382,14 @@ char *ttsCreate(TTSHandler **handlerAddress, TTSConfig *config, const char *payl
                             WEBSOCKET_TTS_PATH, onWebSocketEvent);
   if (!websocketConfig)
   {
-    logPrintf("Failed to create WebsocketConfig");
+    lingxin_log_error("Failed to create WebsocketConfig");
     free(handler);
     return NULL;
   }
   handler->websocket = initWebsocket(websocketConfig);
   if (!handler->websocket)
   {
-    logPrintf("Failed to initialize WebSocket client");
+    lingxin_log_error("Failed to initialize WebSocket client");
     free(websocketConfig);
     free(handler);
     return NULL;
@@ -411,22 +414,22 @@ char *ttsCreate(TTSHandler **handlerAddress, TTSConfig *config, const char *payl
   handler->selfPointer = handlerAddress; // 设置 selfPointer
   *handlerAddress = handler;             // 返回 handler
 
-  logPrintf("[%s], asrCreate finish", getTTSLogPre(handler));
+  lingxin_log_debug("[%s], ttsCreate finish", getTTSLogPre(handler));
   return extraInfo ? extraInfo->instanceId : "";
 }
 
 bool ttsSendStart(TTSHandler *handler, const char *taskId)
 {
-  logPrintf("[%s], ttsSendStart begin", getTTSLogPre(handler));
+  lingxin_log_debug("[%s], ttsSendStart begin", getTTSLogPre(handler));
 
   if (!handler)
   {
-    logPrintf("handler null");
+    lingxin_log_error("handler null");
     return false;
   }
   if (!taskId || !handler->payload)
   {
-    logPrintf("[%s], ttsSendStart params null", getTTSLogPre(handler));
+    lingxin_log_error("[%s], ttsSendStart params null", getTTSLogPre(handler));
     return false;
   }
   if (handler->extraInfo)
@@ -441,22 +444,22 @@ bool ttsSendStart(TTSHandler *handler, const char *taskId)
                                      taskId, handler->payload);
   bool result = websocketSendText(handler->websocket, message);
   free(message);
-  logPrintf("[%s], ttsSendStart result: %s", getTTSLogPre(handler), result ? "true" : "false");
+  lingxin_log_debug("[%s], ttsSendStart result: %s", getTTSLogPre(handler), result ? "true" : "false");
   return result;
 }
 
 int ttsSend(TTSHandler *handler, const char *taskId, const char *text)
 {
-  logPrintf("[%s], ttsSend begin", getTTSLogPre(handler));
+  lingxin_log_debug("[%s], ttsSend begin", getTTSLogPre(handler));
 
   if (!handler)
   {
-    logPrintf("[%s], handler null", getTTSLogPre(handler));
+    lingxin_log_error("[%s], handler null", getTTSLogPre(handler));
     return 0;
   }
   if (!taskId || !text)
   {
-    logPrintf("[%s], ttsSend params null", getTTSLogPre(handler));
+    lingxin_log_error("[%s], ttsSend params null", getTTSLogPre(handler));
     return 0;
   }
   if (handler->extraInfo)
@@ -470,22 +473,22 @@ int ttsSend(TTSHandler *handler, const char *taskId, const char *text)
       taskId, getReqId(handler), text);
   int result = websocketSendText(handler->websocket, message);
   free(message); // 释放分配的内存
-  logPrintf("[%s], ttsSend result: %d", getTTSLogPre(handler), result);
+  lingxin_log_debug("[%s], ttsSend result: %d", getTTSLogPre(handler), result);
 
   return result;
 }
 
 bool ttsSendStop(TTSHandler *handler, const char *taskId)
 {
-  logPrintf("[%s], ttsSendStop begin", getTTSLogPre(handler));
+  lingxin_log_debug("[%s], ttsSendStop begin", getTTSLogPre(handler));
   if (!handler)
   {
-    logPrintf("handler null");
+    lingxin_log_error("handler null");
     return false;
   }
   if (!taskId)
   {
-    logPrintf("[%s], ttsSendStop params null", getTTSLogPre(handler));
+    lingxin_log_error("[%s], ttsSendStop params null", getTTSLogPre(handler));
     return false;
   }
 
@@ -500,18 +503,18 @@ bool ttsSendStop(TTSHandler *handler, const char *taskId)
                          taskId, getReqId(handler));
   bool result = websocketSendText(handler->websocket, message);
   free(message);
-  logPrintf("[%s], ttsSendStop result: %s", getTTSLogPre(handler), result ? "true" : "false");
+  lingxin_log_debug("[%s], ttsSendStop result: %s", getTTSLogPre(handler), result ? "true" : "false");
   return result;
 }
 
 void ttsDestroy(TTSHandler *handler)
 {
-  logPrintf("[%s], ttsDestroy begin", getTTSLogPre(handler));
+  lingxin_log_debug("[%s], ttsDestroy begin", getTTSLogPre(handler));
   if (!handler || !handler->selfPointer || !*handler->selfPointer)
   {
-    logPrintf("handler or handler->selfPointer null");
+    lingxin_log_error("handler or handler->selfPointer null");
     return;
   }
   closeWebsocket(handler->websocket);
-  logPrintf("ttsDestroy after");
+  lingxin_log_debug("ttsDestroy after");
 }

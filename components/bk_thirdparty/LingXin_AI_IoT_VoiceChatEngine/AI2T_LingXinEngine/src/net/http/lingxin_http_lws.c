@@ -20,6 +20,7 @@
 #include <libwebsockets.h>
 #include <signal.h>
 #include <string.h>
+#include "lingxin_log.h"
 
 static int interrupted, bad = 0, status, completed;
 static struct lws *client_wsi;
@@ -36,7 +37,7 @@ typedef struct
 static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
                          void *user, void *in, size_t len)
 {
-  logPrintf("WebSocket callback_ws:%d", reason);
+  lingxin_log_debug("WebSocket callback_ws:%d", reason);
   HttpClient *client = (HttpClient *)user;
 
   char buf[LWS_PRE + 1024], *start = &buf[LWS_PRE],
@@ -51,15 +52,15 @@ static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
 
   case LWS_CALLBACK_ESTABLISHED_CLIENT_HTTP:
     status = (int)lws_http_client_http_response(wsi);
-    lwsl_user("Connected with server response: %d\n", status);
+    lingxin_log_debug("Connected with server response: %d", status);
     break;
 
   case LWS_CALLBACK_HTTP_BODY:
-    logPrintf("LWS_CALLBACK_HTTP_BODY: %s", in ? (char *)in : "(null)");
+    lingxin_log_debug("LWS_CALLBACK_HTTP_BODY: %s", in ? (char *)in : "(null)");
     break;
   /* because we are protocols[0] ... */
   case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
-    logPrintf("CLIENT_CONNECTION_ERROR: %s", in ? (char *)in : "(null)");
+    lingxin_log_debug("CLIENT_CONNECTION_ERROR: %s", in ? (char *)in : "(null)");
     client_wsi = NULL;
     bad = 1;
     char buffer[256];                         // 增大 buffer 大小
@@ -70,7 +71,7 @@ static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
     int lenOfHeaderValue = lws_hdr_custom_length(wsi, headerKey, lenOfHeaderKey);
     if (lenOfHeaderValue < 0)
     {
-      logPrintf("Can't find %s", headerKey);
+      lingxin_log_error("Can't find %s", headerKey);
     }
     else
     {
@@ -78,11 +79,11 @@ static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
       int copyResult = lws_hdr_custom_copy(wsi, buffer, sizeof(buffer), headerKey, lenOfHeaderKey);
       if (copyResult < 0)
       {
-        logPrintf("Custom header too long: %s", headerKey);
+        lingxin_log_error("Custom header too long: %s", headerKey);
       }
       else
       {
-        logPrintf("Custom header: %s", buffer);
+        lingxin_log_debug("Custom header: %s", buffer);
       }
     }
     char *errorMessage = (char *)in;
@@ -93,7 +94,7 @@ static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
     break;
 
   case LWS_CALLBACK_CLIENT_RECEIVE:
-    logPrintf("LWS_CALLBACK_CLIENT_RECEIVE:  %s", in);
+    lingxin_log_debug("LWS_CALLBACK_CLIENT_RECEIVE:  %s", in);
 
     break;
 
@@ -105,13 +106,13 @@ static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
 
   case LWS_CALLBACK_RECEIVE_CLIENT_HTTP:
     n = sizeof(buf) - LWS_PRE;
-    logPrintf("LWS_CALLBACK_RECEIVE_CLIENT_HTTP: %d,  %s", n, in);
+    lingxin_log_debug("LWS_CALLBACK_RECEIVE_CLIENT_HTTP: %d,  %s", n, in);
     if (lws_http_client_read(wsi, (char **)&p, &n) < 0)
       return -1;
     return 0; /* don't passthru */
 
   case LWS_CALLBACK_RECEIVE_CLIENT_HTTP_READ:
-    logPrintf("LWS_CALLBACK_RECEIVE_CLIENT_HTTP_READ: %d,  %s", len, in);
+    lingxin_log_debug("LWS_CALLBACK_RECEIVE_CLIENT_HTTP_READ: %d,  %s", len, in);
     if (client->callback != NULL)
     {
       client->callback(in, len, client->response);
@@ -119,7 +120,7 @@ static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
     return 0; /* don't passthru */
 
   case LWS_CALLBACK_COMPLETED_CLIENT_HTTP:
-    logPrintf("LWS_CALLBACK_COMPLETED_CLIENT_HTTP%s", (char *)in);
+    lingxin_log_debug("LWS_CALLBACK_COMPLETED_CLIENT_HTTP%s", (char *)in);
     client_wsi = NULL;
     bad = status != 200;
     lws_cancel_service(lws_get_context(wsi)); /* abort poll wait */
@@ -130,7 +131,7 @@ static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
     endPos = (*curPos) + len;
     if (!client->config->headers)
     {
-      logPrintf("callback_ws headers null");
+      lingxin_log_error("callback_ws headers null");
       return -1;
     }
     if (!client->config->headers->app_id ||
@@ -139,7 +140,7 @@ static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
             (const unsigned char *)client->config->headers->app_id,
             strlen(client->config->headers->app_id), curPos, endPos))
     {
-      logPrintf("Failed to add HTTP header: app_id");
+      lingxin_log_error("Failed to add HTTP header: app_id");
       return -1;
     }
     if (!client->config->headers->sn ||
@@ -148,7 +149,7 @@ static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
             (const unsigned char *)client->config->headers->sn,
             strlen(client->config->headers->sn), curPos, endPos))
     {
-      logPrintf("Failed to add HTTP header: sn");
+      lingxin_log_error("Failed to add HTTP header: sn");
       return -1;
     }
     if (!client->config->headers->signature ||
@@ -157,7 +158,7 @@ static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
             (const unsigned char *)client->config->headers->signature,
             strlen(client->config->headers->signature), curPos, endPos))
     {
-      logPrintf("Failed to add HTTP header: signature");
+      lingxin_log_error("Failed to add HTTP header: signature");
       return -1;
     }
 
@@ -167,7 +168,7 @@ static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
             (const unsigned char *)client->config->headers->timestamp,
             strlen(client->config->headers->timestamp), curPos, endPos))
     {
-      logPrintf("Failed to add HTTP header: timestamp");
+      lingxin_log_error("Failed to add HTTP header: timestamp");
       return -1;
     }
     // 添加 Content-Type: application/json 头
@@ -176,18 +177,18 @@ static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
                                     strlen("application/json"), curPos,
                                     endPos))
     {
-      logPrintf("Failed to add HTTP header: Content-Type");
+      lingxin_log_error("Failed to add HTTP header: Content-Type");
       return -1;
     }
 
     if (lws_add_http_header_content_length(wsi, client->body_len, curPos,
                                            endPos))
     {
-      logPrintf("Failed to add HTTP header: Content-Length");
+      lingxin_log_error("Failed to add HTTP header: Content-Length");
       return -1;
     }
 
-    logPrintf("callback_ws headers: app_id:%s, sn:%s, signature:%s, "
+    lingxin_log_debug("callback_ws headers: app_id:%s, sn:%s, signature:%s, "
               "timestamp:%s",
               client->config->headers->app_id, client->config->headers->sn,
               client->config->headers->signature,
@@ -207,12 +208,12 @@ static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
 
     memcpy(start, client->config->post_data + client->body_sent, to_send);
     client->body_sent += to_send;
-    logPrintf("LWS_CALLBACK_CLIENT_HTTP_WRITEABLE,%s", start);
+    lingxin_log_debug("LWS_CALLBACK_CLIENT_HTTP_WRITEABLE,%s", start);
 
     if (lws_write(wsi, (uint8_t *)start, to_send, (enum lws_write_protocol)n) !=
         to_send)
     {
-      logPrintf("LWS_CALLBACK_CLIENT_HTTP_WRITEABLE,error");
+      lingxin_log_error("LWS_CALLBACK_CLIENT_HTTP_WRITEABLE,error");
       return 1;
     }
 
@@ -242,7 +243,7 @@ static void sigint_handler(int sig) { interrupted = 1; }
 
 static void customLogEmit(int level, const char *line)
 {
-  logPrintf("customLogEmit: %d, %s", level, line);
+  lingxin_log_debug("customLogEmit: %d, %s", level, line);
   // Do nothing, effectively disabling all logs
 }
 
@@ -280,7 +281,7 @@ int http_post(HttpConfig *config, RequestCallback userCallback,
   context = lws_create_context(&contextCreateInfo);
   if (!context)
   {
-    logPrintf("lws init failed\n");
+    lingxin_log_error("lws init failed");
     return 1;
   }
 
@@ -315,7 +316,7 @@ int http_post(HttpConfig *config, RequestCallback userCallback,
     n = lws_service(context, 0);
 
   lws_context_destroy(context);
-  logPrintf("Completed: %s\n", bad ? "failed" : "OK");
+  lingxin_log_debug("Completed: %s", bad ? "failed" : "OK");
 
   return bad;
 }

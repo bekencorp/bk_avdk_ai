@@ -4,6 +4,7 @@
 #include <libwebsockets.h>
 #include <locale.h>
 #include <pthread.h>
+#include "lingxin_log.h"
 
 typedef struct
 {
@@ -17,12 +18,12 @@ static WebsocketClientHandler *getClientHandler(WebsocketClient *client)
 {
   if (!client)
   {
-    logPrintf("getClientHandler client  null");
+    lingxin_log_error("getClientHandler client  null");
     return NULL;
   }
   if (!client->clientHandler)
   {
-    logPrintf("getClientHandler clientHandler null");
+    lingxin_log_error("getClientHandler clientHandler null");
     return NULL;
   }
   return (WebsocketClientHandler *)client->clientHandler;
@@ -32,19 +33,19 @@ static void freeWebsocketClient(WebsocketClient *client)
 {
   if (!client)
   {
-    logPrintf("freeWebsocketClient client null");
+    lingxin_log_error("freeWebsocketClient client null");
     return;
   }
-  logPrintf("free clientHandler");
+  lingxin_log_debug("free clientHandler");
   if (client->clientHandler)
   {
     free(client->clientHandler);
     client->clientHandler = NULL;
   }
-  logPrintf("free client");
+  lingxin_log_debug("free client");
   free(client);
   client = NULL;
-  logPrintf("after free client");
+  lingxin_log_debug("after free client");
 }
 
 static int callback_ws(struct lws *wsi, enum lws_callback_reasons reason,
@@ -54,20 +55,20 @@ static int callback_ws(struct lws *wsi, enum lws_callback_reasons reason,
   unsigned char *end;
   int isBinary;
   WebsocketClient *client = (WebsocketClient *)clientSelf;
-  logPrintf("WebSocket callback_ws:%d", reason);
+  lingxin_log_debug("WebSocket callback_ws:%d", reason);
   if (!client)
   {
-    logPrintf("callback_ws client null");
+    lingxin_log_warn("callback_ws client null");
     return 0;
   }
   if (!client->config)
   {
-    logPrintf("callback_ws config null");
+    lingxin_log_error("callback_ws config null");
     return 0;
   }
   if (!client->config->listener)
   {
-    logPrintf("callback_ws listener null");
+    lingxin_log_error("callback_ws listener null");
     return 0;
   }
   switch (reason)
@@ -82,10 +83,10 @@ static int callback_ws(struct lws *wsi, enum lws_callback_reasons reason,
             (const unsigned char *)client->config->header_app_id,
             strlen(client->config->header_app_id), p, end))
     {
-      logPrintf("Failed to add HTTP header: app_id");
+      lingxin_log_error("Failed to add HTTP header: app_id");
       return -1;
     }
-    logPrintf("success add HTTP header app_id: %s",
+    lingxin_log_debug("success add HTTP header app_id: %s",
               client->config->header_app_id);
 
     if (!client->config->header_sn ||
@@ -94,20 +95,20 @@ static int callback_ws(struct lws *wsi, enum lws_callback_reasons reason,
             (const unsigned char *)client->config->header_sn,
             strlen(client->config->header_sn), p, end))
     {
-      logPrintf("Failed to add HTTP header: sn");
+      lingxin_log_error("Failed to add HTTP header: sn");
       return -1;
     }
-    logPrintf("success add HTTP header sn: %s", client->config->header_sn);
+    lingxin_log_debug("success add HTTP header sn: %s", client->config->header_sn);
     if (!client->config->header_signature ||
         lws_add_http_header_by_name(
             wsi, (const unsigned char *)"signature",
             (const unsigned char *)client->config->header_signature,
             strlen(client->config->header_signature), p, end))
     {
-      logPrintf("Failed to add HTTP header: signature");
+      lingxin_log_error("Failed to add HTTP header: signature");
       return -1;
     }
-    logPrintf("success add HTTP header signature: %s",
+    lingxin_log_debug("success add HTTP header signature: %s",
               client->config->header_signature);
 
     if (!client->config->header_timestamp ||
@@ -116,16 +117,16 @@ static int callback_ws(struct lws *wsi, enum lws_callback_reasons reason,
             (const unsigned char *)client->config->header_timestamp,
             strlen(client->config->header_timestamp), p, end))
     {
-      logPrintf("Failed to add HTTP header : timestamp");
+      lingxin_log_error("Failed to add HTTP header : timestamp");
       return -1;
     }
-    logPrintf("success add HTTP header timestamp: %s",
+    lingxin_log_debug("success add HTTP header timestamp: %s",
               client->config->header_timestamp);
     break;
   }
   case LWS_CALLBACK_CLIENT_ESTABLISHED:
   {
-    logPrintf("WebSocket connection established");
+    lingxin_log_debug("WebSocket connection established");
     WebsocketClientHandler *clientHandler = getClientHandler(client);
     if (clientHandler)
     {
@@ -137,7 +138,7 @@ static int callback_ws(struct lws *wsi, enum lws_callback_reasons reason,
   }
   case LWS_CALLBACK_CLIENT_RECEIVE:
   {
-    logPrintf("WebSocket REVEIVE", (char *)in);
+    lingxin_log_debug("WebSocket REVEIVE", (char *)in);
     isBinary = lws_frame_is_binary(wsi) ? 1 : 0;
     client->config->listener(ON_WEBSOCKET_DATA_RECEIVED, in, len, isBinary,
                              client->config->userContext);
@@ -145,14 +146,14 @@ static int callback_ws(struct lws *wsi, enum lws_callback_reasons reason,
   }
   case LWS_CALLBACK_WS_PEER_INITIATED_CLOSE:
   {
-    logPrintf("LWS_CALLBACK_WS_PEER_INITIATED_CLOSE");
+    lingxin_log_warn("LWS_CALLBACK_WS_PEER_INITIATED_CLOSE");
     client->config->listener(ON_WEBSOCKET_CONNECTION_ERROR, (const char *)in, len, 0,
                              client->config->userContext);
     break;
   }
   case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
   {
-    logPrintf("LWS_CALLBACK_CLIENT_CONNECTION_ERROR");
+    lingxin_log_error("LWS_CALLBACK_CLIENT_CONNECTION_ERROR");
 
     char buffer[256];                         // 增大 buffer 大小
     const char *headerKey = "x-auth-reason:"; // 自定义 header 名称
@@ -162,7 +163,7 @@ static int callback_ws(struct lws *wsi, enum lws_callback_reasons reason,
     int lenOfHeaderValue = lws_hdr_custom_length(wsi, headerKey, lenOfHeaderKey);
     if (lenOfHeaderValue < 0)
     {
-      logPrintf("Can't find %s", headerKey);
+      lingxin_log_error("Can't find %s", headerKey);
     }
     else
     {
@@ -170,11 +171,11 @@ static int callback_ws(struct lws *wsi, enum lws_callback_reasons reason,
       int copyResult = lws_hdr_custom_copy(wsi, buffer, sizeof(buffer), headerKey, lenOfHeaderKey);
       if (copyResult < 0)
       {
-        logPrintf("Custom header too long: %s", headerKey);
+        lingxin_log_error("Custom header too long: %s", headerKey);
       }
       else
       {
-        logPrintf("Custom header: %s", buffer);
+        lingxin_log_debug("Custom header: %s", buffer);
       }
     }
     char *errorMessage = (char *)in;
@@ -182,14 +183,14 @@ static int callback_ws(struct lws *wsi, enum lws_callback_reasons reason,
     {
       errorMessage = buffer;
     }
-    client->config->listener(ON_WEBSOCKET_CONNECTION_ERROR, (const char *)errorMessage, len, 0,
+    client->config->listener(ON_WEBSOCKET_CONNECTION_ERROR, (const char *)errorMessage, strlen(errorMessage), 0,
                              client->config->userContext);
     break;
   }
   // 这个回调有两个触发的地方：closeWebsocket触发回调 和websocket库内部主动回调
   case LWS_CALLBACK_WSI_DESTROY:
   {
-    logPrintf("LWS_CALLBACK_WSI_DESTROY");
+    lingxin_log_debug("LWS_CALLBACK_WSI_DESTROY");
 
     WebsocketClientHandler *clientHandler = getClientHandler(client);
     if (clientHandler)
@@ -233,7 +234,7 @@ static struct lws_protocols protocols[] = {
 
 static void customLogEmit(int level, const char *line)
 {
-  logPrintf("customLogEmit: %d, %s", level, line);
+  lingxin_log_debug("customLogEmit: %d, %s", level, line);
   // Do nothing, effectively disabling all logs
 }
 
@@ -254,12 +255,12 @@ WebsocketClient *initWebsocket(WebsocketConfig *config)
   info.uid = -1;
   // info.connect_timeout_secs = 5;
 
-  logPrintf("lws_create_context");
+  lingxin_log_debug("lws_create_context");
 
   struct lws_context *context = lws_create_context(&info);
   if (!context)
   {
-    logPrintf("Failed to create libwebsockets context");
+    lingxin_log_error("Failed to create libwebsockets context");
     return NULL;
   }
 
@@ -273,14 +274,14 @@ WebsocketClient *initWebsocket(WebsocketConfig *config)
   ccinfo.ssl_connection =
       strcmp(config->protocol, "ws") == 0 ? 0 : LCCSCF_USE_SSL;
 
-  logPrintf("before lws_client_connect_via_info");
+  lingxin_log_debug("before lws_client_connect_via_info");
 
   struct lws *lws = lws_client_connect_via_info(&ccinfo);
-  logPrintf("after lws_client_connect_via_info");
+  lingxin_log_debug("after lws_client_connect_via_info");
 
   if (!lws)
   {
-    logPrintf("Failed to initiate WebSocket connection");
+    lingxin_log_error("Failed to initiate WebSocket connection");
     lws_context_destroy(context);
     return NULL;
   }
@@ -288,7 +289,7 @@ WebsocketClient *initWebsocket(WebsocketConfig *config)
   WebsocketClient *client = (WebsocketClient *)malloc(sizeof(WebsocketClient));
   if (!client)
   {
-    logPrintf("Failed to allocate memory for WebSocket client");
+    lingxin_log_error("Failed to allocate memory for WebSocket client");
     lws_context_destroy(
         context); // Add this line to destroy context if client allocation fails
     return NULL;
@@ -298,7 +299,7 @@ WebsocketClient *initWebsocket(WebsocketConfig *config)
       (WebsocketClientHandler *)malloc(sizeof(WebsocketClientHandler));
   if (!handler)
   { // 添加空指针检查
-    logPrintf("Failed to allocate memory for WebSocket client handler");
+    lingxin_log_error("Failed to allocate memory for WebSocket client handler");
     lws_context_destroy(context);
     free(client);
     return NULL;
@@ -314,7 +315,7 @@ WebsocketClient *initWebsocket(WebsocketConfig *config)
   ccinfo.userdata = client;             // Set client as userdata
   lws_set_wsi_user(lws, client);        // Ensure client is set correctly
 
-  logPrintf("success connect to %s:%d/%s", config->host, config->port,
+  lingxin_log_debug("success connect to %s:%d/%s", config->host, config->port,
             config->path);
 
   return client;
@@ -324,7 +325,7 @@ void *websocketThread(void *arg)
 {
   if (!arg)
   {
-    logPrintf("websocketThread arg null");
+    lingxin_log_error("websocketThread arg null");
     return NULL;
   }
   WebsocketClient *client = (WebsocketClient *)arg;
@@ -333,16 +334,22 @@ void *websocketThread(void *arg)
   {
     return NULL;
   }
-  logPrintf("websocketThread begin");
+  lingxin_log_debug("websocketThread begin");
   while (!client->isWebsocketDestroyed)
   {
     if (lws_service(clientHandler->context, 1000) < 0)
     {
-      logPrintf("lws_service fail,then break");
+      lingxin_log_warn("lws_service fail,then break");
       break;
     }
   }
-  logPrintf("websocketThread end");
+  // Android需要已经做过AttachCurrentThread操作的native线程退出的时候做清理操作，其他平台暂未发现需要，所以这里先作为内部使用，暂不对外
+#if defined(__ANDROID__) && defined(USE_THREAD_EXIT_CLEANUP)
+    // 这个方法在适配套件的Android module中有实现
+    extern void websocketThreadExitCleanup();
+    websocketThreadExitCleanup();
+#endif
+  lingxin_log_debug("websocketThread end");
   return NULL;
 }
 
@@ -351,14 +358,14 @@ void startWebsocket(WebsocketClient *client)
   WebsocketClientHandler *clientHandler = getClientHandler(client);
   if (!clientHandler)
   {
-    logPrintf("startWebsocket, clientHandler or context null");
+    lingxin_log_error("startWebsocket, clientHandler or context null");
     return;
   }
 
   if (pthread_create(&clientHandler->thread_id, NULL, websocketThread,
                      (void *)client) != 0)
   {
-    logPrintf("Failed to create WebSocket thread");
+    lingxin_log_error("Failed to create WebSocket thread");
     return;
   }
 }
@@ -369,55 +376,55 @@ bool websocketSendText(WebsocketClient *client, const char *message)
 
   if (!clientHandler || !clientHandler->lws)
   {
-    logPrintf("websocketSendText, clientHandler or lws null");
+    lingxin_log_error("websocketSendText, clientHandler or lws null");
     return false;
   }
   if (client->isWebsocketDestroyed)
   {
-    logPrintf("WebsocketClient has been destroyed");
+    lingxin_log_error("WebsocketClient has been destroyed");
     return false;
   }
-  logPrintf("websocketSendText begin: %s", message);
+  lingxin_log_debug("websocketSendText begin: %s", message);
   size_t message_len = strlen(message);
   unsigned char *buf = (unsigned char *)malloc(LWS_PRE + message_len);
   if (!buf)
   {
-    logPrintf("Failed to allocate memory for buffer");
+    lingxin_log_error("Failed to allocate memory for buffer");
     return false;
   }
   memcpy(&buf[LWS_PRE], message, message_len);
 
   int result =
       lws_write(clientHandler->lws, &buf[LWS_PRE], message_len, LWS_WRITE_TEXT);
-  logPrintf("websocketSendText finish, result: %d", result);
+  lingxin_log_debug("websocketSendText finish, result: %d", result);
   free(buf);
   return result > 0;
 }
 
 void closeWebsocket(WebsocketClient *client)
 {
-  logPrintf("closeWebsocket before");
+  lingxin_log_debug("closeWebsocket before");
 
   WebsocketClientHandler *clientHandler = getClientHandler(client);
   if (!clientHandler || !clientHandler->context)
   {
-    logPrintf("closeWebsocket params null");
+    lingxin_log_error("closeWebsocket params null");
     return;
   }
   if (client->isWebsocketDestroyed)
   {
-    logPrintf("client has been destroyed");
+    lingxin_log_error("client has been destroyed");
     return;
   }
   clientHandler->wsiDestroyFromClose = true;
   client->isWebsocketDestroyed = true;
-  logPrintf("set client->isWebsocketDestroyed");
+  lingxin_log_debug("set client->isWebsocketDestroyed");
   lws_cancel_service(clientHandler->context);
-  logPrintf("closeWebsocket after lws_cancel_service");
+  lingxin_log_debug("closeWebsocket after lws_cancel_service");
   pthread_join(clientHandler->thread_id, NULL);
-  logPrintf("closeWebsocket after pthread_join");
+  lingxin_log_debug("closeWebsocket after pthread_join");
   lws_context_destroy(clientHandler->context);
-  logPrintf("closeWebsocket after lws_context_destroy");
+  lingxin_log_debug("closeWebsocket after lws_context_destroy");
 }
 
 int websocketSendBinary(WebsocketClient *client, const char *audioData,
@@ -425,20 +432,20 @@ int websocketSendBinary(WebsocketClient *client, const char *audioData,
 {
   if (!audioData || !dataSize)
   {
-    logPrintf("websocketSendBinary Invalid parameters");
+    lingxin_log_error("websocketSendBinary Invalid parameters");
     return 0;
   }
 
   WebsocketClientHandler *clientHandler = getClientHandler(client);
   if (!clientHandler || !clientHandler->lws)
   {
-    logPrintf("websocketSendBinary Invalid clientHandler");
+    lingxin_log_error("websocketSendBinary Invalid clientHandler");
     return 0;
   }
 
   if (client->isWebsocketDestroyed)
   {
-    logPrintf("websocketSendBinary has been destroyed");
+    lingxin_log_error("websocketSendBinary has been destroyed");
     return 0;
   }
 
@@ -446,7 +453,7 @@ int websocketSendBinary(WebsocketClient *client, const char *audioData,
   unsigned char *buf = (unsigned char *)malloc(bufferSize);
   if (!buf)
   {
-    logPrintf("Failed to allocate memory for buffer");
+    lingxin_log_error("Failed to allocate memory for buffer");
     return 0;
   }
 
@@ -457,7 +464,7 @@ int websocketSendBinary(WebsocketClient *client, const char *audioData,
 
   if (bytesWritten < 0)
   {
-    logPrintf("Failed to send binary data， %d", bytesWritten);
+    lingxin_log_error("Failed to send binary data， %d", bytesWritten);
     free(buf);
     return 0;
   }

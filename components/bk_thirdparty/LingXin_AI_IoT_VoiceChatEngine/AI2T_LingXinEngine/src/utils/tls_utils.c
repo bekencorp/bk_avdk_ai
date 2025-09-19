@@ -4,6 +4,7 @@
 #include "mbedtls/md.h"
 #include <ctype.h>
 #include <stddef.h>
+#include "lingxin_log.h"
 
 // 实现 HMAC-SHA1 加密逻辑
 static char *sdk_hmac_sha1(const char *key, const char *data) {
@@ -21,14 +22,14 @@ static char *sdk_hmac_sha1(const char *key, const char *data) {
   // 获取 SHA1 的 MD 信息
   md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA1);
   if (md_info == NULL) {
-    logPrintf("无法获取 SHA1 MD 信息\n");
+    lingxin_log_error("无法获取 SHA1 MD 信息");
     mbedtls_md_free(&ctx);
     return NULL;
   }
 
   // 设置 HMAC 上下文
   if ((ret = mbedtls_md_setup(&ctx, md_info, 1)) != 0) {
-    logPrintf("HMAC 上下文设置失败，错误码: %d", ret);
+    lingxin_log_error("HMAC 上下文设置失败，错误码: %d", ret);
     mbedtls_md_free(&ctx);
     return NULL;
   }
@@ -36,7 +37,7 @@ static char *sdk_hmac_sha1(const char *key, const char *data) {
   // 设置 HMAC 密钥
   if ((ret = mbedtls_md_hmac_starts(&ctx, (const unsigned char *)key,
                                     strlen(key))) != 0) {
-    logPrintf("设置 HMAC 密钥失败，错误码: %d", ret);
+    lingxin_log_error("设置 HMAC 密钥失败，错误码: %d", ret);
     mbedtls_md_free(&ctx);
     return NULL;
   }
@@ -44,14 +45,14 @@ static char *sdk_hmac_sha1(const char *key, const char *data) {
   // 输入数据
   if ((ret = mbedtls_md_hmac_update(&ctx, (const unsigned char *)data,
                                     strlen(data))) != 0) {
-    logPrintf("HMAC 数据更新失败，错误码: %d", ret);
+    lingxin_log_error("HMAC 数据更新失败，错误码: %d", ret);
     mbedtls_md_free(&ctx);
     return NULL;
   }
 
   // 生成 HMAC-SHA1 输出
   if ((ret = mbedtls_md_hmac_finish(&ctx, output)) != 0) {
-    logPrintf("HMAC 计算失败，错误码: %d", ret);
+    lingxin_log_error("HMAC 计算失败，错误码: %d", ret);
     mbedtls_md_free(&ctx);
     return NULL;
   }
@@ -67,14 +68,14 @@ static char *sdk_hmac_sha1(const char *key, const char *data) {
                               sizeof(base64_output), &base64_len, output,
                               output_len);
   if (ret != 0) {
-    logPrintf("Base64 编码失败，错误码: %d", ret);
+    lingxin_log_error("Base64 编码失败，错误码: %d", ret);
     return NULL;
   }
 
   // 分配存储结果字符串的内存
   char *base64_result = malloc(base64_len + 1);
   if (!base64_result) {
-    logPrintf("内存分配失败\n");
+    lingxin_log_error("内存分配失败");
     return NULL;
   }
   // 复制 Base64 编码结果
@@ -153,14 +154,14 @@ char *generateSignature(const char *sn, const char *appKey, const char *appId,
   }
   char *hmacValue = snprintfWithMalloc("app_id=%s&sn=%s&timestamp=%s", appIdEncode,
                                        snEncode, timestamp);
-  logPrintf("hmacValue:%s", hmacValue);
-  logPrintf("appKey:%s", appKey);
+  lingxin_log_debug("hmacValue:%s", hmacValue);
+  lingxin_log_debug("appKey:%s", appKey);
 
   char *result = sdk_hmac_sha1(appKey, hmacValue);
-  logPrintf("signature:%s", result);
+  lingxin_log_debug("signature:%s", result);
 
   if (!result) {
-    logPrintf("Signature generatte fail");
+    lingxin_log_debug("Signature generatte fail");
     return NULL;
   }
   free(hmacValue);

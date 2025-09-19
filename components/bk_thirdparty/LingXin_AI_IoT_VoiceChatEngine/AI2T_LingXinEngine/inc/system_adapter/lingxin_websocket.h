@@ -1,5 +1,5 @@
-#ifndef AI_IOT_SDK_WEBSOCKET_H
-#define AI_IOT_SDK_WEBSOCKET_H
+#ifndef LINGXIN_WEBSOCKET_H
+#define LINGXIN_WEBSOCKET_H
 
 #ifdef __cplusplus
 extern "C"
@@ -49,8 +49,10 @@ extern "C"
   int websocketSendBinary(WebsocketClient *client, const char *audioData, size_t dataSize);
 
   void closeWebsocket(WebsocketClient *client);
+
+  bool isWebsocketAlive(WebsocketClient *client);
 #ifdef __cplusplus
 }
 #endif
 
-#endif // AI_IOT_SDK_WEBSOCKET_H
+#endif // LINGXIN_WEBSOCKET_H

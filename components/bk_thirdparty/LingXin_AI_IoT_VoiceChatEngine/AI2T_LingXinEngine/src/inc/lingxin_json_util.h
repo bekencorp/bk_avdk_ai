@@ -1,5 +1,5 @@
-#ifndef AI_IOT_SDK_UTIL_JSON_UTIL_H
-#define AI_IOT_SDK_UTIL_JSON_UTIL_H
+#ifndef LINGXIN_UTIL_JSON_UTIL_H
+#define LINGXIN_UTIL_JSON_UTIL_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,4 +17,4 @@ char *parseErrorInfo(cJSON *json);
 #ifdef __cplusplus
 }
 #endif
-#endif // AI_IOT_SDK_UTIL_JSON_UTIL_H
+#endif // LINGXIN_UTIL_JSON_UTIL_H

@@ -2,6 +2,7 @@
 #include "lingxin_common.h"
 #include "lingxin_http.h"
 #include "llm_generate.h"
+#include "lingxin_log.h"
 
 static void callbackFromHttpRequest(void *contents, size_t size, void *userp)
 {
@@ -13,7 +14,7 @@ static void callbackFromHttpRequest(void *contents, size_t size, void *userp)
   char *newResponse = (char *)realloc((void *)(intptr_t)*response, existingLength + size + 1);
   if (!newResponse)
   {
-    logPrintf("Memory allocation failed\n");
+    lingxin_log_error("Memory allocation failed");
     return;
   }
   *response = newResponse;
@@ -23,19 +24,17 @@ static void callbackFromHttpRequest(void *contents, size_t size, void *userp)
   (*response)[existingLength + size] = '\0'; // 添加字符串结束符
 }
 
-void generateImage(const char *appId, const char *sn, const char *appKey, bool showLog,
-                   const char *requestParams, char **response)
+void generateImage(const char *appId, const char *sn, const char *appKey, const char *requestParams, char **response)
 {
-  setLogEnable(showLog);
   if (!appId || !sn || !appKey || !requestParams)
   {
-    logPrintf("generateImage: Invalid input parameters");
+    lingxin_log_error("generateImage: Invalid input parameters");
     return;
   }
   HttpHeader *headers = (HttpHeader *)malloc(sizeof(HttpHeader));
   if (!headers)
   {
-    logPrintf("Failed to allocate memory for HttpHeader");
+    lingxin_log_error("Failed to allocate memory for HttpHeader");
     return;
   }
   HttpConfig *config = createHttpConfig(appId, sn, appKey, LLM_IMAGE_PATH, requestParams, headers);
@@ -44,19 +43,17 @@ void generateImage(const char *appId, const char *sn, const char *appKey, bool s
   free(config);
 }
 
-void queryGenerateImageResult(const char *appId, const char *sn, const char *appKey, bool showLog,
-                              const char *requestParams, char **response)
+void queryGenerateImageResult(const char *appId, const char *sn, const char *appKey, const char *requestParams, char **response)
 {
-  setLogEnable(showLog);
   if (!appId || !sn || !appKey || !requestParams)
   {
-    logPrintf("queryGenerateImageResult: Invalid input parameters");
+    lingxin_log_error("queryGenerateImageResult: Invalid input parameters");
     return;
   }
   HttpHeader *headers = (HttpHeader *)malloc(sizeof(HttpHeader));
   if (!headers)
   {
-    logPrintf("Failed to allocate memory for HttpHeader");
+    lingxin_log_error("Failed to allocate memory for HttpHeader");
     return;
   }
   HttpConfig *config =

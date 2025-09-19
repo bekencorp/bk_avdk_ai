@@ -2,6 +2,7 @@
 #include "bk_websocket_client.h"
 #include "components/log.h"
 #include <locale.h>
+#include "os/mem.h"
 
 #define BK_SEND_TIMEOUT 10 * 1000
 #define TAG "ws_cust"
@@ -175,7 +176,7 @@ void websocket_event_handler(void *event_handler_arg, char *event_base, int32_t 
 
 WebsocketClient *initWebsocket(WebsocketConfig *config)
 {
-  globalClient = (WebsocketClient *)malloc(sizeof(WebsocketClient));
+  globalClient = (WebsocketClient *)psram_malloc(sizeof(WebsocketClient));
   if (!globalClient)
   {
     LOGE("Failed to allocate memory for WebSocket client\r\n");
@@ -183,7 +184,7 @@ WebsocketClient *initWebsocket(WebsocketConfig *config)
   }
 
   WebsocketClientHandler *handler =
-      (WebsocketClientHandler *)malloc(sizeof(WebsocketClientHandler));
+      (WebsocketClientHandler *)psram_malloc(sizeof(WebsocketClientHandler));
   if (!handler)
   { // 添加空指针检查
     LOGE("Failed to allocate memory for WebSocket client handler\r\n");
@@ -299,3 +300,15 @@ int websocketSendBinary(WebsocketClient *client, const char *audioData, size_t d
   }
   return (int)dataSize;
 }
+
+bool isWebsocketAlive(WebsocketClient *client)
+{
+  if (client->isWebsocketDestroyed)
+  {
+    LOGE("WebsocketClient has been destroyed\r\n");
+    return 0;
+  }
+  else
+    return 1;
+}
+

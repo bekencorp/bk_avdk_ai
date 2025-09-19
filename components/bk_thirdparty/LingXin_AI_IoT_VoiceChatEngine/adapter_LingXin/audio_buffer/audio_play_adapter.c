@@ -7,11 +7,11 @@
 #include <os/mem.h>
 #include <os/str.h>
 #include <common/bk_err.h>
-#include "chat_module_config.h"
-#include "audio_buffer_play.h"
-#include "chat_state_machine.h"
+#include <audio_buffer_play.h>
+#include <chat_state_machine_event.h>
 #include <aud_intf.h>
-#include "audio_engine.h"
+#include <audio_engine.h>
+#include <lingxin_semaphore.h>
 
 #define TAG "lx_play"
 #define LOGI(...) BK_LOGI(TAG, ##__VA_ARGS__)
@@ -19,7 +19,6 @@
 #define LOGW(...) BK_LOGW(TAG, ##__VA_ARGS__)
 #define LOGD(...) BK_LOGD(TAG, ##__VA_ARGS__)
 
-#ifdef CONFIG_AUDIO_BUFFER_CUSTOM_ENABLE
 
 typedef struct {
     uint8_t *buffer;
@@ -37,7 +36,8 @@ typedef struct {
     beken_timer_t data_read_tmr;
     audio_info_t info;
     int playing_flags; //0:running 1:end
-    beken_mutex_t lock; //TODO if needed
+    lingxin_semaphore_t play_sema;
+    uint8_t play_write_flag;
 } play_config_t;
 
 #if CONFIG_DEBUG_DUMP
@@ -45,7 +45,7 @@ typedef struct {
 extern bool rx_spk_data_flag;
 #endif
 play_config_t *play_info = NULL;
-#define WSS_AUDIO_BUFFER_SIZE (1500*1024)
+#define WSS_AUDIO_BUFFER_SIZE (600*1024)
 
 // 实现自定义的逻辑
 int play_user_audio_rx_data_handle(unsigned char *data, unsigned int size)
@@ -218,6 +218,13 @@ void play_data_buffer_clean(data_buffer_t *rb)
     return;
 }
 
+int play_data_buffer_available(data_buffer_t *rb)
+{
+	int diff = (rb->length_read_index > rb->length_write_index) ?
+		(rb->length_read_index - rb->length_write_index) : (rb->buffer_count - rb->length_write_index + rb->length_read_index);
+	return diff;
+}
+
 void play_data_check(void *param)
 {
     play_config_t *play = (play_config_t *) param;
@@ -228,9 +235,17 @@ void play_data_check(void *param)
     uint8_t *packet = NULL;
     packet = os_zalloc(play->info.dec_node_size);
     int size = 0;
+	int available = 0;
     if (packet != NULL && (play->info.dec_node_size <= bk_aud_intf_get_dec_rb_free_size()))
     {
         if (play->ring_buffer && (size = play_data_buffer_read(play->ring_buffer, packet))) {
+			available = play_data_buffer_available(play->ring_buffer);
+			if ((available > ((play->ring_buffer->buffer_count) * 3)/4)) {// && play->play_write_flag) {
+				if (play->play_write_flag)
+					LOGE("%s size:%d available:%d wake_up\n", __func__, size, available);
+				lingxin_semaphore_post(play->play_sema);
+				play->play_write_flag = 0;
+			}
             play_user_audio_rx_data_handle(packet, size);
             LOGD("data coming...\n");
         } else {
@@ -278,9 +293,8 @@ void play_data_stop_timeout_check(beken_timer_t *data_read_tmr)
 
 int play_data_end(void *param)
 {
-    LOGI("%s\r\n", __func__);
-    if (play_info && play_info->playing_flags == 0)
-        state_machine_run_event(State_Event_BufferPlay_PlayEnd);
+    LOGI("%s\n", __func__);
+    state_machine_run_event(State_Event_BufferPlay_ServerClosed);
     return BK_OK;
 }
 
@@ -312,7 +326,7 @@ play_config_t *Play_audioInit()
         goto exit;
     }
     audio_register_play_finish_func(play_data_end);
-
+	play->play_sema = lingxin_semaphore_create(0);
     if (play->info.decoding_type) {
         play->ring_buffer = play_data_buffer_init(((play->info.dec_node_size) * max_count), max_count);
         if (play->ring_buffer == NULL)
@@ -343,6 +357,7 @@ void Play_audioDeinit(play_config_t *play)
         return;
     }
     play_data_stop_timeout_check(&play->data_read_tmr);
+	lingxin_semaphore_destroy(play->play_sema);
     play_data_buffer_deinit(play->ring_buffer);
     play->ring_buffer = NULL;
 
@@ -355,11 +370,11 @@ void Play_audioDeinit(play_config_t *play)
 // 调用时机：由chat套件内核发起调用，客户实现
 void module_bufferPlay_audioInit()
 {
-     LOGI("module_bufferPlay_audioInit\n");
+     LOGI("%s\n", __func__);
      if (play_info == NULL) {
         play_info = Play_audioInit();
      }
-     play_info->playing_flags = 0;
+     play_info->playing_flags = 1;
      bk_aud_intf_voc_write_spk_data_ctrl(1);
      state_machine_run_event(State_Event_BufferPlay_AudioInitEnd);
 }
@@ -367,27 +382,27 @@ void module_bufferPlay_audioInit()
 // buf为mp3数据 rlen为当前数据长度
 void module_bufferPlay_data(void *buf, int rlen)
 {
-    int i = 0;
-
-    if (rlen > (play_info->info.dec_node_size)) {
+   int available = 0;
+	play_config_t *play = play_info;
+    if (rlen > (play->info.dec_node_size)) {
         LOGE("data too large, len:%d limit:%d\n", rlen, general_audio.dec_node_size);
         return;
     }
 
     LOGD("%s rlen:%d\n", __func__, rlen);
 
-retry:
-    if (play_info->ring_buffer) {
-        if (play_data_buffer_write(play_info->ring_buffer, buf, rlen) != 0) {
-            rtos_delay_milliseconds(20);
-            i++;
-            if (i > 50) {
-                LOGE("%s, write buffer fail length_write_index:%d write_index:%d read_index:%d data_len:%d\r\n",
-                        __func__, play_info->ring_buffer->length_write_index, play_info->ring_buffer->write_index, play_info->ring_buffer->read_index, rlen);
-                return;
-            }
-            goto retry;
-        }
+    if (play->ring_buffer && play->playing_flags) {
+		available = play_data_buffer_available(play->ring_buffer);
+		if (available < 5) {
+			LOGE("%s rlen:%d available:%d entering sleep\n", __func__, rlen, available);
+			play->play_write_flag = 1;
+			lingxin_semaphore_pend(play->play_sema, 20*1000);
+		}
+		if (play_data_buffer_write(play->ring_buffer, buf, rlen) != 0) {
+			LOGE("%s, write buffer fail length_write_index:%d length_read_index:%d write_index:%d read_index:%d data_len:%d\r\n",
+					__func__, play->ring_buffer->length_write_index, play->ring_buffer->length_read_index,
+					play->ring_buffer->write_index, play->ring_buffer->read_index, rlen);
+		}
     }
 }
 
@@ -395,8 +410,12 @@ retry:
 // 调用时机：由chat套件内核发起调用，客户实现
 void module_bufferPlay_audioEnd()
 {
-    LOGI("module_bufferPlay_audioEnd\n");
+    LOGI("%s\n", __func__);
     bk_aud_intf_voc_write_spk_data_ctrl(0);
+	state_machine_run_event(State_Event_BufferPlay_PlayEnd);
+    if (play_info)
+		play_info->playing_flags == 0;
+
     //Play_audioDeinit(play_info);
     //play_info = NULL;
 }
@@ -405,11 +424,43 @@ void module_bufferPlay_audioEnd()
 // 调用时机：由chat套件内核发起调用，客户实现
 void module_bufferPlay_terminate()
 {
-    LOGI("module_bufferPlay_terminate\n");
+    LOGI("%s\n", __func__);
     Play_audioClean();
-    if (play_info)
-        play_info->playing_flags = 1;
+    if (play_info) {
+        play_info->playing_flags = 0;
+        LOGI("%s wake_up\n", __func__);
+        lingxin_semaphore_post(play_info->play_sema);
+        play_info->play_write_flag = 0;
+    }
     state_machine_run_event(State_Event_BufferPlay_TerminateEnd);
 }
 
-#endif
+// 功能：设置当前播放的音量
+// 调用时机：由chat套件内核发起调用，客户实现
+void module_bufferPlay_setVolume(int volume)
+{
+    LOGI("%s volume:%d\n", __func__, volume);
+
+    if (volume == 0)
+    {
+        BK_LOGI(TAG, "volume have reached minimum volume: 0\n");
+        return;
+    }
+    if (volume == (SPK_VOLUME_LEVEL-1))
+    {
+        BK_LOGI(TAG, "volume have reached maximum volume: %d\n", volume);
+        return;
+    }
+
+    if (BK_OK == bk_aud_intf_set_spk_gain(volume))
+    {
+        BK_LOGI(TAG, "current volume: %d\n", volume);
+    }
+    else
+    {
+        BK_LOGI(TAG, "set volume fail\n");
+    }
+
+	return;
+}
+

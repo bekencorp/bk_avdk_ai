@@ -1,5 +1,5 @@
-#ifndef AI_IOT_SDK_TTS_H
-#define AI_IOT_SDK_TTS_H
+#ifndef LINGXIN_TTS_H
+#define LINGXIN_TTS_H
 
 #ifdef __cplusplus
 extern "C"
@@ -22,7 +22,6 @@ extern "C"
 
   typedef struct
   {
-    bool showLog;
     const char *appKey;
     const char *sn;
     const char *appId;
@@ -53,4 +52,4 @@ extern "C"
 #ifdef __cplusplus
 }
 #endif
-#endif // AI_IOT_SDK_TTS_H
+#endif // LINGXIN_TTS_H

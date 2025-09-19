@@ -1,6 +1,6 @@
 // httpclient.h
-#ifndef AI_IOT_SDK_HTTP_HTTPCLIENT_H
-#define AI_IOT_SDK_HTTP_HTTPCLIENT_H
+#ifndef LINGXIN_HTTP_HTTPCLIENT_H
+#define LINGXIN_HTTP_HTTPCLIENT_H
 
 #ifdef __cplusplus
 extern "C"
@@ -33,4 +33,4 @@ extern "C"
 #ifdef __cplusplus
 }
 #endif
-#endif // AI_IOT_SDK_HTTP_HTTPCLIENT_H
+#endif // LINGXIN_HTTP_HTTPCLIENT_H

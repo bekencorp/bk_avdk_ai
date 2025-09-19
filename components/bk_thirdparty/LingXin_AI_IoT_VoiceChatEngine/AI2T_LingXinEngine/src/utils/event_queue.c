@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "lingxin_event_queue.h"
+#include "lingxin_log.h"
 
 int EVENT_QUEUE_FINISH_FLAG = 10001;
 
@@ -13,10 +14,10 @@ static void *eventNotifyThread(void *arg)
   {
     return NULL;
   }
-  // logPrintf("eventNotifyThread before");
+  // lingxin_log_debug("eventNotifyThread before");
   while (!queue->isDestroyed)
   {
-    // logPrintf("eventNotifyThread");
+    // lingxin_log_debug("eventNotifyThread");
     EventChunk *event = eventQueueDequeue(queue);
     if (event && queue->callback)
     {
@@ -26,10 +27,10 @@ static void *eventNotifyThread(void *arg)
                         event->dataSize);
       }
       free(event); // 释放 eventChunk 内存
-      logPrintf("eventNotifyThread callback finish");
+      lingxin_log_debug("eventNotifyThread callback finish");
     }
   }
-  // logPrintf("eventNotifyThread after");
+  // lingxin_log_debug("eventNotifyThread after");
   return NULL;
 }
 
@@ -63,7 +64,7 @@ void eventQueueDestroy(EventQueue *queue)
   {
     return;
   }
-  logPrintf("eventQueueDestroy begin");
+  lingxin_log_debug("eventQueueDestroy begin");
   pthread_mutex_lock(queue->mutex);
   EventQueueNode *current = queue->front;
   while (current)
@@ -86,14 +87,14 @@ void eventQueueDestroy(EventQueue *queue)
   free(queue->mutex);
   free(queue->cond);
   free(queue);
-  logPrintf("eventQueueDestroy finish");
+  lingxin_log_debug("eventQueueDestroy finish");
 }
 
 // 入队操作
 EventQueueStatus eventQueueEnqueue(EventQueue *queue, int dataType,
                                    const char *message, size_t messageSize)
 {
-  logPrintf("eventQueueEnqueue begin %d: %d: %s", dataType, messageSize,
+  lingxin_log_debug("eventQueueEnqueue begin %d: %d: %s", dataType, messageSize,
             !message ? "NULL" : message);
 
   EventQueueNode *new_node =
@@ -105,7 +106,7 @@ EventQueueStatus eventQueueEnqueue(EventQueue *queue, int dataType,
   EventChunk *chunk = (EventChunk *)calloc(1, sizeof(EventChunk));
   if (!chunk)
   {
-    logPrintf("event malloc fail");
+    lingxin_log_debug("event malloc fail");
   }
   chunk->eventType = dataType;
   chunk->data = message;
@@ -116,7 +117,7 @@ EventQueueStatus eventQueueEnqueue(EventQueue *queue, int dataType,
   int lockResult = pthread_mutex_lock(queue->mutex);
   if (lockResult != 0)
   {
-    logPrintf("queueEnqueue: Mutex lock failed with error code %d", lockResult);
+    lingxin_log_error("queueEnqueue: Mutex lock failed with error code %d", lockResult);
     free(new_node);
     return QUEUE_MUTEX_ERROR;
   }
@@ -133,20 +134,20 @@ EventQueueStatus eventQueueEnqueue(EventQueue *queue, int dataType,
   }
   pthread_cond_signal(queue->cond);
   pthread_mutex_unlock(queue->mutex);
-  logPrintf("eventQueueEnqueue finish");
+  lingxin_log_debug("eventQueueEnqueue finish");
   return QUEUE_SUCCESS;
 }
 
 // 出队操作
 EventChunk *eventQueueDequeue(EventQueue *queue)
 {
-  logPrintf("eventQueueDequeue: begin");
+  lingxin_log_debug("eventQueueDequeue: begin");
   pthread_mutex_lock(queue->mutex);
   while (!queue->front && !queue->isDestroyed)
   {
-    logPrintf("eventQueueDequeue: wait");
+    lingxin_log_debug("eventQueueDequeue: wait");
     pthread_cond_wait(queue->cond, queue->mutex);
-    logPrintf("eventQueueDequeue:after wait");
+    lingxin_log_debug("eventQueueDequeue:after wait");
   }
 
   if (queue->isDestroyed)
@@ -164,7 +165,7 @@ EventChunk *eventQueueDequeue(EventQueue *queue)
   }
   pthread_mutex_unlock(queue->mutex);
   free(front_node);
-  logPrintf("eventQueueDequeue: finish: %d, %zu", data->eventType,
+  lingxin_log_debug("eventQueueDequeue: finish: %d, %zu", data->eventType,
             data->dataSize);
 
   return data;

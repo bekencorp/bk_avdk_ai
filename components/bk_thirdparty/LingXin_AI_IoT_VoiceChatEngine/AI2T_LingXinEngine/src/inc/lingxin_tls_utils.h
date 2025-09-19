@@ -1,5 +1,5 @@
-#ifndef AI_IOT_SDK_TLS_UTIL_H
-#define AI_IOT_SDK_TLS_UTIL_H
+#ifndef LINGXIN_TLS_UTIL_H
+#define LINGXIN_TLS_UTIL_H
 
 #ifdef __cplusplus
 extern "C"
@@ -11,4 +11,4 @@ extern "C"
 #ifdef __cplusplus
 }
 #endif
-#endif // AI_IOT_SDK_TLS_UTIL_H
+#endif // LINGXIN_TLS_UTIL_H
