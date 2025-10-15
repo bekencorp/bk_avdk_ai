@@ -55,11 +55,19 @@ endif()
 
 endif()	#(CONFIG_WANSON_ASR)
 
+
+if(CONFIG_WANSON_CN_LICENSE)
+    list(APPEND incs
+        include
+        bk7258
+    )
+endif()
+
 armino_component_register(INCLUDE_DIRS "${incs}")
 
 if (CONFIG_WANSON_ASR)
 
-if ("${ARMINO_SOC}" STREQUAL "bk7256" OR "${ARMINO_SOC}" STREQUAL "bk7256_cp1")
+if ("${ARMINO_SOC}" STREQUAL "bk7236" OR "${ARMINO_SOC}" STREQUAL "bk7256_cp1")
 	get_filename_component(lib_name ${CMAKE_CURRENT_SOURCE_DIR}/bk7256/${WANSON_ASR_LIB_DIR_NAME}/libasrbase.a NAME)
 	add_prebuilt_library(${lib_name} "${CMAKE_CURRENT_SOURCE_DIR}/bk7256/${WANSON_ASR_LIB_DIR_NAME}/libasrbase.a")
 	target_link_libraries(${COMPONENT_LIB} INTERFACE ${lib_name})
@@ -67,9 +75,15 @@ endif()
 
 if ("${ARMINO_SOC}" STREQUAL "bk7236" OR "${ARMINO_SOC}" STREQUAL "bk7258" OR "${ARMINO_SOC}" STREQUAL "bk7258_cp1" OR "${ARMINO_SOC}" STREQUAL "bk7258_cp2")
 if (CONFIG_WANSON_ASR_GROUP_VERSION)
+if (CONFIG_WANSON_CN_LICENSE)
+	get_filename_component(lib_name ${CMAKE_CURRENT_SOURCE_DIR}/bk7258/libasrfst_with_auth.a NAME)
+	add_prebuilt_library(${lib_name} "${CMAKE_CURRENT_SOURCE_DIR}/bk7258/libasrfst_with_auth.a")
+	target_link_libraries(${COMPONENT_LIB} INTERFACE ${lib_name})
+else()
 	get_filename_component(lib_name ${CMAKE_CURRENT_SOURCE_DIR}/bk7258/libasrfst.a NAME)
 	add_prebuilt_library(${lib_name} "${CMAKE_CURRENT_SOURCE_DIR}/bk7258/libasrfst.a")
 	target_link_libraries(${COMPONENT_LIB} INTERFACE ${lib_name})
+endif()
 else()
 	get_filename_component(lib_name ${CMAKE_CURRENT_SOURCE_DIR}/bk7258/libasrbase.a NAME)
 	add_prebuilt_library(${lib_name} "${CMAKE_CURRENT_SOURCE_DIR}/bk7258/libasrbase.a")
@@ -78,3 +92,12 @@ endif()
 endif()
 
 endif()
+
+if("${ARMINO_SOC}" STREQUAL "bk7236" OR "${ARMINO_SOC}" STREQUAL "bk7258" OR "${ARMINO_SOC}" STREQUAL "bk7258_cp0")
+if(CONFIG_WANSON_CN_LICENSE)
+	get_filename_component(lib_name ${CMAKE_CURRENT_SOURCE_DIR}/license/libwanson_license.a NAME)
+	add_prebuilt_library(${lib_name} "${CMAKE_CURRENT_SOURCE_DIR}/license/libwanson_license.a")
+	target_link_libraries(${COMPONENT_LIB} INTERFACE ${lib_name})
+endif()
+endif()
+
