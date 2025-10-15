@@ -145,7 +145,7 @@ static bk_err_t audio_act_init_handle(media_mailbox_msg_t *msg)
     if (s_audio_task)
     {
         LOGE("audio_task already init");
-        goto fail;
+        return BK_OK;
     }
 
     if (!s_audio_sema)
