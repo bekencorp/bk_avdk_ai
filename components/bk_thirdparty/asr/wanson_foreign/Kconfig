@@ -1,0 +1,15 @@
+menu "Bk_thirdparty::Wanson_Foreign"
+
+	config WANSON_FOREIGN_ASR
+		bool "Enable Wanson_Foreign ASR"
+		default n
+		help
+			Enable Wanson_Foreign Automatic Speech Recognition
+
+	config WANSON_FL_LICENSE
+		bool "Enable Wanson FL License"
+		default n
+		help
+			Enable Wanson Foreign language License for authentication and usage rights
+	
+endmenu
