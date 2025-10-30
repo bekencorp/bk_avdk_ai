@@ -861,17 +861,17 @@ void aud_set_production_mode(int val)
 {
 #if CONFIG_AUD_SWEEP_TEST
     flag_mic_dac_sweep_mode = val;
-	aud_production_mode_init_flag = (val == 1) ? 0 : 1;
-	
-	bk_printf("[%s:%d]:%d\r\n", __func__, __LINE__,flag_mic_dac_sweep_mode);
+    aud_production_mode_init_flag = (val == 1) ? 0 : 1;
+    bk_printf("[%s:%d]:%d\r\n", __func__, __LINE__, flag_mic_dac_sweep_mode);
 #endif
 }
+
 int aud_get_production_mode(void)
 {
 #if CONFIG_AUD_SWEEP_TEST
     return flag_mic_dac_sweep_mode;
 #else
-	return 0;
+    return 0;
 #endif
 }
 
@@ -6600,7 +6600,13 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
                     aud_tras_update_aec_para((app_aud_aec_config_t*)mailbox_msg->param);
                     msg_send_rsp_to_media_major_mailbox(mailbox_msg, BK_OK, APP_MODULE);
                     break;
-
+#if (CONFIG_AUD_SWEEP_TEST)
+                case AUD_TRAS_SET_PRODUCTION_MODE:
+                    mailbox_msg = (media_mailbox_msg_t *)msg.param;
+                    aud_set_production_mode(mailbox_msg->param);
+                    msg_send_rsp_to_media_major_mailbox(mailbox_msg, BK_OK, APP_MODULE);
+                    break;
+#endif
 				default:
 					break;
 			}
@@ -7455,7 +7461,11 @@ bk_err_t audio_event_handle(media_mailbox_msg_t * msg)
 			//TODO set sem
 			//	;
 			break;
-
+#if (CONFIG_AUD_SWEEP_TEST)
+		case EVENT_AUD_SET_PRODUCTION_MODE_REQ:
+			aud_tras_drv_send_msg(AUD_TRAS_SET_PRODUCTION_MODE, (void *)msg);
+			break;
+#endif
 		default:
 			break;
 	}

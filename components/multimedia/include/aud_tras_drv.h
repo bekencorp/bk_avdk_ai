@@ -132,6 +132,7 @@ typedef enum {
 #endif
 
 #if CONFIG_AUD_SWEEP_TEST
+	AUD_TRAS_SET_PRODUCTION_MODE,
 	AUD_TRAS_FACTORY_NOTIFY,
 #endif
 
