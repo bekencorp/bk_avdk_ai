@@ -321,8 +321,8 @@ static int write_authCode_cb(char* aiCodeType, char* authCode_buf, int buf_len, 
 // If you modify the configuration here (e.g., APP_KEY, APP_SECRET, etc.), please synchronize the corresponding configuration in bk_unisound_usrkey_http.c
 static DeviceInfo g_device_info = {
     .deviceInfo = {
-        [DEVICE_INFO_APP_KEY] = "9c547203c24c41f885b52c20710aa75e1fc090ed",
-        [DEVICE_INFO_APP_SECRET] = "06f1bf5da0d1444a8676793b5f5158bf",
+        [DEVICE_INFO_APP_KEY] = "11111111111111111111111111111111",
+        [DEVICE_INFO_APP_SECRET] = "11111111111111111111111111111111",
         [DEVICE_INFO_UNIQUE_ID] = "eth0",
 
         [DEVICE_INFO_IMEI] = "111",
@@ -377,6 +377,137 @@ exit:
 
 uint32 g_dump_kws_data_flag = 0;
 uint8_t g_unisound_wakeup_detected = 0;
+
+/**
+ * e.g. "prUalOFARecognize status= 0 <s> <wakeup_> 拜拜 阿米 诺 </wakeup_> </s> -3.17"
+ */
+static int parse_wakeup_result(const char* result_str, char* wakeup_word, int wakeup_word_len, float* score)
+{
+    if (!result_str) {
+        return -1;
+    }
+
+    const char* wakeup_start_tag = OsalStrstr(result_str, "<wakeup_>");
+    if (!wakeup_start_tag) {
+        return -1;
+    }
+
+    const char* wakeup_word_start = wakeup_start_tag + OsalStrlen("<wakeup_>");
+    const char* wakeup_end_tag = OsalStrstr(wakeup_word_start, "</wakeup_>");
+    if (!wakeup_end_tag) {
+        return -1;
+    }
+
+    while (wakeup_word_start < wakeup_end_tag && (*wakeup_word_start == ' ' || *wakeup_word_start == '\t')) {
+        wakeup_word_start++;
+    }
+
+    while (wakeup_end_tag > wakeup_word_start && (*(wakeup_end_tag - 1) == ' ' || *(wakeup_end_tag - 1) == '\t')) {
+        wakeup_end_tag--;
+    }
+
+    int wakeup_word_size = wakeup_end_tag - wakeup_word_start;
+    if (wakeup_word && wakeup_word_len > 0) {
+        int copy_len = (wakeup_word_size < wakeup_word_len - 1) ? wakeup_word_size : (wakeup_word_len - 1);
+        OsalMemcpy(wakeup_word, wakeup_word_start, copy_len);
+        wakeup_word[copy_len] = '\0';
+    }
+
+    const char* str_end = result_str + OsalStrlen(result_str);
+    const char* score_start = NULL;
+    const char* score_end = str_end;
+    int is_negative = 0;
+
+    for (const char* p = str_end - 1; p >= result_str; p--) {
+        if ((*p >= '0' && *p <= '9') || *p == '.') {
+            if (score_end == str_end) {
+                score_end = p + 1;
+            }
+            if (!score_start) {
+                score_start = p;
+            }
+        } else if (*p == '-') {
+            if (score_start) {
+                is_negative = 1;
+                score_start = p;
+                break;
+            }
+        } else if (*p == '+') {
+            if (score_start) {
+                score_start = p;
+                break;
+            }
+        } else if (score_start) {
+            if (*p != ' ' && *p != '\t' && *p != '\n' && *p != '\r') {
+                break;
+            }
+        }
+    }
+
+    if (score && score_start && score_end > score_start) {
+        char score_buf[32];
+        int score_len = score_end - score_start;
+        if (score_len < sizeof(score_buf)) {
+            OsalMemcpy(score_buf, score_start, score_len);
+            score_buf[score_len] = '\0';
+            *score = 0.0f;
+            float factor = 1.0f;
+            int decimal_found = 0;
+            int decimal_pos = -1;
+            int start_idx = (score_buf[0] == '-' || score_buf[0] == '+') ? 1 : 0;
+            
+            for (int i = start_idx; i < score_len; i++) {
+                if (score_buf[i] == '.') {
+                    decimal_pos = i;
+                    decimal_found = 1;
+                    break;
+                }
+            }
+            if (decimal_found) {
+                for (int i = decimal_pos - 1; i >= start_idx; i--) {
+                    if (score_buf[i] >= '0' && score_buf[i] <= '9') {
+                        *score += (score_buf[i] - '0') * factor;
+                        factor *= 10.0f;
+                    }
+                }
+                factor = 0.1f;
+                for (int i = decimal_pos + 1; i < score_len; i++) {
+                    if (score_buf[i] >= '0' && score_buf[i] <= '9') {
+                        *score += (score_buf[i] - '0') * factor;
+                        factor *= 0.1f;
+                    }
+                }
+            } else {
+                for (int i = score_len - 1; i >= start_idx; i--) {
+                    if (score_buf[i] >= '0' && score_buf[i] <= '9') {
+                        *score += (score_buf[i] - '0') * factor;
+                        factor *= 10.0f;
+                    }
+                }
+            }
+            if (is_negative) {
+                *score = -(*score);
+            }
+        }
+    }
+    const char* wakeup_word_full = "拜拜 阿米 诺";
+    const char* wakeup_word_hi = "嗨 阿米 诺";
+    int len_baibai = OsalStrlen(wakeup_word_full);
+    int len_hi = OsalStrlen(wakeup_word_hi);
+    
+    if (wakeup_word_size >= len_baibai && 
+        (OsalStrncmp(wakeup_word_start, wakeup_word_full, len_baibai) == 0) && (*score > -2.95f)) {
+        g_unisound_wakeup_detected = 2;
+    } else if (wakeup_word_size >= len_hi && 
+        (OsalStrncmp(wakeup_word_start, wakeup_word_hi, len_hi) == 0) && (*score > -2.95f)) {
+        g_unisound_wakeup_detected = 1;
+    } else {
+        g_unisound_wakeup_detected = 0;
+    }
+
+    return 0;
+}
+
 void unisound_kws_recognize(signed char* mic_data, int len)
 {
     int status = 0;
@@ -422,7 +553,14 @@ void unisound_kws_recognize(signed char* mic_data, int len)
          if(g_dump_kws_data_flag == 0)
          {
             bk_printf("prUalOFARecognize status= %s\n",result_const);
-            g_unisound_wakeup_detected = 1;
+
+            char wakeup_word[128] = {0};
+            float score = 0.0f;
+            if (parse_wakeup_result(result_const, wakeup_word, sizeof(wakeup_word), &score) == 0) {
+                bk_printf("Wakeup word: %s, Score: %.2f\n", wakeup_word, score);
+            } else {
+                g_unisound_wakeup_detected = 0;
+            }
          }
     }
    // os_printf("unisound_kws_recognize %d %d %d \r\n",status,tick2-tick1,rtos_get_time());
