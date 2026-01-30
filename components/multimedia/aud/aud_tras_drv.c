@@ -973,6 +973,14 @@ static bk_err_t aud_tras_drv_aec_cfg(void)
  	uint32_t ex_size = 0;
 
 	aec_info_t *temp_aec_info = aud_tras_drv_info.voc_info.aec_info;
+	/* printf aec version */
+#if CONFIG_AEC_VERSION_V3
+    LOGI("%s, %d, use AEC Version V3 %d\n", __func__, __LINE__, aec_ver());
+#elif CONFIG_AEC_VERSION_V2
+    LOGI("%s, %d, use AEC Version V2 %d\n", __func__, __LINE__, aec_ver());
+#else
+    LOGI("%s, %d, use AEC Version V1 \n", __func__, __LINE__);
+#endif
 
 	#if (CONFIG_AEC_VERSION_V3 && CONFIG_AUD_AI_NS_SUPPORT && (!CONFIG_AUD_AI_NS_USE_STATIC_SRAM))
  	ex_size = 93380;
