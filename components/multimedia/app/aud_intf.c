@@ -2082,6 +2082,13 @@ bk_err_t bk_aud_set_production_mode(int val)
 }
 #endif
 
+bk_err_t bk_aud_intf_asr_init(void)
+{
+	bk_err_t ret = BK_OK;
+	ret = mailbox_media_aud_send_msg(EVENT_AUD_ASR_INIT_REQ, NULL);
+	return ret;
+}
+
 void audio_intf_debug_init()
 {
 #if CONFIG_SYS_CPU0

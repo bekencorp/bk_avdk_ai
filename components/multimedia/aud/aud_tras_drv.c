@@ -1750,21 +1750,24 @@ if(aud_get_production_mode())
     }
 
 #if CONFIG_AI_ASR_MODE_CPU2
-    if(ASR_SAMPLE_RATE != aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate)
-    {
-        gl_asr_data.data = (unsigned char *)aud_tras_drv_info.asr_rsp_out_buff;
-        gl_asr_data.size = ASR_SAMP_CNT_20MS;
-    }
-    else
-    {
-        // gl_asr_data.data = (unsigned char *)aec_info_pr->out_addr;
-        gl_asr_data.data = (unsigned char *)asr_data_buf;
-        gl_asr_data.size = (unsigned int)aec_info_pr->samp_rate_points*2;
-    }
-    gl_asr_data.spk_play_flag = spk_play_flag;	
-    gl_asr_data_msg.event = EVENT_ASR_DATA_NOTIFY;
-    gl_asr_data_msg.param = (uint32_t)&gl_asr_data;
-    msg_send_notify_to_media_major_mailbox(&gl_asr_data_msg, MINOR_MODULE);
+	if (gl_aud_cp2_ready_sem)
+	{
+	    if(ASR_SAMPLE_RATE != aud_tras_drv_info.voc_info.aud_codec_setup.adc_samp_rate)
+	    {
+	        gl_asr_data.data = (unsigned char *)aud_tras_drv_info.asr_rsp_out_buff;
+	        gl_asr_data.size = ASR_SAMP_CNT_20MS;
+	    }
+	    else
+	    {
+	        // gl_asr_data.data = (unsigned char *)aec_info_pr->out_addr;
+	        gl_asr_data.data = (unsigned char *)asr_data_buf;
+	        gl_asr_data.size = (unsigned int)aec_info_pr->samp_rate_points*2;
+	    }
+	    gl_asr_data.spk_play_flag = spk_play_flag;
+	    gl_asr_data_msg.event = EVENT_ASR_DATA_NOTIFY;
+	    gl_asr_data_msg.param = (uint32_t)&gl_asr_data;
+	    msg_send_notify_to_media_major_mailbox(&gl_asr_data_msg, MINOR_MODULE);
+	}
 #endif
 
 #if CONFIG_AUD_INTF_SUPPORT_AI_DIALOG_FREE
@@ -4922,6 +4925,44 @@ static void spk_notify_timer_callback(void *param, void *param1)
 }
 #endif
 
+#if CONFIG_AI_ASR_MODE_CPU2
+static bk_err_t aud_tras_init_asr(void)
+{
+    bk_err_t ret = BK_FAIL;
+
+    ret = rtos_init_semaphore(&gl_aud_cp2_ready_sem, 1);
+    if (ret != BK_OK) {
+        LOGE("%s, init gl_aud_cp2_ready_sem failed\r\n", __func__);
+        goto aud_tras_init_asr_exit;
+    }
+
+    if(CPU2_USER_ASR == vote_start_cpu2_core(CPU2_USER_ASR))
+    {    //first owner start CPU2, so needs to wait sem
+        rtos_get_semaphore(&gl_aud_cp2_ready_sem, BEKEN_WAIT_FOREVER);
+    }
+
+    ret = msg_send_req_to_media_major_mailbox_sync(EVENT_ASR_INIT_REQ, MINOR_MODULE, 0, NULL);
+    if (ret != BK_OK) {
+        LOGE("%s, %d, init asr in cpu2 fail, ret: %d\n", __func__, __LINE__, ret);
+        goto aud_tras_init_asr_exit;
+    } else {
+        /* config dialog_running default is fasle, and not send mic data to wifi */
+        gl_dialog_running = false;
+        ret = BK_OK;
+    }
+    return ret;
+aud_tras_init_asr_exit:
+    if (gl_aud_cp2_ready_sem)
+    {
+        rtos_deinit_semaphore(gl_aud_cp2_ready_sem);
+        gl_aud_cp2_ready_sem = NULL;
+    }
+    //vote_stop_cpu2_core(CPU2_USER_ASR);
+    gl_dialog_running = true;
+    return ret;
+}
+#endif
+
 /* audio transfer driver voice mode init */
 static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 {
@@ -5310,12 +5351,12 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
 
 #if CONFIG_AI_ASR_MODE_CPU2
 
-	ret = rtos_init_semaphore(&gl_aud_cp2_ready_sem, 1);
-	if (ret != BK_OK) {
-		LOGE("%s, init jdec_config->jdec_cp2_init_sem failed\r\n", __func__);
-        err = BK_ERR_AUD_INTF_MEMY;
-		goto aud_tras_drv_voc_init_exit;
-	}
+    ret = rtos_init_semaphore(&gl_aud_cp2_ready_sem, 1);
+    if (ret != BK_OK) {
+        LOGE("%s, init jdec_config->jdec_cp2_init_sem failed\r\n", __func__);
+        //err = BK_ERR_AUD_INTF_MEMY;
+        //goto aud_tras_drv_voc_init_exit;
+    }
 
     if(CPU2_USER_ASR == vote_start_cpu2_core(CPU2_USER_ASR)) {    //first owner start CPU2, so needs to wait sem
         rtos_get_semaphore(&gl_aud_cp2_ready_sem, BEKEN_WAIT_FOREVER);
@@ -5324,11 +5365,17 @@ static bk_err_t aud_tras_drv_voc_init(aud_intf_voc_config_t* voc_cfg)
     ret = msg_send_req_to_media_major_mailbox_sync(EVENT_ASR_INIT_REQ, MINOR_MODULE, 0, NULL);
     if (ret != BK_OK) {
         LOGE("%s, %d, init asr in cpu2 fail, ret: %d\n", __func__, __LINE__, ret);
-        err = BK_ERR_AUD_INTF_START_CPU2;
-        goto aud_tras_drv_voc_init_exit;
+        //err = BK_ERR_AUD_INTF_START_CPU2;
+        //goto aud_tras_drv_voc_init_exit;
+        gl_dialog_running = true;
+        if (gl_aud_cp2_ready_sem) {
+            rtos_deinit_semaphore(gl_aud_cp2_ready_sem);
+            gl_aud_cp2_ready_sem = NULL;
+        }
+    } else {
+        /* config dialog_running default is fasle, and not send mic data to wifi */
+        gl_dialog_running = false;
     }
-    /* config dialog_running default is fasle, and not send mic data to wifi */
-    gl_dialog_running = false;
 #endif
 
 #if CONFIG_AUD_INTF_SUPPORT_PROMPT_TONE
@@ -6514,7 +6561,15 @@ static void aud_tras_drv_main(beken_thread_arg_t param_data)
 						aud_tras_dec();
 					}
 					break;
-
+				case AUD_AI_INIT:
+				#if CONFIG_AI_ASR_MODE_CPU2
+					LOGI("AUD_AI_INIT, 0x%x\n", gl_aud_cp2_ready_sem);
+					if (!gl_aud_cp2_ready_sem)
+					{
+						ret = aud_tras_init_asr();
+					}
+				#endif
+					break;
                 case AUD_TRAS_ASR_WAKEUP_IND:
                     LOGD("AUD_TRAS_ASR_WAKEUP_IND\n");
                     if (BK_OK != msg_send_req_to_media_major_mailbox_sync(EVENT_ASR_WAKEUP_IND, APP_MODULE, 1, NULL))
@@ -7474,6 +7529,11 @@ bk_err_t audio_event_handle(media_mailbox_msg_t * msg)
 			aud_tras_drv_send_msg(AUD_TRAS_SET_PRODUCTION_MODE, (void *)msg);
 			break;
 #endif
+
+		case EVENT_AUD_ASR_INIT_REQ:
+			LOGI("EVENT_AUD_ASR_INIT_REQ\n");
+			aud_tras_drv_send_msg(AUD_AI_INIT, NULL);
+			break;
 		default:
 			break;
 	}

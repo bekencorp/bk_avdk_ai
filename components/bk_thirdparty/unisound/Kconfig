@@ -1,0 +1,13 @@
+menu "Bk_thirdparty::Unisound"
+
+	config UNISOUND
+		bool "Enable Unisound ASR"
+		default n
+		help
+			Enable Unisound Automatic Speech Recognition
+	config UNISOUND_LICENSE
+		bool "Enable Unisound License"
+		default n
+		help
+			Enable Unisound License for authentication and usage rights
+endmenu

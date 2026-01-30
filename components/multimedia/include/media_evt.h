@@ -151,6 +151,7 @@ typedef enum
     /* ASR */
     EVENT_ASR_INIT_REQ,
     EVENT_ASR_DEINIT_REQ,
+    EVENT_AUD_ASR_INIT_REQ,
     /* multiple speaker sources */
     EVENT_AUDIO_ACT_INIT_REQ,
     EVENT_AUDIO_ACT_DEINIT_REQ,
