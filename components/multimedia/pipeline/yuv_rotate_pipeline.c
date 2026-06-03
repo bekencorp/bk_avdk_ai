@@ -225,6 +225,7 @@ void rotate_display_partial_start_handler(uint32_t param)
     partial_area->height = PIPELINE_DECODE_LINE;
     partial_area->post_refresh = partial_display_complete_cb;
     partial_area->lcd_device = g_lcd_device;
+
     if (rotate_config->display_req)
     {
         rotate_config->display_req(partial_area);
@@ -1052,9 +1053,8 @@ static bk_err_t rotate_init(media_rotate_mode_t mode)
 	if (mode == HW_ROTATE)
 	{
 		bk_rott_driver_init();
-		bk_rott_int_enable(ROTATE_COMPLETE_INT | ROTATE_CFG_ERR_INT | ROTATE_WARTERMARK_INT, 1);
+		bk_rott_int_enable(ROTATE_COMPLETE_INT | ROTATE_CFG_ERR_INT, 1);
 		bk_rott_isr_register(ROTATE_COMPLETE_INT, rotate_complete_cb);
-		bk_rott_isr_register(ROTATE_WARTERMARK_INT, rotate_watermark_cb);
 		bk_rott_isr_register(ROTATE_CFG_ERR_INT, rotate_cfg_err_cb);
 	}
 	bk_dma2d_driver_init();
